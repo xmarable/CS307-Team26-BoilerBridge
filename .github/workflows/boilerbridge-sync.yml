@@ -8,15 +8,18 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # --- THIS IS THE FIX ---
-    # We explicitly give the token permission to write code
-    permissions:
-      contents: write
-    # -----------------------
-    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          # Use your PAT to checkout so we have permission to push later
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Configure Git User
+        # THIS FIXES ERROR 128: We introduce ourselves before doing anything
+        run: |
+          git config --global user.name "Xavion Marable"
+          git config --global user.email "xmarable@purdue.edu"
 
       - name: Create credentials
         run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
@@ -24,26 +27,13 @@ jobs:
       - name: Sync BoilerBridge Folder
         uses: r7kamura/google-docs-to-github@v3
         with:
-          # Your specific BoilerBridge folder ID
           google_drive_folder_id: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
           github_directory: 'docs'
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Use the strong token here too
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         env:
           GOOGLE_APPLICATION_CREDENTIALS: credentials.json
 
       - name: Cleanup Credentials
         if: always()
         run: rm credentials.json
-
-      - name: Commit and Push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          
-          if git diff --staged --quiet; then
-            echo "No changes in BoilerBridge docs."
-          else
-            git commit -m "Auto-sync: BoilerBridge docs update"
-            git push
-          fi
