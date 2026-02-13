@@ -1,17 +1,46 @@
-        # This creates the physical file from your GitHub Secret
+name: Sync BoilerBridge Docs
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Create credentials
+        # Creates the temp file from your Secret
         run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
 
       - name: Sync BoilerBridge Folder
         uses: r7kamura/google-docs-to-github@v3
         with:
-          # Updated to the specific names the Action expects
+          # Your specific BoilerBridge folder ID
           google_drive_folder_id: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
           github_directory: 'docs'
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          # This line fixes the "Could not load default credentials" error
+          # This connects the credentials file to the Action
           GOOGLE_APPLICATION_CREDENTIALS: credentials.json
 
-      - name: Cleanup
+      - name: Cleanup Credentials
         if: always()
         run: rm credentials.json
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          
+          if git diff --staged --quiet; then
+            echo "No changes in BoilerBridge docs."
+          else
+            git commit -m "Auto-sync: BoilerBridge docs update"
+            git push
+          fi
