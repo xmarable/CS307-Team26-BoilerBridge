@@ -1,4 +1,3 @@
-- name: Create credentials
         # This creates the physical file from your GitHub Secret
         run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
 
