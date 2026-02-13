@@ -2,19 +2,23 @@ name: Sync BoilerBridge Docs
 
 on:
   schedule:
-    # Runs every 30 minutes
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # --- THIS IS THE FIX ---
+    # We explicitly give the token permission to write code
+    permissions:
+      contents: write
+    # -----------------------
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Create credentials
-        # Creates the temp file from your Secret
         run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
 
       - name: Sync BoilerBridge Folder
@@ -25,7 +29,6 @@ jobs:
           github_directory: 'docs'
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          # This connects the credentials file to the Action
           GOOGLE_APPLICATION_CREDENTIALS: credentials.json
 
       - name: Cleanup Credentials
