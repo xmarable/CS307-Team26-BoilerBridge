@@ -53,3 +53,5 @@ Open http://localhost:3000 to view the application.
 ```lib/``` - Database connection logic and helpers.
 
 ```public/``` - Static assets and images.
+
+```docs/``` - Design Documents
