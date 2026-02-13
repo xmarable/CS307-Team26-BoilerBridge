@@ -1,4 +1,4 @@
-name: Sync BoilerBridge Docs
+name: Sync BoilerBridge Docs to PDF
 
 on:
   schedule:
@@ -6,35 +6,85 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync:
+  sync-pdfs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          # Use your PAT to checkout so we have permission to push later
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          python-version: '3.9'
 
-      - name: Configure Git User
-        # THIS FIXES ERROR 128: We introduce ourselves before doing anything
-        run: |
-          git config --global user.name "Xavion Marable"
-          git config --global user.email "xmarable@purdue.edu"
+      - name: Install Google Client
+        run: pip install google-api-python-client google-auth
 
-      - name: Create credentials
+      - name: Create Credentials File
         run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
 
-      - name: Sync BoilerBridge Folder
-        uses: r7kamura/google-docs-to-github@v3
-        with:
-          google_drive_folder_id: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
-          github_directory: 'docs'
-          # Use the strong token here too
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          export_type: 'pdf'
+      - name: Download PDFs from Drive
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: credentials.json
+          # Your BoilerBridge Folder ID
+          DRIVE_FOLDER_ID: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
+        run: |
+          # Create a Python script on the fly to handle the PDF export
+          cat <<EOF > download_pdfs.py
+          import os
+          import io
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          
+          # 1. Setup
+          folder_id = os.environ['DRIVE_FOLDER_ID']
+          creds = service_account.Credentials.from_service_account_file('credentials.json')
+          service = build('drive', 'v3', credentials=creds)
+          
+          # 2. Find all Google Docs in the folder
+          results = service.files().list(
+              q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false",
+              fields="files(id, name)"
+          ).execute()
+          files = results.get('files', [])
+          
+          if not os.path.exists('docs'):
+              os.makedirs('docs')
+          
+          # 3. Download each as PDF
+          for file in files:
+              print(f"Exporting {file['name']} to PDF...")
+              file_path = f"docs/{file['name']}.pdf"
+              
+              request = service.files().export_media(fileId=file['id'], mimeType='application/pdf')
+              fh = io.FileIO(file_path, 'wb')
+              downloader = MediaIoBaseDownload(fh, request)
+              
+              done = False
+              while not done:
+                  status, done = downloader.next_chunk()
+          EOF
+          
+          # Run the script we just made
+          python download_pdfs.py
 
       - name: Cleanup Credentials
         if: always()
         run: rm credentials.json
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "Xavion Marable"
+          git config --global user.email "xmarable@purdue.edu"
+          git add docs/*.pdf
+          
+          # Check if anything actually changed
+          if git diff --staged --quiet; then
+            echo "No PDF changes to commit."
+          else
+            git commit -m "Auto-sync: Updated PDFs from Google Drive"
+            git push
+          fi
