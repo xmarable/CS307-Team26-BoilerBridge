@@ -29,7 +29,7 @@ jobs:
       - name: Download PDFs from Drive
         env:
           # Your BoilerBridge Folder ID
-          DRIVE_FOLDER_ID: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: |
           # Create a Python script on the fly to handle the PDF export
           cat <<EOF > download_pdfs.py
