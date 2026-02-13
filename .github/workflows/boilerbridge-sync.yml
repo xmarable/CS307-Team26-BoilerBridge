@@ -31,6 +31,7 @@ jobs:
           github_directory: 'docs'
           # Use the strong token here too
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          export_type: 'pdf'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: credentials.json
 
