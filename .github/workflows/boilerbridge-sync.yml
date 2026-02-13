@@ -1,0 +1,41 @@
+name: Sync BoilerBridge Docs
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:      # so we can run it manually if needed
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create credentials
+        run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
+
+      - name: Sync BoilerBridge Folder
+        uses: r7kamura/google-docs-to-github@v3
+        with:
+          folder_id: '1aSBqeWVH9GSI8Zc5MbiIQetEFsCwv319'
+          destination_folder: 'docs'
+          credentials_path: './credentials.json'
+          export_type: 'markdown'
+
+      - name: Cleanup
+        if: always()
+        run: rm credentials.json
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          
+          if git diff --staged --quiet; then
+            echo "No changes in BoilerBridge docs."
+          else
+            git commit -m "Auto-sync: BoilerBridge docs update"
+            git push
+          fi
