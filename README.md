@@ -54,4 +54,4 @@ Open http://localhost:3000 to view the application.
 
 ```public/``` - Static assets and images.
 
-```docs/``` - Design Documents
+```docs/``` - Design Documents. (auto-sync from google drive)
