@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {
   "1clYOh7ytaR1xLVVwCmmB8vlvuONnxZBI-i89Dl8ssXo": {
     "name": "Sprint 1 Planning Document",
@@ -12,19 +11,4 @@
     "name": "BoilerBridge Design Document",
     "modifiedTime": "2026-02-16T00:18:42.591Z"
   }
-=======
-{
-  "1clYOh7ytaR1xLVVwCmmB8vlvuONnxZBI-i89Dl8ssXo": {
-    "name": "Sprint 1 Planning Document",
-    "modifiedTime": "2026-02-17T01:45:04.260Z"
-  },
-  "1vhL0anq1jU4VWs8THkAF9NvxVcGzpIjtspQQwH8Ffc4": {
-    "name": "CS307 Project Backlog",
-    "modifiedTime": "2026-02-16T18:53:08.804Z"
-  },
-  "1VrXtxukg8wNAkl0U0akeH5mhPj8eUk9VKhqPi-1V_7E": {
-    "name": "BoilerBridge Design Document",
-    "modifiedTime": "2026-02-16T00:18:42.591Z"
-  }
->>>>>>> 4b708c6 (fixed file paths)
 }
