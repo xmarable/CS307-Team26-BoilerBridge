@@ -23,8 +23,8 @@ BoilerBridge is a group travel app built for CS 307. We’re focusing on keeping
 If you're on the team, here is how to get the dev environment running on your local machine.
 
 ```bash
-git clone [https://github.com/xmarable/CS307-Team26-BoilerBridge.git](https://github.com/xmarable/CS307-Team26-BoilerBridge.git)
-cd CS307-Team26-BoilerBridge/boilerbridge
+git clone https://github.com/xmarable/CS307-Team26-BoilerBridge.git
+cd CS307-Team26-BoilerBridge
 ```
 
 2. Install Dependencies:
@@ -32,12 +32,14 @@ cd CS307-Team26-BoilerBridge/boilerbridge
 npm install
 ```
 
-3. Environment Setup (.env):
-Create a .env.local file in the boilerbridge folder. Ask Xavy for the MONGODB_URI string. Do not commit this file.
+3. Environment Setup (Crucial!)
+We use environment variables for database connections. **Do not commit your real keys to GitHub.**
+Look for the file named .env.example in the root directory.
+Duplicate it and rename the copy to .env.local.
+Open .env.local and paste your actual connection string.
+If something is not working after a commit please update your environmental variables.
+(check discord messages for environmental variables most of the time they are pinned)
 
-```Plaintext
-MONGODB_URI=your_string_here
-```
 4. Run Development Server:
 ```Bash
 npm run dev
