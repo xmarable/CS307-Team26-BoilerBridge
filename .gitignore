@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+.jest/
 
 # next.js
 /.next/
@@ -23,6 +24,8 @@
 # misc
 .DS_Store
 *.pem
+.vscode/
+*.local
 
 # debug
 npm-debug.log*
