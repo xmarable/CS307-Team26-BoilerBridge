@@ -15,7 +15,7 @@ BoilerBridge is a group travel app built for CS 307. We’re focusing on keeping
 
 ## 🛠 Tech Stack
 * **Framework:** Next.js (Unified frontend/backend).
-* **Environment:** Node.js.
+* **Environment:** Node.js. 
 * **Database:** MongoDB Atlas (NoSQL).
 * **Hosting:** Vercel.
 
@@ -57,3 +57,4 @@ Open http://localhost:3000 to view the application.
 ```public/``` - Static assets and images.
 
 ```docs/``` - Design documents (auto-sync from google drive).
+
