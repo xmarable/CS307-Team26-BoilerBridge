@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 // Export the Jest configuration
 export default {
   // Set the testing environment to Node

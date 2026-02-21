@@ -34,12 +34,22 @@ describe("User Model Test Suite", () => {
   });
 
   it("should fail to save a user with a duplicate email", async () => {
+    // Use a unique email just for this specific test case
+    const duplicateEmail = "duplicate_test@purdue.edu";
+
+    // Save the first instance
+    await new User({
+      username: "original_user",
+      email: duplicateEmail,
+      passwordHash: "hash123"
+    }).save();
+
+    // Attempt to save the second instance
     const duplicateUser = new User({
       username: "xavy_duplicate",
-      email: "xmarable@purdue.edu",
+      email: duplicateEmail,
       passwordHash: "hashed_password_456"
     });
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let error: any = null;
     try {
@@ -49,9 +59,7 @@ describe("User Model Test Suite", () => {
     }
 
     expect(error).toBeDefined();
-    if (error !== null) {
-      expect(error.code).toBe(11000); 
-    }
+    expect(error.code).toBe(11000); 
   });
 
   it("should fail to save a user without a password", async () => {
