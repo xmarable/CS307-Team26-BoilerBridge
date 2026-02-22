@@ -24,3 +24,5 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: app.yaml
+          print_build_logs: true  # Shows the 'npm run build' output
+          print_deploy_logs: true  # Shows the 'npm start' output
