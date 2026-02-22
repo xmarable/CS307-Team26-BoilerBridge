@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import User from "@/models/User";
+import FriendRequest from "@/models/FriendRequest";
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const requesterId = body.requesterId;
+    const recipientId = body.recipientId;
+
+    if (!requesterId || !recipientId) {
+      return NextResponse.json({ error: "Missing IDs" }, { status: 400 });
+    } else {
+      const requester = await User.findOne({ userId: requesterId });
+      let isAlreadyFriends = false;
+
+      if (requester) {
+        if (requester.friends) {
+          if (requester.friends.includes(recipientId)) {
+            isAlreadyFriends = true;
+          }
+        }
+      }
+
+      if (isAlreadyFriends) {
+        return NextResponse.json({ error: "Already friends" }, { status: 400 });
+      } else {
+        const existingRequest = await FriendRequest.findOne({
+          requesterId: requesterId,
+          recipientId: recipientId,
+        });
+
+        if (existingRequest) {
+          return NextResponse.json(
+            { error: "Friend request already exists" },
+            { status: 400 },
+          );
+        } else if (requesterId === recipientId) {
+          return NextResponse.json(
+            { error: "Cannot send friend request to yourself" },
+            { status: 400 },
+          );
+        } else {
+          const newRequest = new FriendRequest({
+            requesterId: requesterId,
+            recipientId: recipientId,
+            status: "pending",
+          });
+
+          await newRequest.save();
+          return NextResponse.json(
+            { message: "Friend request sent" },
+            { status: 200 },
+          );
+        }
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}
