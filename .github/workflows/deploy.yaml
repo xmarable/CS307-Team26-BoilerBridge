@@ -10,10 +10,14 @@ permissions:
 jobs:
   deploy-app:
     runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Deploy the app
+        id: deploy
         uses: digitalocean/app_action/deploy@v2
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
