@@ -1,5 +1,5 @@
 name: cs307-team26-boilerbridge
-region: nyc
+region: nyc3
 services:
   - name: boilerbridge-web
     github:
@@ -13,16 +13,16 @@ services:
     instance_size_slug: basic-xxs
     envs:
       - key: NPM_CONFIG_LEGACY_PEER_DEPS
-        scope: RUN_AND_BUILD
+        scope: RUN_AND_BUILD_TIME
         value: "true"
       - key: NEXT_TELEMETRY_DISABLED
-        scope: RUN_AND_BUILD
+        scope: RUN_AND_BUILD_TIME
         value: "1"
       - key: NODE_ENV
-        scope: RUN_AND_BUILD
+        scope: RUN_AND_BUILD_TIME
         value: "production"
-      - key: DATABASE_URL
+      - key: MONGODB_URI
         # This pulls from your GitHub Secrets during the Action run
-        scope: RUN_AND_BUILD
-        value: ${DATABASE_URL}
+        scope: RUN_AND_BUILD_TIME
+        value: ${MONGODB_URI}
         type: SECRET
