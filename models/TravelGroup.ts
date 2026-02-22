@@ -40,6 +40,18 @@ const TravelGroupSchema = new Schema<ITravelGroup>(
   },
   { timestamps: true }
 );
+// Simple guard for undefined arrays
+TravelGroupSchema.pre("save", async function () {
+    const g = this as ITravelGroup;
+  
+    g.members = g.members ?? [];
+    g.admins = g.admins ?? [];
+  
+    if (g.createdBy) {
+      if (!g.members.includes(g.createdBy)) g.members.push(g.createdBy);
+      if (!g.admins.includes(g.createdBy)) g.admins.push(g.createdBy);
+    }
+  });
 
 // Ensure creator is member + admin if not explicitly added
 TravelGroupSchema.pre("save", async function () {
