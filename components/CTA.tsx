@@ -4,15 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
 import Link from "next/link";
 
-interface CTAProps {
-  onNavigate: Dispatch<SetStateAction<string>>;
-}
-
-// Export the CTA component
 export function CTA() {
-  // Return the section JSX
   return (
-    // Apply Tailwind v4 linear gradient
     <section className="py-20 px-6 lg:px-8 bg-linear-to-br from-amber-500 via-orange-600 to-amber-600">
       <div className="mx-auto max-w-4xl text-center">
         <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
