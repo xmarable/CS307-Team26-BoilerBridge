@@ -20,6 +20,7 @@ jobs:
         with:
           deploy_pr_preview: "true"
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_spec_location: app.yaml
       - name: Comment PR
         uses: actions/github-script@v7
         with:

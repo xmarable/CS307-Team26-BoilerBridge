@@ -17,4 +17,4 @@ jobs:
         uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          spec_file: app.yaml
+          app_spec_location: app.yaml
