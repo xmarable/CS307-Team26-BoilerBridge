@@ -16,5 +16,5 @@ jobs:
       - name: Deploy the app
         uses: digitalocean/app_action/deploy@v2
         with:
-          # Use the secret name you created in step 1
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          spec_file: app.yaml

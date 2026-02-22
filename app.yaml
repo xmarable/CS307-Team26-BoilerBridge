@@ -1,0 +1,28 @@
+name: cs307-team26-boilerbridge
+region: nyc
+services:
+  - name: boilerbridge-web
+    github:
+      repo: xmarable/CS307-Team26-BoilerBridge
+      branch: main
+      deploy_on_push: false # Set to false since GitHub Actions will now trigger it
+    run_command: npm start
+    build_command: npm run build
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: NPM_CONFIG_LEGACY_PEER_DEPS
+        scope: RUN_AND_BUILD
+        value: "true"
+      - key: NEXT_TELEMETRY_DISABLED
+        scope: RUN_AND_BUILD
+        value: "1"
+      - key: NODE_ENV
+        scope: RUN_AND_BUILD
+        value: "production"
+      - key: DATABASE_URL
+        # This pulls from your GitHub Secrets during the Action run
+        scope: RUN_AND_BUILD
+        value: ${DATABASE_URL}
+        type: SECRET
