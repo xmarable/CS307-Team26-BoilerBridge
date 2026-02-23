@@ -47,7 +47,9 @@ export async function POST(req: Request) {
       }
     }
   }
-  catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  catch (error: any) {
+    console.error("REGISTRATION_ERROR:", error.message)
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

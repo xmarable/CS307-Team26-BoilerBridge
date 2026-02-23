@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import dbConnect from "../lib/dbConnect.js";
-import UserImport from "../models/User.js";
+import dbConnect from "../lib/dbConnect";
+import UserImport from "../models/User";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const User = (UserImport as any).default || UserImport;
@@ -23,14 +23,14 @@ describe("User Model Test Suite", () => {
   it("should create and save a valid user successfully", async () => {
     const validUser = new User({
       username: "xavy_test",
-      email: "xmarable@purdue.edu",
+      email: "xmarabl@purdue.edu",
       passwordHash: "hashed_password_123",
       school: "Purdue University"
     });
 
     const savedUser = await validUser.save();
     expect(savedUser._id).toBeDefined();
-    expect(savedUser.email).toBe("xmarable@purdue.edu");
+    expect(savedUser.email).toBe("xmarabl@purdue.edu");
   });
 
   it("should fail to save a user with a duplicate email", async () => {

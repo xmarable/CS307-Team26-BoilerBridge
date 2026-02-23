@@ -16,6 +16,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 const trips = [
   {
@@ -72,6 +73,9 @@ const upcomingActivities = [
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState("my-trips");
+  const { data: session } = useSession();
+  const userInitial = session?.user?.email?.[0].toUpperCase() || "U";
+  const userEmail = session?.user?.email || "User";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,7 +105,7 @@ export function Dashboard() {
             </Button>
             <Avatar>
               <AvatarFallback className="bg-linear-to-br from-amber-500 to-orange-600 text-white">
-                JD
+                {userInitial}
               </AvatarFallback>
             </Avatar>
           </div>

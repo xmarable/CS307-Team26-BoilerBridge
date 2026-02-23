@@ -1,36 +1,22 @@
-/* eslint-disable import/no-anonymous-default-export */
-// Export the Jest configuration
-export default {
-  // Set the testing environment to Node
+import nextJest from "next/jest.js";
+
+const createJestConfig = nextJest({
+  // Provide the path to your Next.js app to load .env files
+  dir: "./",
+});
+
+const customJestConfig = {
   testEnvironment: "node",
-  // Define the root directory
-  rootDir: "./",
-  // Tell Jest to run this file before the tests
-  setupFiles: ["<rootDir>/jest.setup.js"],
-  // Treat TS files as ES Modules
-  extensionsToTreatAsEsm: [".ts"],
-  // Map module paths
+  // Use globalSetup to ensure env vars load before anything else
+  globalSetup: "<rootDir>/jest.setup.js",
+  // moduleNameMapper handles your @/ aliases
   moduleNameMapper: {
-    // Map root alias
     "^@/(.*)$": "<rootDir>/$1",
-    // Map JS imports to actual files
-    "^(\\.{1,2}/.*)\\.js$": "$1", 
   },
-  // Transform settings
-  transform: {
-    // Use babel-jest to transform TS files while keeping them as ESM
-    "^.+\\.(mt|t|cj|j)s$": [
-      // Use Babel
-      "babel-jest",
-      {
-        // Define presets
-        presets: [
-          // Env preset
-          ["@babel/preset-env", { targets: { node: "current" } }],
-          // TS preset
-          "@babel/preset-typescript",
-        ],
-      },
-    ],
-  },
+  // Tells Jest to treat these as ES Modules
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
+  // This allows Jest to handle the "import from .js" quirk in TS files
+  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
 };
+
+export default createJestConfig(customJestConfig);
