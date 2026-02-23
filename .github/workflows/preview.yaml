@@ -34,6 +34,8 @@ jobs:
           tags: registry.digitalocean.com/boilerbridge-registry/boilerbridge:pr-${{ github.event.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
 
       - name: Deploy PR Preview
         id: deploy

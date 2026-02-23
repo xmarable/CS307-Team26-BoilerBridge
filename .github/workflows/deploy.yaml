@@ -33,6 +33,8 @@ jobs:
           tags: registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
 
       - name: Deploy to App Platform
         id: deploy
