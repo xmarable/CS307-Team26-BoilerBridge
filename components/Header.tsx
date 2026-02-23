@@ -43,7 +43,7 @@ export async function Header() {
                 </Button>
               </Link>
             }
-            <Link href="/signup">
+            <Link href="/login">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
                 Get Started
               </Button>

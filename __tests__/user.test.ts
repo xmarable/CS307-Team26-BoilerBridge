@@ -23,14 +23,14 @@ describe("User Model Test Suite", () => {
   it("should create and save a valid user successfully", async () => {
     const validUser = new User({
       username: "xavy_test",
-      email: "xmarable@purdue.edu",
+      email: "xmarab@purdue.edu",
       passwordHash: "hashed_password_123",
       school: "Purdue University"
     });
 
     const savedUser = await validUser.save();
     expect(savedUser._id).toBeDefined();
-    expect(savedUser.email).toBe("xmarable@purdue.edu");
+    expect(savedUser.email).toBe("xmarab@purdue.edu");
   });
 
   it("should fail to save a user with a duplicate email", async () => {

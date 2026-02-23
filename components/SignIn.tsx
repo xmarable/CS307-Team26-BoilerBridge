@@ -10,6 +10,7 @@ import { signIn } from "next-auth/react";
 import { Footer } from "./Footer";
 
 export function SignIn() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter();
 
   const handleSignIn = async (e: React.SubmitEvent<HTMLFormElement>) => {
