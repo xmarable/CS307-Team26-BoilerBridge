@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -53,7 +54,7 @@ const UpdateEventSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { groupId: string; eventId: string } }
+  { params }: { params: Promise<{ groupId: string; eventId: string }> }
 ) {
   try {
     const ids = await getUserIdentifiers();
@@ -61,7 +62,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId, eventId } = params;
+    const { groupId, eventId } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
@@ -120,7 +121,8 @@ export async function PUT(
     await event.save();
 
     return NextResponse.json({ event }, { status: 200 });
-  } catch (err: any) {
+  } 
+  catch (err: any) {
     console.error("PUT /api/groups/:groupId/calendar/events/:eventId error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
@@ -131,7 +133,7 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { groupId: string; eventId: string } }
+  { params }: { params: Promise<{ groupId: string; eventId: string }> }
 ) {
   try {
     const ids = await getUserIdentifiers();
@@ -139,7 +141,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId, eventId } = params;
+    const { groupId, eventId } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
@@ -169,7 +171,8 @@ export async function DELETE(
     await CalendarEvent.deleteOne({ _id: eventId, groupId });
 
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (err: any) {
+  } 
+  catch (err: any) {
     console.error("DELETE /api/groups/:groupId/calendar/events/:eventId error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -47,7 +48,7 @@ const CreateEventSchema = z.object({
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { groupId: string } }
+    { params }: { params: Promise<{ groupId: string }> }
   ) {
     try {
       const ids = await getUserIdentifiers();
@@ -55,7 +56,7 @@ export async function POST(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
   
-      const { groupId } = params;
+      const { groupId } = await params;
   
       await dbConnect();
   
@@ -115,7 +116,7 @@ export async function POST(
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { groupId: string } }
+    { params }: { params: Promise<{ groupId: string }> }
   ) {
     try {
       const ids = await getUserIdentifiers();
@@ -123,7 +124,7 @@ export async function GET(
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
   
-      const { groupId } = params;
+      const { groupId } = await params;
   
       await dbConnect();
   
@@ -173,4 +174,3 @@ export async function GET(
       );
     }
   }
-  
