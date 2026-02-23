@@ -112,4 +112,65 @@ export async function POST(
       );
     }
   }
+
+export async function GET(
+    req: NextRequest,
+    { params }: { params: { groupId: string } }
+  ) {
+    try {
+      const ids = await getUserIdentifiers();
+      if (!ids) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+  
+      const { groupId } = params;
+  
+      await dbConnect();
+  
+      const group: any = await TravelGroup.findOne({ groupId }).lean();
+      if (!group) {
+        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      }
+  
+      if (!isMember(group, ids)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+  
+      const { searchParams } = new URL(req.url);
+      const fromStr = searchParams.get("from");
+      const toStr = searchParams.get("to");
+  
+      const now = new Date();
+      const from = fromStr ? new Date(fromStr) : now;
+      const to = toStr ? new Date(toStr) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        return NextResponse.json(
+          { error: "Invalid date params. Use ISO strings for from/to." },
+          { status: 400 }
+        );
+      }
+      if (to <= from) {
+        return NextResponse.json(
+          { error: "Invalid date range: to must be after from" },
+          { status: 400 }
+        );
+      }
+  
+      // Overlap query: start < to AND end > from
+      const events = await CalendarEvent.find({
+        groupId,
+        startTime: { $lt: to },
+        endTime: { $gt: from },
+      }).sort({ startTime: 1 });
+  
+      return NextResponse.json({ events }, { status: 200 });
+    } catch (err: any) {
+      console.error("GET /api/groups/:groupId/calendar/events error:", err);
+      return NextResponse.json(
+        { error: "Server error", details: err?.message ?? String(err) },
+        { status: 500 }
+      );
+    }
+  }
   
