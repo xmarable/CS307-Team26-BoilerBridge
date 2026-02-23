@@ -7,7 +7,6 @@ import { Label } from "./ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Header } from "./Header";
 import { Footer } from "./Footer";
 
 export function SignIn() {
@@ -33,7 +32,6 @@ export function SignIn() {
 
   return (
     <div>
-    <Header />
     <main>
     <div className="min-h-screen bg-linear-to-br from-amber-50 to-orange-50 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden">

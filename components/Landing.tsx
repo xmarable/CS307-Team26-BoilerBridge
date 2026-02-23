@@ -1,6 +1,5 @@
 "use client";
 
-import { Header } from "./Header";
 import { Hero } from "./Hero";
 import { Features } from "./Features";
 import { HowItWorks } from "./HowItWorks";
@@ -11,7 +10,6 @@ import { Footer } from "./Footer";
 export function Landing() {
   return (
     <div className="min-h-screen bg-white">
-      <Header />
       <main>
         <Hero />
         <Features />
