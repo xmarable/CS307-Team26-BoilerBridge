@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy PR Preview
         id: deploy
-        uses: digitalocean/app_platform-deploy@v2
+        uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           spec_location: app.yaml
