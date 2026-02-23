@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { randomUUID } from "crypto";
 
-// Minimal sub-schemas for embedded documents (full schemas can live in models/ later)
 const expenseSchema = new mongoose.Schema(
   {
     expenseID: { type: String },
