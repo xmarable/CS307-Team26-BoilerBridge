@@ -28,6 +28,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
+          retries: 3
           context: .
           push: true
           tags: registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest
