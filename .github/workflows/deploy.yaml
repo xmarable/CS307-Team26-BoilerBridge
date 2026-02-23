@@ -41,7 +41,7 @@ jobs:
         uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          spec_location: app.yaml
-          app_id: "768a6408-3da7-4d51-903e-154a0b023ed2"
+          app_spec_location: app.yaml
+          app_name: "cs307-team26-boilerbridge"
           print_build_logs: true
           print_deploy_logs: true

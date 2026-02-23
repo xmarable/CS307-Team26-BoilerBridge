@@ -42,7 +42,8 @@ jobs:
         uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          spec_location: app.yaml
+          app_spec_location: app.yaml
+          app_name: "cs307-team26-boilerbridge"
           deploy_pr_preview: "true"
           image: registry.digitalocean.com/boilerbridge-registry/boilerbridge:pr-${{ github.event.number }}
           print_build_logs: true
