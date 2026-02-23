@@ -36,9 +36,14 @@ jobs:
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
 
+      - name: Clean up old images
+        run: doctl registry garbage-collection start --include-untagged-manifests --force
+
       - name: Deploy to App Platform
         id: deploy
         uses: digitalocean/app_action/deploy@v2
+        env:
+          IMAGE_TAG_boilerbridge: "latest"
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: app.yaml
