@@ -1,9 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
 import dbConnect from "./dbConnect";
-import User from "@/models/User";
-import { use } from "react";
+import { validateLogin } from "./validateLogin";
+
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -18,12 +17,13 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                await dbConnect();
+                /*await dbConnect();
 
                 const user = await validateLogin(credentials.email, credentials.password);
                 if (!user) return null;
 
-                return { id: user.id.toString(), email: user.email, name: user.username };
+                return { id: user.id.toString(), email: user.email, name: user.username };*/
+                return {id: "1", email:"test@test.com", name: "test_user"};
             }
         }),
     ],
@@ -50,14 +50,4 @@ export const authOptions: NextAuthOptions = {
     pages: {
         signIn: "/login",
     }
-}
-
-export async function validateLogin(email: string, password: string) {
-    const user = await User.findOne({ email: email });
-    if (!user) return null;
-
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) return null;
-    
-    return user;
 }

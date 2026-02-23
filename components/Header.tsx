@@ -1,12 +1,12 @@
-"use client";
-
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
 import { Button } from "./ui/button";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
+import { authOptions } from "@/lib/auth";
+import MobileMenu from "./MobileMenu";
 
-export function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export async function Header() {
+  const session = await getServerSession(authOptions);
+  const isAuthed = !!session;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
@@ -29,11 +29,20 @@ export function Header() {
             <a href="#testimonials" className="text-gray-700 hover:text-gray-900 transition-colors">
               Testimonials
             </a>
-            <Link href="/signin">
-              <Button variant="ghost" className="text-gray-700">
-                Sign In
-              </Button>
-            </Link>
+            {
+              session ?
+              <Link href="/dashboard">
+                <Button variant="ghost" className="text-gray-700">
+                  Dashboard
+                </Button> 
+              </Link>
+              :
+              <Link href="/signin"> 
+                <Button variant="ghost" className="text-gray-700">
+                  Sign In
+                </Button>
+              </Link>
+            }
             <Link href="/signup">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
                 Get Started
@@ -41,49 +50,8 @@ export function Header() {
             </Link>
           </div>
 
-          <button
-            className="md:hidden p-2 text-gray-700"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <MobileMenu isAuthed={isAuthed} />
         </div>
-
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 flex flex-col gap-4">
-            <a
-              href="#features"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              How It Works
-            </a>
-            <a
-              href="#testimonials"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Testimonials
-            </a>
-            <Link href="/signin">
-              <Button variant="ghost" className="text-gray-700 justify-start">
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
-                Get Started
-              </Button>
-            </Link>
-          </div>
-        )}
       </nav>
     </header>
   );
