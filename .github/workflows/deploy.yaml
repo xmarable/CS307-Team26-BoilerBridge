@@ -1,0 +1,28 @@
+name: Update App
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-app:
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Deploy the app
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_spec_location: app.yaml
+          print_build_logs: true  # Shows the 'npm run build' output
+          print_deploy_logs: true  # Shows the 'npm start' output
