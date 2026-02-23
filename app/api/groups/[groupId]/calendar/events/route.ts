@@ -44,3 +44,72 @@ const CreateEventSchema = z.object({
   externalId: z.string().optional(),
   timezone: z.string().optional(),
 });
+
+export async function POST(
+    req: NextRequest,
+    { params }: { params: { groupId: string } }
+  ) {
+    try {
+      const ids = await getUserIdentifiers();
+      if (!ids) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+  
+      const { groupId } = params;
+  
+      await dbConnect();
+  
+      const group: any = await TravelGroup.findOne({ groupId }).lean();
+      if (!group) {
+        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      }
+  
+      if (!isMember(group, ids)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+  
+      const body = await req.json();
+      const parsed = CreateEventSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Invalid payload", details: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+  
+      const data = parsed.data;
+      if (data.endTime <= data.startTime) {
+        return NextResponse.json(
+          { error: "Invalid time range: endTime must be after startTime" },
+          { status: 400 }
+        );
+      }
+  
+      // Choose what to store in createdBy:
+      // Prefer UUID if your User has one, otherwise use mongoId.
+      const createdBy = ids.uuid ?? ids.mongoId;
+  
+      const created = await CalendarEvent.create({
+        title: data.title,
+        description: data.description,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        eventType: data.eventType ?? "general",
+        createdBy,
+        groupId,
+        source: data.source ?? "manual",
+        externalId: data.externalId,
+        timezone: data.timezone ?? "UTC",
+      });
+  
+      return NextResponse.json({ event: created }, { status: 201 });
+    } catch (err: any) {
+      console.error("POST /api/groups/:groupId/calendar/events error:", err);
+      return NextResponse.json(
+        { error: "Server error", details: err?.message ?? String(err) },
+        { status: 500 }
+      );
+    }
+  }
+  
