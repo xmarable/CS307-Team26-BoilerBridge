@@ -43,6 +43,8 @@ jobs:
       - name: Deploy PR Preview
         id: deploy
         uses: digitalocean/app_action/deploy@v2
+        env:
+          IMAGE_TAG_boilerbridge: "pr-${{ github.event.number }}"
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: app.yaml
