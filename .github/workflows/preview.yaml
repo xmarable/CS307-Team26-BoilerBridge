@@ -34,7 +34,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          retries: 3
           push: true
           tags: registry.digitalocean.com/boilerbridge-registry/boilerbridge:pr-${{ github.event.number }}
           cache-from: type=gha
