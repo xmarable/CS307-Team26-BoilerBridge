@@ -35,6 +35,9 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
+            
+      - name: Clean up old images
+        run: doctl registry garbage-collection start --include-untagged-manifests --force
 
       - name: Deploy to App Platform
         id: deploy
