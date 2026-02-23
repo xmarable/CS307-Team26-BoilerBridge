@@ -25,7 +25,8 @@ export function SignIn() {
     });
 
     if (res?.ok) {
-        window.location.href = "/";
+        router.refresh();
+        router.push("/");
     } else {
         alert("Invalid Credentials");
     }
@@ -82,10 +83,12 @@ export function SignIn() {
                   <Label htmlFor="email" className="text-black">Email</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="you@university.edu"
                     className="mt-1.5 bg-white text-black placeholder:text-gray-400"
                     autoComplete="off"
+                    required
                   />
                 </div>
 
@@ -94,13 +97,15 @@ export function SignIn() {
                     <Label htmlFor="password" className="text-black">Password</Label>
                     <a href="#" className="text-sm text-amber-600 hover:text-amber-700">
                       Forgot?
-                    </a>
+                    </a >
                   </div>
                   <Input
                     id="password"
+                    name="password"
                     type="password"
                     placeholder="••••••••"
                     className="mt-1.5 bg-white text-black placeholder:text-gray-400"
+                    required
                   />
                 </div>
 
