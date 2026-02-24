@@ -1,6 +1,7 @@
 {
   "name": "boilerbridge",
   "version": "0.1.0",
+  "os": ["darwin", "linux", "win32"],
   "cacheDirectories": [
     ".next/cache"
   ],
