@@ -4,7 +4,11 @@ import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
 
-export async function Header() {
+interface HeaderProps {
+  readonly user?: any;
+}
+
+export async function Header(user: HeaderProps) {
   const session = await getServerSession(authOptions);
   const isAuthed = !!session;
 

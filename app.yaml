@@ -2,27 +2,32 @@ name: cs307-team26-boilerbridge
 region: nyc3
 services:
   - name: boilerbridge-web
-    github:
-      repo: xmarable/CS307-Team26-BoilerBridge
-      branch: main
-      deploy_on_push: false # Set to false since GitHub Actions will now trigger it
+    image:
+      registry_type: DOCR
+      repository: boilerbridge
+      tag: latest
     run_command: npm start
-    build_command: npm run build
     http_port: 3000
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
       - key: NPM_CONFIG_LEGACY_PEER_DEPS
-        scope: RUN_AND_BUILD_TIME
+        scope: RUN_TIME
         value: "true"
       - key: NEXT_TELEMETRY_DISABLED
-        scope: RUN_AND_BUILD_TIME
+        scope: RUN_TIME
         value: "1"
       - key: NODE_ENV
-        scope: RUN_AND_BUILD_TIME
+        scope: RUN_TIME
         value: "production"
+      - key: NEXTAUTH_URL
+        scope: RUN_TIME
+        value: https://cs307-team26-boilerbridge-o9gmr.ondigitalocean.app
+      - key: NEXTAUTH_SECRET
+        scope: RUN_TIME
+        value: ${NEXTAUTH_SECRET}
+        type: SECRET
       - key: MONGODB_URI
-        # This pulls from your GitHub Secrets during the Action run
         scope: RUN_AND_BUILD_TIME
         value: ${MONGODB_URI}
         type: SECRET

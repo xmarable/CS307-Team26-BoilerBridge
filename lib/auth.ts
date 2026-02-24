@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import dbConnect from "./dbConnect";
@@ -40,6 +41,7 @@ export const authOptions: NextAuthOptions = {
         },
         async session({ session, token }) {
             if (session.user) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 session.user.id = token.id;
             }
