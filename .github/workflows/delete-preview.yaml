@@ -14,3 +14,13 @@ jobs:
           from_pr_preview: "true"
           ignore_not_found: "true"
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Delete registry image
+        run: |
+          doctl registry repository delete-manifest boilerbridge pr-${{ github.event.number }} --force
+          doctl registry garbage-collection start --include-untagged-manifests --force

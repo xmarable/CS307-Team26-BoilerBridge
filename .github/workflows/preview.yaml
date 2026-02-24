@@ -7,10 +7,14 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  deployments: write  
 
 jobs:
   preview:
     runs-on: ubuntu-latest
+    environment:
+      name: preview/pr-${{ github.event.number }}
+      url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,7 +57,6 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: app.yaml
           deploy_pr_preview: "true"
-          image: registry.digitalocean.com/boilerbridge-registry/boilerbridge:pr-${{ github.event.number }}
           print_build_logs: true
           print_deploy_logs: true
 
