@@ -28,6 +28,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
       validate: [
         {
           // Mongoose "this" typing is messy; using any avoids TS errors
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           validator: function (this: any, value: Date) {
             return value > this.startTime;
           },
