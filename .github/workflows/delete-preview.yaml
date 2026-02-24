@@ -4,6 +4,13 @@ on:
   pull_request:
     types: [closed]
 
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+permissions:
+  deployments: write
+
 jobs:
   closed:
     runs-on: ubuntu-latest
@@ -20,7 +27,39 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Delete registry image
+      - name: Delete registry image and prune orphans
         run: |
-          doctl registry repository delete-manifest boilerbridge pr-${{ github.event.number }} --force
+          if doctl registry repository list-tags boilerbridge | grep -q "pr-${{ github.event.number }}"; then
+            doctl registry repository delete-manifest boilerbridge pr-${{ github.event.number }} --force
+          fi
+
+          UNTAGGED=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | awk '$2 == "" || $2 == "[]" {print $1}')
+          
+          if [ ! -z "$UNTAGGED" ]; then
+            for digest in $UNTAGGED; do
+              doctl registry repository delete-manifest boilerbridge $digest --force
+            done
+          fi
+
+          sleep 5
           doctl registry garbage-collection start --include-untagged-manifests --force
+
+      - name: Deactivate GitHub Environment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const envName = `Preview/pr-${context.issue.number}`;
+            const { data: deployments } = await github.rest.repos.listDeployments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              environment: envName
+            });
+            
+            for (const deployment of deployments) {
+              await github.rest.repos.createDeploymentStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                deployment_id: deployment.id,
+                state: 'inactive'
+              });
+            }

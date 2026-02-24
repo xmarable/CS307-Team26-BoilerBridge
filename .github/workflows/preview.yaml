@@ -4,16 +4,20 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
-  deployments: write  
+  deployments: write
 
 jobs:
   preview:
     runs-on: ubuntu-latest
     environment:
-      name: preview/pr-${{ github.event.number }}
+      name: Preview/pr-${{ github.event.number }}
       url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
     steps:
       - name: Checkout repository
