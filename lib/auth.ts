@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import dbConnect from "./dbConnect";
 import { validateLogin } from "./validateLogin";
 
 
@@ -18,13 +17,14 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                /*await dbConnect();
-
                 const user = await validateLogin(credentials.email, credentials.password);
                 if (!user) return null;
 
-                return { id: user.id.toString(), email: user.email, name: user.username };*/
-                return {id: "1", email:"test@test.com", name: "test_user"};
+                // Use Mongo _id as the stable identifier for sessions
+                const mongoId = (user as any)._id?.toString?.() ?? undefined;
+                if (!mongoId) return null;
+
+                return { id: mongoId, email: user.email, name: user.username };
             }
         }),
     ],

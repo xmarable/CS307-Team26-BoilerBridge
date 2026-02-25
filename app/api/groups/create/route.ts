@@ -10,10 +10,30 @@ const createGroupSchema = z.object({
   description: z.string().trim().optional(),
 });
 
+function cookiesAndHeadersFromRequest(req: Request): { cookies: Record<string, string>; headers: Record<string, string> } {
+  const cookieHeader = req.headers.get("cookie");
+  const cookies: Record<string, string> = cookieHeader
+    ? Object.fromEntries(
+        cookieHeader.split(";").map((c) => {
+          const [key, ...v] = c.trim().split("=");
+          return [key ?? "", decodeURIComponent(v.join("=").trim())];
+        })
+      )
+    : {};
+  const headers: Record<string, string> = Object.fromEntries(req.headers.entries());
+  return { cookies, headers };
+}
+
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const { cookies, headers } = cookiesAndHeadersFromRequest(req);
+    const session = await getServerSession(
+      { cookies, headers } as never,
+      { getHeader: () => undefined, setCookie: () => undefined, setHeader: () => undefined } as never,
+      authOptions
+    );
+    const userId = session?.user && "id" in session.user ? session.user.id : undefined;
+    if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to create a group" },
         { status: 401 }
@@ -27,12 +47,12 @@ export async function POST(req: Request) {
 
     if (!validation.success) {
       const message =
-        validation.error.errors[0]?.message ?? "Invalid input data";
+        validation.error.issues[0]?.message ?? "Invalid input data";
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
     const { groupName, description } = validation.data;
-    const leaderId = session.user.id;
+    const leaderId = userId;
 
     const newGroup = new TravelGroup({
       groupName,
@@ -54,7 +74,7 @@ export async function POST(req: Request) {
           groupName: newGroup.groupName,
           description: newGroup.description,
           leaderID: newGroup.leaderID.toString(),
-          membersList: newGroup.membersList.map((id) => id.toString()),
+          membersList: newGroup.membersList.map((id: { toString(): string }) => id.toString()),
         },
       },
       { status: 201 }

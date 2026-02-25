@@ -7,25 +7,26 @@ import TravelGroup from "@/models/TravelGroup";
 
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = session?.user && "id" in session.user ? session.user.id : undefined;
+    if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to view this group" },
         { status: 401 }
       );
     }
 
-    const { id } = await params;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    const { groupId } = await params;
+    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
       return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
     }
 
     await dbConnect();
 
-    const group = await TravelGroup.findById(id).lean();
+    const group = await TravelGroup.findById(groupId).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -33,7 +34,7 @@ export async function GET(
     const memberIds = (group.membersList as mongoose.Types.ObjectId[]).map(
       (m) => m.toString()
     );
-    if (!memberIds.includes(session.user.id)) {
+    if (!memberIds.includes(userId)) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
         { status: 403 }
@@ -51,7 +52,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("GET /api/groups/[id] error:", error);
+    console.error("GET /api/groups/[groupId] error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
