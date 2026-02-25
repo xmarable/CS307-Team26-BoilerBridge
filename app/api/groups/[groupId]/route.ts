@@ -11,7 +11,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user && "id" in session.user ? session.user.id : undefined;
+    const rawId = session?.user && "id" in session.user ? session.user.id : undefined;
+    const userId = typeof rawId === "string" ? rawId : undefined;
     if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to view this group" },
