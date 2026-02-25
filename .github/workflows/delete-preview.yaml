@@ -29,12 +29,14 @@ jobs:
 
       - name: Delete registry image and prune orphans
         run: |
-          if doctl registry repository list-tags boilerbridge | grep -q "pr-${{ github.event.number }}"; then
-            doctl registry repository delete-manifest boilerbridge pr-${{ github.event.number }} --force
+          DIGEST=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep "pr-${{ github.event.number }}" | awk '{print $1}')
+
+          if [ ! -z "$DIGEST" ]; then
+            doctl registry repository delete-manifest boilerbridge "$DIGEST" --force
           fi
 
           UNTAGGED=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | awk '$2 == "" || $2 == "[]" {print $1}')
-          
+
           if [ ! -z "$UNTAGGED" ]; then
             for digest in $UNTAGGED; do
               doctl registry repository delete-manifest boilerbridge $digest --force
@@ -54,7 +56,7 @@ jobs:
               repo: context.repo.repo,
               environment: envName
             });
-            
+
             for (const deployment of deployments) {
               await github.rest.repos.createDeploymentStatus({
                 owner: context.repo.owner,

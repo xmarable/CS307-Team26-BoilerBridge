@@ -9,7 +9,7 @@ services:
     run_command: npm start
     http_port: 3000
     instance_count: 1
-    instance_size_slug: basic-xxs
+    instance_size_slug: basic-xs
     envs:
       - key: NPM_CONFIG_LEGACY_PEER_DEPS
         scope: RUN_TIME
