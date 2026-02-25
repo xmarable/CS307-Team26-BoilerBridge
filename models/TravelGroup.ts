@@ -1,70 +1,53 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose from "mongoose";
+import { randomUUID } from "crypto";
 
-export interface ITravelGroup extends Document {
-  groupId: string;          // UUID or other unique string used in URLs
-  name: string;
-  createdBy: string;        // User.userId (UUID)
-  members: string[];        // array of User.userId (UUIDs)
-  admins: string[];         // subset of members
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const TravelGroupSchema = new Schema<ITravelGroup>(
+const expenseSchema = new mongoose.Schema(
   {
-    groupId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-      trim: true,
-    },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    createdBy: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    members: {
-      type: [String],
-      default: [],
-    },
-    admins: {
-      type: [String],
-      default: [],
-    },
+    expenseID: { type: String },
+    payerID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    amount: { type: Number },
+    description: { type: String },
+    debtors: { type: Map, of: Number },
+    isSettled: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { _id: false }
 );
-// Simple guard for undefined arrays
-TravelGroupSchema.pre("save", async function () {
-    const g = this as ITravelGroup;
-  
-    g.members = g.members ?? [];
-    g.admins = g.admins ?? [];
-  
-    if (g.createdBy) {
-      if (!g.members.includes(g.createdBy)) g.members.push(g.createdBy);
-      if (!g.admins.includes(g.createdBy)) g.admins.push(g.createdBy);
-    }
-  });
 
-// Ensure creator is member + admin if not explicitly added
-TravelGroupSchema.pre("save", async function () {
-    const g = this as ITravelGroup;
-  
-    if (g.createdBy) {
-      if (!g.members.includes(g.createdBy)) g.members.push(g.createdBy);
-      if (!g.admins.includes(g.createdBy)) g.admins.push(g.createdBy);
-    }
+const messageSchema = new mongoose.Schema(
+  {
+    messageID: { type: String },
+    senderID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    content: { type: String },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const travelGroupSchema = new mongoose.Schema({
+  groupID: {
+    type: String,
+    default: () => randomUUID(),
+    unique: true,
+  },
+  groupName: { type: String, required: true, trim: true },
+  description: { type: String, trim: true },
+  leaderID: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  membersList: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+  ledger: [expenseSchema],
+  chatLogs: [messageSchema],
 });
 
-const TravelGroup: Model<ITravelGroup> =
+const TravelGroup =
   mongoose.models.TravelGroup ||
-  mongoose.model<ITravelGroup>("TravelGroup", TravelGroupSchema);
+  mongoose.model("TravelGroup", travelGroupSchema);
 
 export default TravelGroup;
