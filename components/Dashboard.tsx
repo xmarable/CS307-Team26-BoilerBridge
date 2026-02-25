@@ -183,12 +183,19 @@ export function Dashboard() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-1">Your Trips</h1>
                 <p className="text-gray-600">Manage and plan your adventures</p>
               </div>
-              <Link href="/trip/new">
-                <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
-                  <Plus className="mr-2" size={18} />
-                  Create Trip
-                </Button>
-              </Link>
+              <div className="flex gap-2">
+                <Link href="/groups/new">
+                  <Button variant="outline" className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                    Create Group
+                  </Button>
+                </Link>
+                <Link href="/trip/new">
+                  <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
+                    <Plus className="mr-2" size={18} />
+                    Create Trip
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
