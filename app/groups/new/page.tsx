@@ -29,7 +29,7 @@ export default function CreateGroupPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.errors[0]?.message ?? "Group name is required");
+      setError(parsed.error.issues[0]?.message ?? "Group name is required");
       return null;
     }
 
