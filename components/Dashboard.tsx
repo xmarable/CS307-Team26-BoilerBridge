@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { 
   Search, 
   Bell, 
@@ -71,6 +72,7 @@ const upcomingActivities = [
 ];
 
 export function Dashboard() {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("my-trips");
 
   return (
@@ -99,11 +101,13 @@ export function Dashboard() {
               <Bell size={20} />
               <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </Button>
-            <Avatar>
-              <AvatarFallback className="bg-linear-to-br from-amber-500 to-orange-600 text-white">
-                JD
-              </AvatarFallback>
-            </Avatar>
+            <Link href="/settings">
+              <Avatar className="cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all">
+                <AvatarFallback className="bg-linear-to-br from-amber-500 to-orange-600 text-white">
+                  {session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "JD"}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
           </div>
         </div>
       </header>
@@ -228,11 +232,17 @@ export function Dashboard() {
 
                       <div className="flex items-center gap-1 mb-4">
                         {trip.members.slice(0, 5).map((member, idx) => (
-                          <Avatar key={idx} className="w-8 h-8 border-2 border-white -ml-2 first:ml-0">
-                            <AvatarFallback className="text-xs bg-linear-to-br from-amber-400 to-orange-500 text-white">
-                              {member}
-                            </AvatarFallback>
-                          </Avatar>
+                          <Link 
+                            key={idx} 
+                            href={`/profile/${member}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Avatar className="w-8 h-8 border-2 border-white -ml-2 first:ml-0 hover:scale-110 transition-transform cursor-pointer">
+                              <AvatarFallback className="text-xs bg-linear-to-br from-amber-400 to-orange-500 text-white">
+                                {member.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          </Link>
                         ))}
                         {trip.members.length > 5 && (
                           <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white -ml-2 flex items-center justify-center text-xs text-gray-600">

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { Check } from "lucide-react";
 
 const steps = [
@@ -23,7 +24,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-20 px-6 lg:px-8 bg-gradient-to-b from-white to-blue-50">
+    <section id="how-it-works" className="py-20 px-6 lg:px-8 bg-linear-to-b from-white to-blue-50">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -46,7 +47,7 @@ export function HowItWorks() {
             >
               {/* Content */}
               <div className="flex-1">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-linear-to-br from-blue-500 to-purple-600 rounded-2xl mb-6">
                   <span className="text-2xl font-bold text-white">{step.number}</span>
                 </div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-4">
@@ -73,7 +74,7 @@ export function HowItWorks() {
 
               {/* Image */}
               <div className="flex-1">
-                <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
+                <div className="aspect-4/3 rounded-2xl overflow-hidden shadow-2xl">
                   <img
                     src={step.image}
                     alt={step.title}

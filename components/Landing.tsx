@@ -1,6 +1,5 @@
 "use client";
 
-import { Header } from "./Header";
 import { Hero } from "./Hero";
 import { Features } from "./Features";
 import { HowItWorks } from "./HowItWorks";
@@ -8,12 +7,15 @@ import { Testimonials } from "./Testimonials";
 import { CTA } from "./CTA";
 import { Footer } from "./Footer";
 
-export function Landing() {
+interface LandingProps {
+  readonly user?: any;
+}
+
+export function Landing(user: LandingProps) {
   return (
     <div className="min-h-screen bg-white">
-      <Header />
       <main>
-        <Hero />
+        <Hero user={user} />
         <Features />
         <HowItWorks />
         <Testimonials />
