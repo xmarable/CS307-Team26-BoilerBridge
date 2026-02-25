@@ -7,7 +7,7 @@ import TravelGroup from "@/models/TravelGroup";
 
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ groupId: string }> }
+  { params }: { params: { groupId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -19,7 +19,7 @@ export async function GET(
       );
     }
 
-    const { groupId } = await params;
+    const { groupId } = params;
     if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
       return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
     }

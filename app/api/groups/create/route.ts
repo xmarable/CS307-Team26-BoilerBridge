@@ -27,9 +27,14 @@ function cookiesAndHeadersFromRequest(req: Request): { cookies: Record<string, s
 export async function POST(req: Request) {
   try {
     const { cookies, headers } = cookiesAndHeadersFromRequest(req);
-    const session = await getServerSession(
-      { cookies, headers } as never,
-      { getHeader: () => undefined, setCookie: () => undefined, setHeader: () => undefined } as never,
+    // Use a minimal request/response shape compatible with NextAuth's AuthHandler.
+    const session = await (getServerSession as any)(
+      { cookies, headers },
+      {
+        getHeader() {},
+        setCookie() {},
+        setHeader() {},
+      },
       authOptions
     );
     const userId = session?.user && "id" in session.user ? session.user.id : undefined;

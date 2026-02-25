@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { validateLogin } from "./validateLogin";
@@ -33,21 +32,20 @@ export const authOptions: NextAuthOptions = {
     },
     secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-        async jwt({token, user}) {
+        async jwt({ token, user }) {
             if (user) {
-                token.id = user.id;
+                // Propagate the user id into the JWT so it is available in the session callback.
+                (token as any).id = (user as any).id;
             }
             return token;
         },
         async session({ session, token }) {
-            if (session.user) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                session.user.id = token.id;
+            if (session.user && (token as any).id) {
+                (session.user as any).id = (token as any).id;
             }
 
             return session;
-        }
+        },
     },
     pages: {
         signIn: "/login",
