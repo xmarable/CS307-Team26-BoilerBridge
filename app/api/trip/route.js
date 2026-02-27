@@ -1,34 +1,24 @@
 import { NextResponse } from "next/server";
 import Trip from "@/models/Trip";
 import dbConnect from "../../../lib/dbConnect";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function POST(req) {
   try {
     await dbConnect();
 
-    // TEMP AUTH for Postman:
-    // Send header: x-user-id: <Mongo ObjectId of an existing user>
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized: missing x-user-id header" },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const body = await req.json();
     const { fromCity, toCity, fromDate, toDate, mode, budget, tripConfirmed } = body;
 
-    // minimal validation
-    if (!fromCity || !toCity || !fromDate || !toDate || !mode || budget == null) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
     const trip = await Trip.create({
-      userId, // IMPORTANT: take from header, not from body
+      userId,
       fromCity,
       toCity,
       fromDate: new Date(fromDate),
@@ -47,17 +37,15 @@ export async function POST(req) {
   }
 }
 
-export async function GET(req) {
+export async function GET() {
   try {
     await dbConnect();
 
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized: missing x-user-id header" },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 });
     return NextResponse.json(trips, { status: 200 });

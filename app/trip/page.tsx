@@ -1,5 +1,5 @@
-import { Trip } from "@/components/TripWorkspace";
+import { Header } from "@/components/Header";
 
 export default function TripPage() {
-  return <Trip />;
+  return <Header />;
 }
