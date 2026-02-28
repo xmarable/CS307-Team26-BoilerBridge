@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import User from "@/models/User";
 import FriendRequest from "@/models/FriendRequest";
-
+import dbConnect from "@/lib/dbConnect";
 export async function POST(req: Request) {
   try {
+    await dbConnect();
+
     const body = await req.json();
     const requesterId = body.requesterId;
     const recipientId = body.recipientId;
@@ -56,7 +58,8 @@ export async function POST(req: Request) {
       }
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Friend Request API Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },
