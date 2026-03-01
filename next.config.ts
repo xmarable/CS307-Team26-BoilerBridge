@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    turbo: {},
+  },
   webpack: (config, { dev, isServer }) => {
     // Fix for MongoDB/Mongoose Node modules leaking into client components
     if (!isServer) {
