@@ -21,7 +21,7 @@ const messageSchema = new mongoose.Schema(
       default: () => randomUUID(),
       unique: true
      },
-    senderID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    senderID: { type: String },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },
   },
@@ -43,7 +43,7 @@ const travelGroupSchema = new mongoose.Schema({
   membersList: [
     {
       type: String,
-      required: true,
+      require: true,
     },
   ],
   ledger: [expenseSchema],
