@@ -3,8 +3,11 @@
 import { ArrowRight, Play } from "lucide-react";
 import { Button } from "./ui/button";
 import Link from "next/link";
+interface HeroProps {
+  readonly user?: any;
+}
 
-export function Hero() {
+export function Hero(user: HeroProps) {
   return (
     <section className="pt-32 pb-16 px-6 lg:px-8 bg-linear-to-b from-amber-50 to-white">
       <div className="mx-auto max-w-7xl">

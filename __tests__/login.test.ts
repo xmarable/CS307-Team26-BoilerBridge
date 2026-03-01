@@ -25,6 +25,9 @@ afterAll(async () => {
 })
 
 describe('Login Test Suite', () => {
+    beforeEach(async () => {
+        await User.deleteMany();
+    });
     it("should return user for correct credentials", async () => {
         const plainPass = "securePassword123";
         const hashedPass = await bcrypt.hash(plainPass, 10);

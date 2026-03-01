@@ -1,6 +1,5 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import dbConnect from "./dbConnect";
 import { validateLogin } from "./validateLogin";
 
 
@@ -17,13 +16,14 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                await dbConnect();
-
                 const user = await validateLogin(credentials.email, credentials.password);
                 if (!user) return null;
 
-                return { id: user.id.toString(), email: user.email, name: user.username };
-                //return {id: "1", email:"test@test.com", name: "test_user"};
+                // Use Mongo _id as the stable identifier for sessions
+                const mongoId = (user as any)._id?.toString?.() ?? undefined;
+                if (!mongoId) return null;
+
+                return { id: mongoId, email: user.email, name: user.username };
             }
         }),
     ],
@@ -32,20 +32,20 @@ export const authOptions: NextAuthOptions = {
     },
     secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-        async jwt({token, user}) {
+        async jwt({ token, user }) {
             if (user) {
-                token.id = user.id;
+                // Propagate the user id into the JWT so it is available in the session callback.
+                (token as any).id = (user as any).id;
             }
             return token;
         },
         async session({ session, token }) {
-            if (session.user) {
-                // @ts-ignore
-                session.user.id = token.id;
+            if (session.user && (token as any).id) {
+                (session.user as any).id = (token as any).id;
             }
 
             return session;
-        }
+        },
     },
     pages: {
         signIn: "/login",
