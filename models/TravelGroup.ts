@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { randomUUID } from "crypto";
+import { unique } from "next/dist/build/utils";
 
 const expenseSchema = new mongoose.Schema(
   {
@@ -15,7 +16,11 @@ const expenseSchema = new mongoose.Schema(
 
 const messageSchema = new mongoose.Schema(
   {
-    messageID: { type: String },
+    messageID: { 
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+      unique: true
+     },
     senderID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },

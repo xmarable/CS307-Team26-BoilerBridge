@@ -12,7 +12,7 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: 'password' },
             },
             async authorize(credentials, req) {
-                if (!credentials?.email || !credentials.password) {
+                if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
 
@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
                 if (!user) return null;
 
                 // Use Mongo _id as the stable identifier for sessions
-                const mongoId = (user as any)._id?.toString?.() ?? undefined;
+                const mongoId = (user as any).userId ?? undefined;
                 if (!mongoId) return null;
 
                 return { id: mongoId, email: user.email, name: user.username };
