@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import User from "@/models/User";
 import FriendRequest from "@/models/FriendRequest";
 import dbConnect from "@/lib/dbConnect";
+
 export async function POST(req: Request) {
   try {
     await dbConnect();
@@ -13,7 +14,9 @@ export async function POST(req: Request) {
     if (!requesterId || !recipientId) {
       return NextResponse.json({ error: "Missing IDs" }, { status: 400 });
     } else {
-      const requester = await User.findOne({ userId: requesterId });
+      const requester = await User.collection.findOne({
+        userId: requesterId,
+      });
       let isAlreadyFriends = false;
 
       if (requester) {
@@ -27,7 +30,7 @@ export async function POST(req: Request) {
       if (isAlreadyFriends) {
         return NextResponse.json({ error: "Already friends" }, { status: 400 });
       } else {
-        const existingRequest = await FriendRequest.findOne({
+        const existingRequest = await FriendRequest.collection.findOne({
           requesterId: requesterId,
           recipientId: recipientId,
         });
@@ -43,13 +46,13 @@ export async function POST(req: Request) {
             { status: 400 },
           );
         } else {
-          const newRequest = new FriendRequest({
+          await FriendRequest.collection.insertOne({
             requesterId: requesterId,
             recipientId: recipientId,
             status: "pending",
+            createdAt: new Date(),
           });
 
-          await newRequest.save();
           return NextResponse.json(
             { message: "Friend request sent" },
             { status: 200 },

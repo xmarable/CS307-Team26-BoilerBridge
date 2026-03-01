@@ -16,15 +16,21 @@ export default function FriendCard({
   email,
   school,
 }: FriendCardProps) {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">(
     "idle",
   );
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleAddFriend = async () => {
-    if (!session?.user?.id) {
+    // ONLY show the error if the session is confirmed unauthenticated
+    if (sessionStatus === "unauthenticated") {
       setErrorMessage("You must be logged in");
+      return;
+    }
+
+    // Wait if the session is still fetching to avoid sending 'undefined'
+    if (sessionStatus === "loading" || !session?.user?.id) {
       return;
     }
 
@@ -74,7 +80,12 @@ export default function FriendCard({
         {!isSelf && (
           <button
             onClick={handleAddFriend}
-            disabled={status === "loading" || status === "sent"}
+            // Disable if session is loading to prevent early clicks
+            disabled={
+              status === "loading" ||
+              status === "sent" ||
+              sessionStatus === "loading"
+            }
             className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
               status === "sent"
                 ? "bg-green-100 text-green-700 cursor-default"
@@ -83,11 +94,13 @@ export default function FriendCard({
                   : "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
             }`}
           >
-            {status === "loading"
-              ? "Sending..."
-              : status === "sent"
-                ? "Request Sent"
-                : "Add Friend"}
+            {sessionStatus === "loading"
+              ? "Checking..."
+              : status === "loading"
+                ? "Sending..."
+                : status === "sent"
+                  ? "Request Sent"
+                  : "Add Friend"}
           </button>
         )}
 
