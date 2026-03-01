@@ -17,13 +17,13 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                /*await dbConnect();
+                await dbConnect();
 
                 const user = await validateLogin(credentials.email, credentials.password);
                 if (!user) return null;
 
-                return { id: user.id.toString(), email: user.email, name: user.username };*/
-                return {id: "1", email:"test@test.com", name: "test_user"};
+                return { id: user.id.toString(), email: user.email, name: user.username };
+                //return {id: "1", email:"test@test.com", name: "test_user"};
             }
         }),
     ],
