@@ -37,14 +37,13 @@ const travelGroupSchema = new mongoose.Schema({
   groupName: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
   leaderID: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    type: String,
     required: true,
   },
   membersList: [
     {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
+      required: true,
     },
   ],
   ledger: [expenseSchema],
