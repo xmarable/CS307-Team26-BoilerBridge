@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { FindFriends } from "@/components/FindFriends";
+import { Friends } from "@/components/Friends";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -13,5 +13,5 @@ export default async function FriendsPage() {
     return null; // Ensure we don't render anything while redirecting
   }
 
-  return <FindFriends />;
+  return <Friends />;
 }

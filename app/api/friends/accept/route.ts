@@ -26,22 +26,12 @@ export async function PATCH(req: Request) {
         await friendRequest.save();
 
         await User.findOneAndUpdate(
-          {
-            $or: [
-              { userId: friendRequest.requesterId },
-              { _id: friendRequest.requesterId },
-            ],
-          },
+          { userId: friendRequest.requesterId },
           { $addToSet: { friendsList: friendRequest.recipientId } },
         );
 
         await User.findOneAndUpdate(
-          {
-            $or: [
-              { userId: friendRequest.recipientId },
-              { _id: friendRequest.recipientId },
-            ],
-          },
+          { userId: friendRequest.recipientId },
           { $addToSet: { friendsList: friendRequest.requesterId } },
         );
 

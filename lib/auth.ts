@@ -26,14 +26,18 @@ export const authOptions: NextAuthOptions = {
           credentials.email,
           credentials.password,
         );
+
         if (!user) return null;
 
-                // Use Mongo _id as the stable identifier for sessions
-                const mongoId = (user as any).userId ?? undefined;
-                if (!mongoId) return null;
+        // mongoId is the Mongo ObjectId string, userId is the UUID string
+        const mongoId = (user as any)._id?.toString();
+        const uuid = (user as any).userId;
+
+        if (!mongoId || !uuid) return null;
 
         return {
           id: mongoId,
+          userId: uuid,
           email: user.email,
           name: user.username,
           username: user.username,
@@ -49,6 +53,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = (user as any).id;
+        token.userId = (user as any).userId;
         token.username = (user as any).username;
       }
       return token;
@@ -56,6 +61,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id as string;
+        (session.user as any).userId = token.userId as string;
         (session.user as any).username = token.username as string;
       }
       return session;
