@@ -30,7 +30,7 @@ const CreateEventSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -39,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId } = params;
+    const { groupId } = await params;
 
     await dbConnect();
 
@@ -58,7 +58,7 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid payload", details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -66,7 +66,7 @@ export async function POST(
     if (data.endTime <= data.startTime) {
       return NextResponse.json(
         { error: "Invalid time range: endTime must be after startTime" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -78,7 +78,7 @@ export async function POST(
       location: data.location,
       eventType: data.eventType ?? "general",
       createdBy: userMongoId, // store as string mongo id
-      groupId: groupId,       // store TravelGroup _id string for consistent queries
+      groupId: groupId, // store TravelGroup _id string for consistent queries
       source: data.source ?? "manual",
       externalId: data.externalId,
       timezone: data.timezone ?? "UTC",
@@ -89,14 +89,14 @@ export async function POST(
     console.error("POST calendar event error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -105,7 +105,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId } = params;
+    const { groupId } = await params;
 
     await dbConnect();
 
@@ -124,18 +124,20 @@ export async function GET(
 
     const now = new Date();
     const from = fromStr ? new Date(fromStr) : now;
-    const to = toStr ? new Date(toStr) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const to = toStr
+      ? new Date(toStr)
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
       return NextResponse.json(
         { error: "Invalid date params. Use ISO strings for from/to." },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (to <= from) {
       return NextResponse.json(
         { error: "Invalid date range: to must be after from" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -151,7 +153,7 @@ export async function GET(
     console.error("GET calendar events error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

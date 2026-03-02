@@ -33,7 +33,7 @@ const UpdateEventSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { groupId: string; eventId: string } }
+  { params }: { params: Promise<{ groupId: string; eventId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -42,7 +42,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId, eventId } = params;
+    const { groupId, eventId } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
@@ -76,14 +76,15 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid payload", details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const updates = parsed.data;
 
     if (updates.title !== undefined) event.title = updates.title;
-    if (updates.description !== undefined) event.description = updates.description;
+    if (updates.description !== undefined)
+      event.description = updates.description;
     if (updates.location !== undefined) event.location = updates.location;
     if (updates.eventType !== undefined) event.eventType = updates.eventType;
     if (updates.timezone !== undefined) event.timezone = updates.timezone;
@@ -94,7 +95,7 @@ export async function PUT(
     if (event.endTime <= event.startTime) {
       return NextResponse.json(
         { error: "Invalid time range: endTime must be after startTime" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -105,14 +106,14 @@ export async function PUT(
     console.error("PUT calendar event error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { groupId: string; eventId: string } }
+  { params }: { params: Promise<{ groupId: string; eventId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -121,7 +122,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId, eventId } = params;
+    const { groupId, eventId } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
@@ -157,7 +158,7 @@ export async function DELETE(
     console.error("DELETE calendar event error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
