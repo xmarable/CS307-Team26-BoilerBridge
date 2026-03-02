@@ -1,37 +1,36 @@
-import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import TravelGroup from "@/models/TravelGroup";
 
-jest.unstable_mockModule("next-auth", () => ({
+jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.unstable_mockModule("@/lib/auth", () => ({
+jest.mock("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { POST } = await import("@/app/api/groups/create/route");
+const nextAuth = require("next-auth");
+const mockGetServerSession = nextAuth.getServerSession;
 
-const getServerSession = nextAuth.getServerSession;
-
-const mockGetServerSession = getServerSession as jest.MockedFunction<
-  typeof getServerSession
->;
+let POST: (req: Request) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+  const createRoute = await import("@/app/api/groups/create/route");
+  POST = createRoute.POST;
 });
 
 afterAll(async () => {
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
-  await mongoose.connection.close();
+  if (mongoose.connection.readyState === 1) {
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+    await mongoose.connection.close();
+  }
   await new Promise((resolve) => setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS));
 });
 
