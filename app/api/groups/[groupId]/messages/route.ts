@@ -10,12 +10,12 @@ const MessageSchema = z.object({
     content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
 });
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
+async function verifyUser(params: Promise<any>) {
     // Verify user logged in
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id as string | undefined;
     if (!userId) {
-        return NextResponse.json({ error: "unauthorized"}, { status: 401 });
+        return null;
     }
 
     // Verify user exists
@@ -23,20 +23,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     const user = await User.findOne({ userId: userId });
 
     if (!user) {
-        return NextResponse.json({ error: "Unauthorized"}, { status: 401 });
+        return null;
     }
 
     // Find group from id
     const { groupId } = await params;    
     const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
-        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+        return null;
     }
 
     // Verify user in member list
     const members = group?.membersList ?? [];
     if (!members.includes(userId)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return null;
+    }
+
+    return { group, userId: userId };
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
+    // Get group and userId info
+    const info = await verifyUser(params);
+
+    if (!info) {
+        return NextResponse.json({ error: "Unauthorized"}, { status: 401 });
     }
 
     // Verify json data is formatted correct
@@ -49,13 +60,59 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
         );
     }
 
-    const newMessage = group.chatLogs.create({
-        senderID: userId,
+    const newMessage = {
+        senderID: info.userId,
         content: message.data.content
-    });
+    };
 
-    group.chatLogs.push(newMessage);
-    await group.save();
+    info.group.chatLogs.push(newMessage as any);
+    await info.group.save();
 
     return NextResponse.json({ message: newMessage }, { status: 201 });
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: String}> }) {
+    // Verify user logged in
+    const info = await verifyUser(params);
+    
+    if (!info) {
+        return NextResponse.json({ error: "Unauthorized"}, { status: 401 });
+    }
+
+    const url = new URL(req.url);
+    const limit = 50;
+
+    const before = url.searchParams.get("before");
+    const logs = info.group.chatLogs ?? [];
+
+    // Make sure chat logs are sorted in ascending order
+    logs.sort((ma: any, mb: any) => {
+        const ta = new Date(ma.timestamp).getTime();
+        const tb = new Date(mb.timestamp).getTime();
+        return ta-tb;
+    });
+
+    let e_Index = logs.length;
+
+    if (before) {
+        const beforeTime = new Date(before).getTime();
+
+        e_Index = logs.findIndex((message: any) => new Date(message.timestamp).getTime() >= beforeTime);
+
+        if (e_Index = -1) {
+            e_Index = logs.length;
+        }
+    }
+
+    const s_index = Math.max(0, e_Index - 50);
+    const messages = logs.slice(s_index, e_Index);
+
+    return NextResponse.json(
+        {
+            messages: messages,
+            nextbefore: messages[0]?.timestamp || null,
+            hasMore: s_index > 0
+        },
+        { status: 200 }
+    );
 }
