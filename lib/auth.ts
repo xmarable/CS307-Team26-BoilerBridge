@@ -1,6 +1,5 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "./mongodb";
 import { validateLogin } from "./validateLogin";
 
@@ -28,7 +27,6 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) return null;
 
-        // mongoId is the Mongo ObjectId string, userId is the UUID string
         const mongoId = (user as any)._id?.toString();
         const uuid = (user as any).userId;
 
