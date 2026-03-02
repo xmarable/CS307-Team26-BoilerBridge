@@ -43,7 +43,7 @@ const travelGroupSchema = new mongoose.Schema({
   membersList: [
     {
       type: String,
-      require: true,
+      required: true,
     },
   ],
   ledger: [expenseSchema],

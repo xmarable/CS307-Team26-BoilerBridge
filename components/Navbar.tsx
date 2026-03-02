@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Bell, Search, LogOut, Settings } from "lucide-react";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { NotificationBell } from "./NotificationBell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,10 +43,7 @@ export async function Navbar({ session }: { session?: any }) {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="relative text-gray-600 hover:text-gray-900 p-2">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
-          </button>
+          <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
