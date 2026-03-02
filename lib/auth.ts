@@ -24,9 +24,11 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) return null;
 
-                // Use Mongo _id as the stable identifier for sessions
-                const mongoId = (user as any).userId ?? undefined;
-                if (!mongoId) return null;
+        // mongoId is the Mongo ObjectId string, userId is the UUID string
+        const mongoId = (user as any)._id?.toString();
+        const uuid = (user as any).userId;
+
+        if (!mongoId || !uuid) return null;
 
         return {
           id: mongoId,
