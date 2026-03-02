@@ -20,33 +20,43 @@ export async function Header(user: HeaderProps) {
             <div className="w-8 h-8 bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">B</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">BoilerBridge</span>
+            <span className="text-xl font-bold text-gray-900">
+              BoilerBridge
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-gray-700 hover:text-gray-900 transition-colors">
+            <a
+              href="#features"
+              className="text-gray-700 hover:text-gray-900 transition-colors"
+            >
               Features
             </a>
-            <a href="#how-it-works" className="text-gray-700 hover:text-gray-900 transition-colors">
+            <a
+              href="#how-it-works"
+              className="text-gray-700 hover:text-gray-900 transition-colors"
+            >
               How It Works
             </a>
-            <a href="#testimonials" className="text-gray-700 hover:text-gray-900 transition-colors">
+            <a
+              href="#testimonials"
+              className="text-gray-700 hover:text-gray-900 transition-colors"
+            >
               Testimonials
             </a>
-            {
-              session ?
+            {session ? (
               <Link href="/dashboard">
                 <Button variant="ghost" className="text-gray-700">
                   Dashboard
-                </Button> 
+                </Button>
               </Link>
-              :
-              <Link href="/signin"> 
+            ) : (
+              <Link href="/signin">
                 <Button variant="ghost" className="text-gray-700">
                   Sign In
                 </Button>
               </Link>
-            }
+            )}
             <Link href="/signup">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
                 Get Started

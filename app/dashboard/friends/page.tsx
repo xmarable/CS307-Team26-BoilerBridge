@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 
-import { Dashboard } from "@/components/Dashboard";
+import { FindFriends } from "@/components/FindFriends";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
-export default async function Page() {
+export default async function FriendsPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -13,5 +13,5 @@ export default async function Page() {
     return null; // Ensure we don't render anything while redirecting
   }
 
-  return <Dashboard />;
+  return <FindFriends />;
 }

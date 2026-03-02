@@ -1,34 +1,43 @@
 import { NextResponse } from "next/server";
 import Trip from "@/models/Trip";
 import dbConnect from "../../../lib/dbConnect";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { z } from "zod";
+
+const tripSchema = z.object({
+    fromCity: z.string().min(1),
+    toCity: z.string().min(1),
+    fromDate: z.coerce.date(),
+    toDate: z.coerce.date(),
+    mode: z.enum(["flight", "train", "bus", "taxi"]),
+    budget: z.coerce.number(),
+    tripConfirmed: z.boolean()
+});
 
 export async function POST(req) {
   try {
     await dbConnect();
 
-    // TEMP AUTH for Postman:
-    // Send header: x-user-id: <Mongo ObjectId of an existing user>
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized: missing x-user-id header" },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const body = await req.json();
-    const { fromCity, toCity, fromDate, toDate, mode, budget, tripConfirmed } = body;
 
-    // minimal validation
-    if (!fromCity || !toCity || !fromDate || !toDate || !mode || budget == null) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    // Validate using zod;
+    const result = tripSchema.safeParse(body);
+
+    if(!result.success){
+      return NextResponse.json({ error: "Invalid input data" }, { status: 400 });
     }
+    else{
+      const { fromCity, toCity, fromDate, toDate, mode, budget, tripConfirmed } = result.data;
 
     const trip = await Trip.create({
-      userId, // IMPORTANT: take from header, not from body
+      userId,
       fromCity,
       toCity,
       fromDate: new Date(fromDate),
@@ -39,6 +48,8 @@ export async function POST(req) {
     });
 
     return NextResponse.json(trip, { status: 201 });
+    }
+
   } catch (err) {
     return NextResponse.json(
       { error: err?.message || "Server error" },
@@ -47,17 +58,15 @@ export async function POST(req) {
   }
 }
 
-export async function GET(req) {
+export async function GET() {
   try {
     await dbConnect();
 
-    const userId = req.headers.get("x-user-id");
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized: missing x-user-id header" },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 });
     return NextResponse.json(trips, { status: 200 });
