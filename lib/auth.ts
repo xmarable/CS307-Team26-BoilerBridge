@@ -5,22 +5,17 @@ import clientPromise from "./mongodb";
 import { validateLogin } from "./validateLogin";
 
 export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(clientPromise),
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: {
-          label: "Email",
-          type: "email",
-          placeholder: "youremail@test.com",
-        },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) {
-          return null;
-        }
+    providers: [
+        CredentialsProvider({
+            name: 'Credentials',
+            credentials: {
+                email: { label: "Email", type: "email", placeholder: "youremail@test.com" },
+                password: { label: "Password", type: 'password' },
+            },
+            async authorize(credentials, req) {
+                if (!credentials?.email || !credentials?.password) {
+                    return null;
+                }
 
         const user = await validateLogin(
           credentials.email,
@@ -28,8 +23,9 @@ export const authOptions: NextAuthOptions = {
         );
         if (!user) return null;
 
-        const mongoId = (user as any)._id?.toString?.() ?? undefined;
-        if (!mongoId) return null;
+                // Use Mongo _id as the stable identifier for sessions
+                const mongoId = (user as any).userId ?? undefined;
+                if (!mongoId) return null;
 
         return {
           id: mongoId,
