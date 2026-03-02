@@ -109,6 +109,14 @@ export function Dashboard() {
             <p className="text-gray-600">Manage and plan your adventures</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/groups">
+              <Button
+                variant="outline"
+                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
+              >
+                My Groups
+              </Button>
+            </Link>
             <Link href="/groups/new">
               <Button
                 variant="outline"
