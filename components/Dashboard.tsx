@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { 
-  Search, 
-  Bell, 
-  Plus, 
-  Map, 
-  MessageSquare, 
-  DollarSign, 
+import {
+  Search,
+  Bell,
+  Plus,
+  Map,
+  MessageSquare,
+  DollarSign,
   Settings,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  Clock,
+  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -28,7 +30,7 @@ const trips = [
     activities: 12,
     expenses: 28,
     unreadChats: 3,
-    image: "https://images.unsplash.com/photo-1533993192821-2cce3a8267d1?w=400"
+    image: "https://images.unsplash.com/photo-1533993192821-2cce3a8267d1?w=400",
   },
   {
     id: 2,
@@ -39,7 +41,7 @@ const trips = [
     activities: 8,
     expenses: 15,
     unreadChats: 0,
-    image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400"
+    image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400",
   },
   {
     id: 3,
@@ -50,7 +52,7 @@ const trips = [
     activities: 5,
     expenses: 9,
     unreadChats: 7,
-    image: "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400"
+    image: "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400",
   },
   {
     id: 4,
@@ -61,14 +63,32 @@ const trips = [
     activities: 3,
     expenses: 4,
     unreadChats: 1,
-    image: "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=400"
-  }
+    image: "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=400",
+  },
 ];
 
 const upcomingActivities = [
-  { trip: "Spring Break Miami", activity: "Beach Volleyball", date: "Tomorrow", time: "2:00 PM" },
-  { trip: "Weekend Camping", activity: "Trail Hike", date: "Apr 5", time: "9:00 AM" },
-  { trip: "NYC Museum Tour", activity: "MoMA Visit", date: "May 20", time: "11:00 AM" }
+  {
+    trip: "Spring Break Miami",
+    activity: "Beach Volleyball",
+    date: "Tomorrow",
+    time: "2:00 PM",
+    location: "South Beach",
+  },
+  {
+    trip: "Weekend Camping",
+    activity: "Trail Hike",
+    date: "Apr 5",
+    time: "9:00 AM",
+    location: "State Park",
+  },
+  {
+    trip: "NYC Museum Tour",
+    activity: "MoMA Visit",
+    date: "May 20",
+    time: "11:00 AM",
+    location: "Midtown",
+  },
 ];
 
 export function Dashboard() {
@@ -76,241 +96,180 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState("my-trips");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">B</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">BoilerBridge</span>
-            </Link>
-            
-            <div className="hidden md:block relative w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                placeholder="Search trips..."
-                className="pl-10"
-              />
-            </div>
+    <div className="p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">
+              Welcome back,{" "}
+              {(session?.user as any)?.username ||
+                session?.user?.name ||
+                "Boilermaker"}
+            </h1>
+            <p className="text-gray-600">Manage and plan your adventures</p>
           </div>
-
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
-            </Button>
-            <Link href="/settings">
-              <Avatar className="cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all">
-                <AvatarFallback className="bg-linear-to-br from-amber-500 to-orange-600 text-white">
-                  {session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "JD"}
-                </AvatarFallback>
-              </Avatar>
+          <div className="flex gap-2">
+            <Link href="/groups/new">
+              <Button
+                variant="outline"
+                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
+              >
+                Create Group
+              </Button>
+            </Link>
+            <Link href="/trip/new">
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                <Plus className="mr-2" size={18} />
+                Create Trip
+              </Button>
             </Link>
           </div>
         </div>
-      </header>
 
-      <div className="flex">
-        <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] sticky top-18.25">
-          <nav className="p-4 space-y-1">
-            <button
-              onClick={() => setActiveTab("my-trips")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === "my-trips"
-                  ? "bg-amber-50 text-amber-700"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <Map size={20} />
-              <span className="font-medium">My Trips</span>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab("discover")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === "discover"
-                  ? "bg-amber-50 text-amber-700"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <TrendingUp size={20} />
-              <span className="font-medium">Discover Trips</span>
-            </button>
+        <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-10">
+          {trips.map((trip) => (
+            <Link key={trip.id} href={`/trip/${trip.id}`}>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all group">
+                <div className="h-44 overflow-hidden relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={trip.image}
+                    alt={trip.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute top-4 right-4">
+                    {trip.unreadChats > 0 && (
+                      <span className="bg-amber-500 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-sm">
+                        {trip.unreadChats} NEW
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-            <button
-              onClick={() => setActiveTab("messages")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === "messages"
-                  ? "bg-amber-50 text-amber-700"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <MessageSquare size={20} />
-              <span className="font-medium">Messages</span>
-              <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
-                11
-              </span>
-            </button>
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-xl text-gray-900">
+                      {trip.name}
+                    </h3>
+                    <ArrowUpRight
+                      className="text-gray-400 group-hover:text-amber-500 transition-colors"
+                      size={20}
+                    />
+                  </div>
 
-            <button
-              onClick={() => setActiveTab("expenses")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === "expenses"
-                  ? "bg-amber-50 text-amber-700"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <DollarSign size={20} />
-              <span className="font-medium">Expenses</span>
-            </button>
+                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                    <Calendar size={14} />
+                    <span>{trip.dates}</span>
+                  </div>
 
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                activeTab === "settings"
-                  ? "bg-amber-50 text-amber-700"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <Settings size={20} />
-              <span className="font-medium">Settings</span>
-            </button>
-          </nav>
-        </aside>
-
-        <main className="flex-1 p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-1">Your Trips</h1>
-                <p className="text-gray-600">Manage and plan your adventures</p>
-              </div>
-              <div className="flex gap-2">
-                <Link href="/groups/new">
-                  <Button variant="outline" className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                    Create Group
-                  </Button>
-                </Link>
-                <Link href="/trip/new">
-                  <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white">
-                    <Plus className="mr-2" size={18} />
-                    Create Trip
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-              {trips.map((trip) => (
-                <Link key={trip.id} href={`/trip/${trip.id}`}>
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="h-40 overflow-hidden bg-gray-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={trip.image}
-                        alt={trip.name}
-                        className="w-full h-full object-cover"
-                      />
+                  <div className="flex items-center mb-6">
+                    <div className="flex -space-x-2 overflow-hidden">
+                      {trip.members.slice(0, 5).map((member, idx) => (
+                        <Avatar
+                          key={idx}
+                          className="inline-block h-8 w-8 rounded-full ring-2 ring-white"
+                        >
+                          <AvatarFallback className="bg-gray-100 text-gray-700 text-xs font-bold">
+                            {member.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
                     </div>
-                    
-                    <div className="p-5">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-lg text-gray-900">{trip.name}</h3>
-                        {trip.unreadChats > 0 && (
-                          <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full">
-                            {trip.unreadChats} new
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
-                        <Calendar size={14} />
-                        <span>{trip.dates}</span>
-                      </div>
+                    {trip.members.length > 5 && (
+                      <span className="ml-3 text-xs text-gray-500 font-medium">
+                        +{trip.members.length - 5} others
+                      </span>
+                    )}
+                  </div>
 
-                      <div className="flex items-center gap-1 mb-4">
-                        {trip.members.slice(0, 5).map((member, idx) => (
-                          <Link 
-                            key={idx} 
-                            href={`/profile/${member}`}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Avatar className="w-8 h-8 border-2 border-white -ml-2 first:ml-0 hover:scale-110 transition-transform cursor-pointer">
-                              <AvatarFallback className="text-xs bg-linear-to-br from-amber-400 to-orange-500 text-white">
-                                {member.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                          </Link>
-                        ))}
-                        {trip.members.length > 5 && (
-                          <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white -ml-2 flex items-center justify-center text-xs text-gray-600">
-                            +{trip.members.length - 5}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600">Budget</span>
-                          <span className="font-medium text-gray-900">
-                            ${trip.budget.used} / ${trip.budget.total}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-linear-to-r from-amber-500 to-orange-600 h-2 rounded-full transition-all"
-                            style={{ width: `${(trip.budget.used / trip.budget.total) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <span>{trip.activities} activities</span>
-                        <span>{trip.expenses} expenses</span>
-                        <span>{trip.unreadChats} chats</span>
-                      </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5">
+                      <span className="text-gray-600 font-medium">Budget</span>
+                      <span className="font-bold text-gray-900">
+                        ${trip.budget.used}{" "}
+                        <span className="text-gray-400 font-normal">
+                          / ${trip.budget.total}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-linear-to-r from-amber-500 to-orange-600 h-2 rounded-full transition-all duration-1000"
+                        style={{
+                          width: `${(trip.budget.used / trip.budget.total) * 100}%`,
+                        }}
+                      ></div>
                     </div>
                   </div>
-                </Link>
-              ))}
-            </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Upcoming Activities</h2>
-              <div className="space-y-3">
-                {upcomingActivities.length > 0 ? (
-                  upcomingActivities.map((activity, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-4 bg-amber-50 rounded-xl"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-linear-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-                          <Calendar className="text-white" size={20} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{activity.activity}</p>
-                          <p className="text-sm text-gray-600">{activity.trip}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{activity.date}</p>
-                        <p className="text-sm text-gray-600">{activity.time}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Calendar className="mx-auto mb-2 text-gray-400" size={32} />
-                    <p>No upcoming activities ✈️</p>
+                  <div className="flex items-center justify-between mt-4 text-xs text-gray-500 font-medium">
+                    <span>{trip.activities} activities</span>
+                    <span>{trip.expenses} expenses</span>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            </Link>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              Upcoming Activities
+            </h2>
+            <Button
+              variant="ghost"
+              className="text-amber-600 hover:text-amber-700 font-bold"
+            >
+              View Schedule
+            </Button>
           </div>
-        </main>
+
+          <div className="space-y-4">
+            {upcomingActivities.length > 0 ? (
+              upcomingActivities.map((activity, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-gray-50 rounded-2xl border border-transparent hover:border-amber-200 hover:bg-amber-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-md">
+                      <Calendar className="text-white" size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-lg text-gray-900">
+                        {activity.activity}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <span className="font-medium text-amber-600">
+                          {activity.trip}
+                        </span>
+                        {activity.location && (
+                          <>
+                            <span>•</span>
+                            <span>{activity.location}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-gray-200">
+                    <p className="text-base font-bold text-gray-900">
+                      {activity.date}
+                    </p>
+                    <p className="text-sm font-medium text-gray-500 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm mt-1">
+                      {activity.time}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No upcoming activities ✈️</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

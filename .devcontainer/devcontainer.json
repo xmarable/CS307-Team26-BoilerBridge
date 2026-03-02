@@ -19,7 +19,13 @@
           "source.fixAll.eslint": "explicit"
         },
         "tailwindCSS.emmetCompletions": true,
-        "terminal.integrated.defaultProfile.linux": "bash"
+        "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-entries/**": true,
+        "**/node_modules/**": true,
+        "**/.next/**": true
+      },
+      "terminal.integrated.defaultProfile.linux": "bash"
       }
     }
   },
