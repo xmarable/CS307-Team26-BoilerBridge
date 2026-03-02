@@ -1,4 +1,4 @@
-import mongoose, { Mongoose } from "mongoose";
+import mongoose from "mongoose";
 import { randomUUID } from "crypto";
 
 const userSchema = new mongoose.Schema({
@@ -10,9 +10,19 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
+    unique: true,
     trim: true,
     minlength: 3,
     maxlength: 30,
+  },
+  usernameLastChanged: {
+    type: Date,
+    default: null,
+  },
+  name: {
+    type: String,
+    trim: true,
+    default: "",
   },
   email: {
     type: String,
@@ -23,6 +33,8 @@ const userSchema = new mongoose.Schema({
   },
   passwordHash: { type: String, required: true },
   school: { type: String, trim: true },
+  location: { type: String, trim: true },
+  image: { type: String, default: "" },
   friendsList: [
     {
       type: mongoose.Schema.Types.UUID,
@@ -33,20 +45,20 @@ const userSchema = new mongoose.Schema({
     type: {
       notifications: {
         tripReminders: { type: Boolean, default: false },
-        friendRequests: { type: Boolean, defualt: false },
-        groupInvite: { type: Boolean, default: false }
+        friendRequests: { type: Boolean, default: false },
+        groupInvite: { type: Boolean, default: false },
       },
       deletion: {
         requested: { type: Boolean, default: false },
         requestedAt: { type: Date, default: null },
         scheduledFor: { type: Date, default: null },
-        reason: {type: String, default: "" }
+        reason: { type: String, default: "" },
       },
       security: {
         isStudentVerified: { type: Boolean, default: false },
-        passwordLastChanged: { type: Date, default: null }
-      }
-    }
+        passwordLastChanged: { type: Date, default: null },
+      },
+    },
   },
 });
 
