@@ -4,17 +4,12 @@
 /** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: "node",
-  testEnvironmentOptions: {
-    ...(typeof globalThis.Request !== "undefined" && { Request: globalThis.Request }),
-    ...(typeof globalThis.Headers !== "undefined" && { Headers: globalThis.Headers }),
-    ...(typeof globalThis.Response !== "undefined" && { Response: globalThis.Response }),
-  },
-  rootDir: "./",
-  setupFiles: ["<rootDir>/jest.setup.js"],
-  moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/$1",
-    "^(\\.{1,2}/.*)\\.js$": "$1",
-  },
+
+  // Required for ESM support in Jest
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
+
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+
   transform: {
     "^.+\\.(t|j)sx?$": [
 =======
@@ -39,13 +34,17 @@ module.exports = {
       "babel-jest",
       {
         presets: [
-          ["@babel/preset-env", { targets: { node: "current" } }],
-<<<<<<< HEAD
+          // Keep modules: false for ESM compatibility
+          [
+            "@babel/preset-env",
+            { targets: { node: "current" }, modules: false },
+          ],
           ["@babel/preset-react", { runtime: "automatic" }],
 =======
 >>>>>>> 0dd804b (Fixed test files)
           "@babel/preset-typescript",
         ],
+        plugins: ["@babel/plugin-syntax-top-level-await"],
       },
     ],
   },
@@ -53,11 +52,10 @@ module.exports = {
 
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 
-  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
-  testPathIgnorePatterns: ["/node_modules/", "/.next/"],
+  transformIgnorePatterns: [
+    "/node_modules/(?!(bson|mongodb|mongoose|@mongodb-js|next-auth)/)",
+  ],
 };
-=======
-};
->>>>>>> 0dd804b (Fixed test files)

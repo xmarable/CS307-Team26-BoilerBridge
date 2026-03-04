@@ -1,4 +1,5 @@
-import mongoose from "mongoose";
+/** @jest-environment node */
+import { jest } from "@jest/globals";
 import bcrypt from "bcryptjs";
 import type { Types } from "mongoose";
 
@@ -10,8 +11,12 @@ jest.mock("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = require("next-auth");
-const mockGetServerSession = nextAuth.getServerSession;
+const { default: mongoose } = await import("mongoose");
+const { default: dbConnect } = await import("@/lib/dbConnect");
+const { default: User } = await import("@/models/User");
+const { default: TravelGroup } = await import("@/models/TravelGroup");
+const { getServerSession } = await import("next-auth");
+const { POST } = await import("@/app/api/groups/create/route");
 
 let POST: (req: Request) => Promise<Response>;
 
@@ -19,17 +24,32 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
-  const createRoute = await import("@/app/api/groups/create/route");
-  POST = createRoute.POST;
+
+  try {
+    await mongoose.connection
+      .collection("travelgroups")
+      .dropIndex("chatLogs.messageID_1");
+  } catch (error) {}
 });
 
 afterAll(async () => {
   if (mongoose.connection.readyState === 1) {
     await TravelGroup.deleteMany({});
     await User.deleteMany({});
-    await mongoose.connection.close();
+
+    await mongoose.connection.close(true);
   }
-  await new Promise((resolve) => setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS));
+  await mongoose.disconnect();
+
+  if ((global as any).mongoose) {
+    (global as any).mongoose.conn = null;
+    (global as any).mongoose.promise = null;
+  }
+
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS);
+    timer.unref();
+  });
 });
 
 beforeEach(() => {
