@@ -103,7 +103,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "jest-environment-node": "^30.2.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "why-is-node-running": "^3.2.2"
   },
-  "test": "jest --config jest.config.cjs"
+  "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.cjs --forceExit --no-cache"
 }
