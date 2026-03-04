@@ -1,0 +1,125 @@
+name: Sync BoilerBridge Docs to PDF
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+  workflow_dispatch:       # Allows manual trigger
+
+jobs:
+  sync-pdfs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          # Use your Personal Access Token to ensure we can push back
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Google Client
+        run: pip install google-api-python-client google-auth
+
+      - name: Create Credentials File
+        run: echo '${{ secrets.GCP_SA_KEY }}' > credentials.json
+
+      - name: Smart Sync PDFs from Drive
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: |
+          cat <<EOF > download_pdfs.py
+          import os
+          import io
+          import json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          
+          # 1. Setup
+          folder_id = os.environ['DRIVE_FOLDER_ID']
+          creds = service_account.Credentials.from_service_account_file('credentials.json')
+          service = build('drive', 'v3', credentials=creds)
+          
+          # 2. Ensure docs folder exists
+          if not os.path.exists('docs'):
+              os.makedirs('docs')
+
+          # 3. Load previous state (from the repo)
+          state_file = 'docs/sync_state.json'
+          last_state = {}
+          if os.path.exists(state_file):
+              try:
+                  with open(state_file, 'r') as f:
+                      last_state = json.load(f)
+              except:
+                  last_state = {}
+
+          current_state = {}
+          
+          # 4. Get file list from Drive
+          results = service.files().list(
+              q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false",
+              fields="files(id, name, modifiedTime)"
+          ).execute()
+          files = results.get('files', [])
+          
+          print(f"Found {len(files)} documents in Drive.")
+          
+          # 5. Process files
+          for file in files:
+              doc_id = file['id']
+              doc_name = file['name']
+              mod_time = file['modifiedTime']
+              
+              # Add to current state tracker
+              current_state[doc_id] = {'name': doc_name, 'modifiedTime': mod_time}
+              
+              # Check if modified since last sync
+              prev_data = last_state.get(doc_id)
+              
+              if not prev_data or prev_data['modifiedTime'] != mod_time:
+                  print(f"--> Downloading update for: {doc_name}")
+                  
+                  # Download as PDF
+                  request = service.files().export_media(fileId=doc_id, mimeType='application/pdf')
+                  fh = io.FileIO(f"docs/{doc_name}.pdf", 'wb')
+                  downloader = MediaIoBaseDownload(fh, request)
+                  done = False
+                  while not done:
+                      status, done = downloader.next_chunk()
+              else:
+                  print(f"--> Skipping (no changes): {doc_name}")
+          
+          # 6. Save new state to file
+          with open(state_file, 'w') as f:
+              json.dump(current_state, f, indent=2)
+          EOF
+          
+          # Run the script
+          python download_pdfs.py
+
+      - name: Cleanup Credentials
+        if: always()
+        run: rm credentials.json
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "Xavion Marable"
+          git config --global user.email "xmarable@purdue.edu"
+          
+          # Add PDFs AND the state file (so the runner remembers for next time)
+          git add docs/*.pdf
+          git add docs/sync_state.json
+          
+          if git diff --staged --quiet; then
+            echo "No changes found."
+          else
+            git commit -m "Auto-sync: Smart update of BoilerBridge PDFs"
+            git push origin main
+          fi

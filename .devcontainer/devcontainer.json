@@ -1,0 +1,49 @@
+{
+  "name": "BoilerBridge Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "mongodb.mongodb-vscode",
+        "bradlc.vscode-tailwindcss",
+        "eamodio.gitlens",
+        "humao.rest-client",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.cpptools",
+        "prisma.prisma"
+      ],
+      "settings": {
+        "workbench.colorTheme": "Default Dark Modern",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "tailwindCSS.emmetCompletions": true,
+        "files.watcherExclude": {
+          "**/.git/objects/**": true,
+          "**/.git/subtree-entries/**": true,
+          "**/node_modules/**": true,
+          "**/.next/**": true
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "forwardPorts": [3000],
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+  ],
+  "postCreateCommand": "sudo chown -R node node_modules && curl -sL https://github.com/digitalocean/doctl/releases/download/v1.110.0/doctl-1.110.0-linux-amd64.tar.gz | tar -xzv && sudo mv doctl /usr/local/bin && npm install",
+  "remoteUser": "node"
+}
