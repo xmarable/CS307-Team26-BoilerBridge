@@ -11,21 +11,22 @@ const expenseSchema = new mongoose.Schema(
     debtors: { type: Map, of: Number },
     isSettled: { type: Boolean, default: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const messageSchema = new mongoose.Schema(
   {
-    messageID: { 
+    messageID: {
       type: mongoose.Schema.Types.UUID,
       default: () => randomUUID(),
-      unique: true
-     },
+      unique: true,
+      sparse: true, // added to allow multiple nulls in unique index
+    },
     senderID: { type: String },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const travelGroupSchema = new mongoose.Schema({
