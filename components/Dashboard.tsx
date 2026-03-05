@@ -91,9 +91,20 @@ const upcomingActivities = [
   },
 ];
 
-export function Dashboard() {
+interface DashboardProps {
+  initialData: {
+    displayName: string;
+    profileImage?: string | null;
+  };
+}
+
+export function Dashboard({ initialData }: DashboardProps) {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("my-trips");
+
+  // Determine the best name to display
+  const displayName =
+    session?.user?.name || (session?.user as any)?.username || "Boilermaker";
 
   return (
     <div className="p-6 lg:p-8">
@@ -101,10 +112,7 @@ export function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">
-              Welcome back,{" "}
-              {(session?.user as any)?.username ||
-                session?.user?.name ||
-                "Boilermaker"}
+              Welcome back, {initialData.displayName}!
             </h1>
             <p className="text-gray-600">Manage and plan your adventures</p>
           </div>

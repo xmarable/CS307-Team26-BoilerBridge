@@ -7,42 +7,41 @@ const friendRequestSchema = new mongoose.Schema(
     requestId: {
       type: mongoose.Schema.Types.UUID,
       default: () => randomUUID(),
-      unique: true
+      unique: true,
     },
     requesterId: {
       type: mongoose.Schema.Types.UUID,
       required: true,
-      ref: "User"
+      ref: "User",
     },
     recipientId: {
       type: mongoose.Schema.Types.UUID,
       required: true,
-      ref: "User"
+      ref: "User",
     },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected"],
-      default: "pending"
-    }
+      default: "pending",
+    },
   },
   {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 );
 
-friendRequestSchema.pre("save", function (next: any) {
+friendRequestSchema.pre("save", function () {
   const doc = this as any;
   const requester = String(doc.requesterId);
   const recipient = String(doc.recipientId);
 
   if (requester === recipient) {
-    next(new Error("Cannot send a friend request to yourself."));
-  }
-  else {
-    next();
+    throw new Error("Cannot send a friend request to yourself.");
   }
 });
 
-const FriendRequest = mongoose.models.FriendRequest || mongoose.model("FriendRequest", friendRequestSchema);
+const FriendRequest =
+  mongoose.models.FriendRequest ||
+  mongoose.model("FriendRequest", friendRequestSchema);
 
 export default FriendRequest;

@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import dbConnect from "@/lib/dbConnect";
-import User from "@/models/User";
-import TravelGroup from "@/models/TravelGroup";
+import type { Types } from "mongoose";
 
 jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -88,7 +86,9 @@ describe("POST /api/groups/create", () => {
     const saved = await TravelGroup.findById(data.group._id);
     expect(saved).not.toBeNull();
     expect(saved!.leaderID.toString()).toBe(userId);
-    expect(saved!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).toContain(userId);
+    expect(
+      saved!.membersList.map((id: Types.ObjectId) => id.toString()),
+    ).toContain(userId);
 
     await User.deleteOne({ _id: user._id });
     await TravelGroup.deleteOne({ _id: data.group._id });

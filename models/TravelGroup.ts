@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { randomUUID } from "crypto";
+import { unique } from "next/dist/build/utils";
 
 const expenseSchema = new mongoose.Schema(
   {
@@ -10,17 +11,22 @@ const expenseSchema = new mongoose.Schema(
     debtors: { type: Map, of: Number },
     isSettled: { type: Boolean, default: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const messageSchema = new mongoose.Schema(
   {
-    messageID: { type: String },
-    senderID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    messageID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+      unique: true,
+      sparse: true, // added to allow multiple nulls in unique index
+    },
+    senderID: { type: String },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const travelGroupSchema = new mongoose.Schema({
@@ -32,14 +38,13 @@ const travelGroupSchema = new mongoose.Schema({
   groupName: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
   leaderID: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    type: String,
     required: true,
   },
   membersList: [
     {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
+      required: true,
     },
   ],
   ledger: [expenseSchema],
