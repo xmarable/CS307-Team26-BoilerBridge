@@ -10,8 +10,11 @@ const User = (UserImport as any).default || UserImport; // IMPORTANT: handle pot
 const CONNECTION_CLEANUP_DELAY_MS = 500; // time to wait for mongo to actually kill the connection
 
 beforeAll(async () => {
-  await dbConnect(); // make sure we are connected before any tests run
-  await User.syncIndexes(); // ensure indexes are in place before testing unique constraints
+  await dbConnect();
+
+  await User.deleteMany({}); // clear the users collection before starting the tests to ensure a clean slate
+
+  await User.syncIndexes();
 });
 
 afterAll(async () => {
@@ -37,16 +40,17 @@ afterAll(async () => {
 });
 
 describe("User Model Test Suite", () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
   it("should create and save a valid user successfully", async () => {
-    const validUser = new User({
-      // create a new instance with all required fields
+    const savedUser = await User.create({
       username: "xavy_test",
       email: "xmarab@purdue.edu",
       passwordHash: "hashed_password_123",
       school: "Purdue University",
     });
 
-    const savedUser = await validUser.save(); // push it to the database
     expect(savedUser._id).toBeDefined(); // verify mongo generated an objectid
     expect(savedUser.email).toBe("xmarab@purdue.edu"); // double check the data stayed correct
   });
@@ -56,50 +60,42 @@ describe("User Model Test Suite", () => {
     const duplicateEmail = "duplicate_test@purdue.edu"; // constant for the email we are going to collide
 
     // save the first instance
-    await new User({
+    await User.create({
       // setup the first user that will own the email
       username: "original_user",
       email: duplicateEmail,
       passwordHash: "hash123",
-    }).save();
-
-    // attempt to save the second instance
-    const duplicateUser = new User({
-      // create a second user with that same email
-      username: "xavy_duplicate",
-      email: duplicateEmail,
-      passwordHash: "hashed_password_456",
     });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let error: any = null; // local var to capture the thrown error
     try {
-      await duplicateUser.save(); // IMPORTANT: this should explode because of the unique index
+      await User.create({
+        username: "xavy_duplicate",
+        email: duplicateEmail,
+        passwordHash: "hashed_password_456",
+      });
     } catch (err) {
       error = err; // catch the error so we can inspect it
     }
 
-    expect(error).toBeDefined(); // make sure it actually failed
+    expect(error).not.toBeNull(); // make sure it actually failed
     expect(error.code).toBe(11000); // IMPORTANT: 11000 is the specific mongo code for duplicate key errors
   });
 
   it("should fail to save a user without a password", async () => {
-    const invalidUser = new User({
-      // create a user but leave out the required passwordhash
-      username: "missing_password_user",
-      email: "nopassword@purdue.edu",
-    });
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let error: any = null; // another var for error catching
     try {
-      await invalidUser.save(); // this should trigger mongoose validation
+      await User.create({
+        username: "missing_password_user",
+        email: "nopassword@purdue.edu",
+      });
     } catch (err) {
       error = err; // grab the validation error
     }
 
-    expect(error).toBeDefined(); // confirm save failed
-    if (error !== null) {
-      expect(error.name).toBe("ValidationError"); // IMPORTANT: verify it failed for schema reasons not connection reasons
-    }
+    expect(error).toBeDefined();
+    expect(error.name).toBe("ValidationError");
   });
 });

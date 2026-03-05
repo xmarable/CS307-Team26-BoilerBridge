@@ -13,17 +13,17 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+
+  await User.deleteMany({}); // clear the users collection before starting the tests to ensure a clean slate
+
   await User.syncIndexes();
 });
 
 afterAll(async () => {
-  if (User && typeof User.deleteMany() === "function") {
-    await User.deleteMany({});
-  }
+  await User.deleteMany({});
   if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close(true); // close the connection after tests complete
+    await mongoose.connection.close(); // close the connection after tests complete
   }
-  await mongoose.disconnect(); // ensure mongoose fully disconnects
 
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
@@ -46,28 +46,31 @@ describe("Login Test Suite", () => {
     const plainPass = "securePassword123";
     const hashedPass = await bcrypt.hash(plainPass, 10);
 
-    await new User({
+    await User.create({
       username: "login_test_user",
       email: "login_success@test.com",
       passwordHash: hashedPass,
-    }).save();
+    });
+
+    const userInDb = await User.findOne({ email });
+    expect(userInDb).not.toBeNull();
 
     const result = await validateLogin("login_success@test.com", plainPass);
 
     expect(result).not.toBeNull();
     if (result) {
-      expect(result.email).toBe("login_success@test.com");
+      expect(result?.email).toBe("login_success@test.com");
     }
   });
 
   it("should return null with incorrect password", async () => {
     const hashedPass = await bcrypt.hash("correctPass123", 10);
 
-    await new User({
+    await User.create({
       username: "login_test_user",
       email: "incorrect_pass@test.com",
       passwordHash: hashedPass,
-    }).save();
+    });
 
     const result = await validateLogin(
       "incorrect_pass@test.com",
