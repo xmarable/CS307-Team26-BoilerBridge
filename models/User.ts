@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema({
     type: {
       notifications: {
         tripReminders: { type: Boolean, default: false },
-        friendRequests: { type: Boolean, defualt: false },
+        friendRequests: { type: Boolean, default: false },
         groupInvite: { type: Boolean, default: false }
       },
       deletion: {
