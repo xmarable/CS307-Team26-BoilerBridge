@@ -1,26 +1,19 @@
-/** @jest-environment node */
-import { jest } from "@jest/globals";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import type { Types } from "mongoose";
 
-jest.unstable_mockModule("next-auth", () => ({
+jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.unstable_mockModule("@/lib/auth", () => ({
+jest.mock("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const { default: mongoose } = await import("mongoose");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-const { getServerSession } = await import("next-auth");
-const { POST } = await import("@/app/api/groups/create/route");
+const nextAuth = require("next-auth");
+const mockGetServerSession = nextAuth.getServerSession;
 
-const mockGetServerSession = getServerSession as jest.MockedFunction<
-  typeof getServerSession
->;
+let POST: (req: Request) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
@@ -42,6 +35,8 @@ beforeAll(async () => {
   } catch (error) {
     // index might not exist, which is fine
   }
+  const createRoute = await import("@/app/api/groups/create/route");
+  POST = createRoute.POST;
 });
 
 afterAll(async () => {
