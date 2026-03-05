@@ -18,7 +18,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.cjs --runInBand",
+    "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config=jest.config.cj --runInBand --forceExit --colors 2>&1 | grep -v 'Force exiting Jest'",
+    "test:watch": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "lint": "eslint"
   },
   "dependencies": {
@@ -105,6 +106,5 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "why-is-node-running": "^3.2.2"
-  },
-  "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.cjs --forceExit --no-cache"
+  }
 }
