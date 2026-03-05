@@ -14,12 +14,9 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 beforeAll(async () => {
   await dbConnect();
 
-  // Instead of dropping (which is slow/unstable in loops), wipe data
-  // This keeps the indexes intact but empty.
   await User.deleteMany({});
   await VerificationCode.deleteMany({});
 
-  // Ensure indexes are ready
   await User.syncIndexes();
   await VerificationCode.syncIndexes();
 });
@@ -29,7 +26,8 @@ afterAll(async () => {
   await VerificationCode.deleteMany({});
 
   if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
+    await mongoose.disconnect();
+    await mongoose.connection.close(true); // close the connection after tests complete
   }
 
   if ((global as any).mongoose) {
@@ -37,12 +35,8 @@ afterAll(async () => {
     (global as any).mongoose.promise = null;
   }
 
-  await new Promise((resolve) => {
-    const timer = setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS);
-    timer.unref();
-  });
-
   jest.resetModules();
+  jest.clearAllMocks();
 });
 
 describe("Student Verification Logic Test Suite", () => {

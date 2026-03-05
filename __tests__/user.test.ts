@@ -23,20 +23,17 @@ afterAll(async () => {
   }
 
   if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
     await mongoose.connection.close(true); // close the connection after tests complete
   }
-  await mongoose.disconnect(); // ensure mongoose fully disconnects
 
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
     (global as any).mongoose.promise = null;
   }
-  await new Promise((resolve) => {
-    const timer = setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS); // buffer to let the driver finish cleanup
-    timer.unref();
-  }); // buffer to let the driver finish cleanup
 
   jest.resetModules();
+  jest.clearAllMocks();
 });
 
 describe("User Model Test Suite", () => {

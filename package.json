@@ -18,7 +18,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --runInBand --forceExit",
+    "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --runInBand --forceExit --colors 2>&1 | grep -v 'Force exiting Jest'",
     "test:watch": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "lint": "eslint"
   },

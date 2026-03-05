@@ -27,31 +27,39 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 beforeAll(async () => {
   await dbConnect();
 
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
+
+  // Sync indexes for both models to prevent race conditions
+  await User.syncIndexes();
+  await TravelGroup.syncIndexes();
+
   try {
-    await mongoose.connection
-      .collection("travelgroups")
-      .dropIndex("chatLogs.messageID_1");
-  } catch (error) {}
+    const db = mongoose.connection.db;
+    if (db) {
+      await db.collection("travelgroups").dropIndex("chatLogs.messageID_1");
+    }
+  } catch (error) {
+    // index might not exist, which is fine
+  }
 });
 
 afterAll(async () => {
-  if (mongoose.connection.readyState === 1) {
-    await TravelGroup.deleteMany({});
-    await User.deleteMany({});
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
 
-    await mongoose.connection.close(true);
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+    await mongoose.connection.close(true); // close the connection after tests complete
   }
-  await mongoose.disconnect();
 
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
     (global as any).mongoose.promise = null;
   }
 
-  await new Promise((resolve) => {
-    const timer = setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS);
-    timer.unref();
-  });
+  jest.resetModules();
+  jest.clearAllMocks();
 });
 
 beforeEach(() => {

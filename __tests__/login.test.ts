@@ -21,8 +21,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await User.deleteMany({});
+
   if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close(); // close the connection after tests complete
+    await mongoose.disconnect();
+    await mongoose.connection.close(true); // close the connection after tests complete
   }
 
   if ((global as any).mongoose) {
@@ -30,12 +32,8 @@ afterAll(async () => {
     (global as any).mongoose.promise = null;
   }
 
-  await new Promise((resolve) => {
-    const timer = setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS);
-    timer.unref();
-  });
-
   jest.resetModules();
+  jest.clearAllMocks();
 });
 
 describe("Login Test Suite", () => {
