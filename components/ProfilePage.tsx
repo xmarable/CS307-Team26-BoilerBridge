@@ -78,11 +78,22 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
         method: "POST",
         body: JSON.stringify({ action: "confirm", code: vCode }),
       });
+      const data = await res.json();
       if (res.ok) {
         setIsVerified(true);
+        setEduEmail(data.eduEmail);
         setStep("idle");
+
+        await update({
+          ...session,
+          user: {
+            ...session?.user,
+            isStudentVerified: true,
+            eduEmail: data.eduEmail,
+          },
+        });
       } else {
-        alert("Invalid code");
+        alert(data.error || "Invalid code");
       }
     } catch (error) {
       alert("Error verifying code");

@@ -7,12 +7,16 @@ declare module "next-auth" {
       id: string;
       userId: string;
       username?: string | null;
+      isStudentVerified?: boolean;
+      eduEmail?: string | null;
     } & DefaultSession["user"];
   }
 
   interface User {
     userId: string;
     username?: string | null;
+    isStudentVerified?: boolean;
+    eduEmail?: string | null;
   }
 }
 
@@ -21,5 +25,7 @@ declare module "next-auth/jwt" {
     id: string;
     userId: string;
     username?: string | null;
+    isStudentVerified?: boolean;
+    eduEmail?: string | null;
   }
 }

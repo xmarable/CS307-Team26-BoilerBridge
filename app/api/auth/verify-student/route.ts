@@ -52,17 +52,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { userId: session.user.userId },
       {
-        "settings.security.isStudentVerified": true,
-        eduEmail: record.email,
+        $set: {
+          "settings.security.isStudentVerified": true,
+          eduEmail: record.email,
+        },
       },
+      { new: true },
     );
 
     await VerificationCode.deleteOne({ _id: record._id });
 
-    return NextResponse.json({ message: "Verified successfully" });
+    return NextResponse.json({
+      message: "Verified successfully",
+      isStudentVerified: true,
+      eduEmail: updatedUser.eduEmail,
+    });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });

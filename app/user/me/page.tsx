@@ -5,30 +5,35 @@ import ProfilePage from "@/components/ProfilePage";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
+import dbConnect from "@/lib/dbConnect";
+import User from "@/models/User";
 
 export default async function MePage() {
+  await dbConnect();
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email) {
-    redirect("/login");
+    redirect("/signin");
   }
 
   const client = await clientPromise;
   const db = client.db("BoilerBridge");
+  const dbUser = await User.findOne({ email: session.user.email }).lean();
 
-  // Fetch the full user document from MongoDB
-  const userData = await db.collection("users").findOne({
-    email: session.user.email,
-  });
+  if (!dbUser) {
+    redirect("/signin");
+  }
 
   const initialData = {
-    // Only use userData.name if it exists; DO NOT fallback to session.user.name
-    name: userData?.name || "",
-    email: userData?.email || session.user.email,
-    image: userData?.image || session.user.image,
-    username: userData?.username || (session.user as any).username || "",
-    school: userData?.school || "",
-    location: userData?.location || "",
+    // Only use dbUser.name if it exists; DO NOT fallback to session.user.name
+    name: dbUser?.name || "",
+    email: dbUser?.email || session.user.email,
+    image: dbUser?.image || session.user.image,
+    username: dbUser?.username || (session.user as any).username || "",
+    school: dbUser?.school || "",
+    location: dbUser?.location || "",
+    isStudentVerified: Boolean(dbUser?.settings?.security?.isStudentVerified),
+    eduEmail: dbUser?.eduEmail || null,
   };
 
   return (
