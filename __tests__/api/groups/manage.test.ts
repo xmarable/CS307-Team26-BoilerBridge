@@ -23,6 +23,10 @@ let DELETEMember: (
   req: Request,
   ctx: { params: Promise<{ groupId: string; memberId: string }> }
 ) => Promise<Response>;
+let PATCHLeader: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> }
+) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
@@ -39,6 +43,8 @@ beforeAll(async () => {
     "@/app/api/groups/[groupId]/members/[memberId]/route"
   );
   DELETEMember = memberIdRoute.DELETE;
+  const leaderRoute = await import("@/app/api/groups/[groupId]/leader/route");
+  PATCHLeader = leaderRoute.PATCH;
 });
 
 afterAll(async () => {
@@ -535,6 +541,200 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
       member._id.toString()
     );
     expect(updated!.membersList).toHaveLength(1);
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+});
+
+describe("PATCH /api/groups/[groupId]/leader", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await PATCHLeader(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: "507f1f77bcf86cd799439011" }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: params({ groupId: "507f1f77bcf86cd799439011" }) }
+    );
+    const data = await res.json();
+    expect(res.status).toBe(401);
+    expect(data.error).toMatch(/logged in/i);
+  });
+
+  it("returns 403 when not the leader", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "tl_leader",
+      email: "tl_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "tl_member",
+      email: "tl_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: member._id.toString() },
+      expires: "",
+    });
+    const res = await PATCHLeader(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: leader._id.toString() }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: params({ groupId: group._id.toString() }) }
+    );
+    const data = await res.json();
+    expect(res.status).toBe(403);
+    expect(data.error).toMatch(/only the group leader/i);
+    const unchanged = await TravelGroup.findById(group._id);
+    expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      leader._id.toString()
+    );
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+
+  it("returns 400 when transferring to self", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "tl_self_leader",
+      email: "tl_self_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "tl_self_member",
+      email: "tl_self_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: leader._id.toString() },
+      expires: "",
+    });
+    const res = await PATCHLeader(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: leader._id.toString() }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: params({ groupId: group._id.toString() }) }
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/yourself/i);
+    const unchanged = await TravelGroup.findById(group._id);
+    expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      leader._id.toString()
+    );
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+
+  it("returns 400 when new leader is not in membersList", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "tl_nm_leader",
+      email: "tl_nm_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "tl_nm_member",
+      email: "tl_nm_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const outsider = await User.create({
+      username: "tl_nm_outside",
+      email: "tl_nm_outside@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: leader._id.toString() },
+      expires: "",
+    });
+    const res = await PATCHLeader(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: outsider._id.toString() }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: params({ groupId: group._id.toString() }) }
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/not a member/i);
+    const unchanged = await TravelGroup.findById(group._id);
+    expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      leader._id.toString()
+    );
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({
+      _id: { $in: [leader._id, member._id, outsider._id] },
+    });
+  });
+
+  it("returns 200 and updates leaderID when leader transfers to another member", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "tl_ok_leader",
+      email: "tl_ok_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "tl_ok_member",
+      email: "tl_ok_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: leader._id.toString() },
+      expires: "",
+    });
+    const res = await PATCHLeader(
+      new Request("http://localhost", {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: member._id.toString() }),
+        headers: { "Content-Type": "application/json" },
+      }),
+      { params: params({ groupId: group._id.toString() }) }
+    );
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.group).toBeDefined();
+    expect(data.group.leaderID).toBe(member._id.toString());
+    const updated = await TravelGroup.findById(group._id);
+    expect((updated!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      member._id.toString()
+    );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
   });
