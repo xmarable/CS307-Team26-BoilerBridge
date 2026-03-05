@@ -52,7 +52,7 @@ describe("Login Test Suite", () => {
       passwordHash: hashedPass,
     });
 
-    const userInDb = await User.findOne({ email });
+    const userInDb = await User.findOne({ email: "login_success@test.com" });
     expect(userInDb).not.toBeNull();
 
     const result = await validateLogin("login_success@test.com", plainPass);
