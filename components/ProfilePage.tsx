@@ -175,7 +175,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
           </p>
         </div>
         {isVerified && (
-          <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
+          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
             <CheckCircle2 size={16} />
             <span className="text-xs font-bold uppercase tracking-wider">
               Verified Student
@@ -185,8 +185,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex flex-col items-center sm:items-start gap-4 mb-8">
-          <label className="text-sm font-semibold text-gray-700">
+        <div className="flex flex-col items-center gap-4 mb-8">
+          <label className="align-center font-semibold text-gray-700">
             Profile Picture
           </label>
           <div className="relative group">
