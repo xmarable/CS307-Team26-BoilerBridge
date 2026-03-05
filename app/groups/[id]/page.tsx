@@ -50,6 +50,10 @@ export default function GroupPage() {
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
 
+  const [transferToMemberId, setTransferToMemberId] = useState<string | null>(null);
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+
   const fetchGroup = useCallback(async () => {
     if (!id) return;
     const res = await fetch(`/api/groups/${id}`, { credentials: "include" });
@@ -156,6 +160,31 @@ export default function GroupPage() {
       }
     } finally {
       setRemoving(false);
+    }
+  };
+
+  const handleTransferLeadership = async () => {
+    if (!id || !group?.isLeader || !transferToMemberId || transferring) return;
+    setTransferError(null);
+    setTransferring(true);
+    try {
+      const res = await fetch(`/api/groups/${id}/leader`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newLeaderId: transferToMemberId }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.group) {
+        setGroup(data.group);
+        setTransferToMemberId(null);
+      } else {
+        setTransferError(data?.error ?? "Failed to transfer leadership.");
+      }
+    } catch {
+      setTransferError("Failed to transfer leadership.");
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -310,6 +339,31 @@ export default function GroupPage() {
               )}
             </div>
           )}
+
+          {isLeader && (() => {
+            const otherMembers = members.filter((m) => m.id !== group.leaderID);
+            if (otherMembers.length === 0) return null;
+            return (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Label className="text-gray-700">Transfer leadership</Label>
+                <p className="mt-1 text-sm text-gray-500 mb-2">
+                  Make another member the leader. You will become a regular member.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {otherMembers.map((m) => (
+                    <Button
+                      key={m.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTransferToMemberId(m.id)}
+                    >
+                      Transfer to {m.username || m.email || "Unknown"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -335,6 +389,43 @@ export default function GroupPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {removing ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={transferToMemberId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransferToMemberId(null);
+            setTransferError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transfer leadership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will become a regular member and{" "}
+              {transferToMemberId
+                ? members.find((m) => m.id === transferToMemberId)?.username ||
+                  members.find((m) => m.id === transferToMemberId)?.email ||
+                  "this member"
+                : "the selected member"}{" "}
+              will become the leader. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {transferError && (
+              <p className="text-sm text-red-600 mr-auto">{transferError}</p>
+            )}
+            <AlertDialogCancel disabled={transferring}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTransferLeadership}
+              disabled={transferring}
+            >
+              {transferring ? "Transferring…" : "Transfer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
