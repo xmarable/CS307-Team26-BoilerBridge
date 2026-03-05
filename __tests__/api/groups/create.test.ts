@@ -1,37 +1,34 @@
-import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import dbConnect from "@/lib/dbConnect";
-import User from "@/models/User";
-import TravelGroup from "@/models/TravelGroup";
+import type { Types } from "mongoose";
 
-jest.unstable_mockModule("next-auth", () => ({
+jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.unstable_mockModule("@/lib/auth", () => ({
+jest.mock("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { POST } = await import("@/app/api/groups/create/route");
+const nextAuth = require("next-auth");
+const mockGetServerSession = nextAuth.getServerSession;
 
-const getServerSession = nextAuth.getServerSession;
-
-const mockGetServerSession = getServerSession as jest.MockedFunction<
-  typeof getServerSession
->;
+let POST: (req: Request) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+  const createRoute = await import("@/app/api/groups/create/route");
+  POST = createRoute.POST;
 });
 
 afterAll(async () => {
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
-  await mongoose.connection.close();
+  if (mongoose.connection.readyState === 1) {
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+    await mongoose.connection.close();
+  }
   await new Promise((resolve) => setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS));
 });
 
@@ -89,7 +86,9 @@ describe("POST /api/groups/create", () => {
     const saved = await TravelGroup.findById(data.group._id);
     expect(saved).not.toBeNull();
     expect(saved!.leaderID.toString()).toBe(userId);
-    expect(saved!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).toContain(userId);
+    expect(
+      saved!.membersList.map((id: Types.ObjectId) => id.toString()),
+    ).toContain(userId);
 
     await User.deleteOne({ _id: user._id });
     await TravelGroup.deleteOne({ _id: data.group._id });

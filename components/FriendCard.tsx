@@ -23,13 +23,11 @@ export default function FriendCard({
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleAddFriend = async () => {
-    // ONLY show the error if the session is confirmed unauthenticated
     if (sessionStatus === "unauthenticated") {
       setErrorMessage("You must be logged in");
       return;
     }
 
-    // Wait if the session is still fetching to avoid sending 'undefined'
     if (sessionStatus === "loading" || !session?.user?.id) {
       return;
     }
@@ -66,6 +64,12 @@ export default function FriendCard({
 
   const isSelf = session?.user?.id === targetUserId;
 
+  const userFriendsList =
+    (session?.user as any)?.friendsList ||
+    (session?.user as any)?.friends ||
+    [];
+  const isAlreadyFriend = userFriendsList.includes(targetUserId);
+
   return (
     <div className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-white mb-3">
       <div className="flex flex-col">
@@ -80,27 +84,31 @@ export default function FriendCard({
         {!isSelf && (
           <button
             onClick={handleAddFriend}
-            // Disable if session is loading to prevent early clicks
             disabled={
               status === "loading" ||
               status === "sent" ||
-              sessionStatus === "loading"
+              sessionStatus === "loading" ||
+              isAlreadyFriend
             }
             className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
-              status === "sent"
-                ? "bg-green-100 text-green-700 cursor-default"
-                : status === "error"
-                  ? "bg-red-500 text-white hover:bg-red-600"
-                  : "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
+              isAlreadyFriend
+                ? "bg-gray-100 text-gray-500 cursor-default border border-gray-200"
+                : status === "sent"
+                  ? "bg-green-100 text-green-700 cursor-default"
+                  : status === "error"
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300"
             }`}
           >
-            {sessionStatus === "loading"
-              ? "Checking..."
-              : status === "loading"
-                ? "Sending..."
-                : status === "sent"
-                  ? "Request Sent"
-                  : "Add Friend"}
+            {isAlreadyFriend
+              ? "Friends"
+              : sessionStatus === "loading"
+                ? "Checking..."
+                : status === "loading"
+                  ? "Sending..."
+                  : status === "sent"
+                    ? "Request Sent"
+                    : "Add Friend"}
           </button>
         )}
 

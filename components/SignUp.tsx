@@ -11,6 +11,7 @@ import { Label } from "./ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { signIn } from "next-auth/react";
 
 const signUpSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(30),
@@ -48,8 +49,20 @@ export function SignUp() {
 
       if (!response.ok) {
         setServerError(result.error || "Failed to create account");
-      } else {
+        setIsLoading(false);
+        return;
+      }
+      const loginResult = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (loginResult?.ok) {
+        router.refresh();
         router.push("/dashboard?registered=true");
+      } else {
+        router.push("/login?error=auto_login_failed");
       }
     } catch (_err) {
       setServerError("An unexpected error occurred.");
