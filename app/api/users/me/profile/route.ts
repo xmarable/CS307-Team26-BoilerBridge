@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
 import { uploadImage } from "@/lib/cloudinary";
-import User from "@/models/User";
 
 export async function PATCH(req: Request) {
   const session = await getServerSession(authOptions);
@@ -79,24 +78,13 @@ export async function PATCH(req: Request) {
       updateData.image = profileImage;
     }
 
-    const result = await User.findOneAndUpdate(
-      { email: session.user.email },
-      {
-        $set: {
-          name: updateData.name,
-          school: updateData.school,
-          location: updateData.location,
-          image: updateData.image,
-          username: updateData.username,
-          usernameLastChanged: updateData.usernameLastChanged,
-          updatedAt: new Date(),
-        },
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    ).lean();
+    const result = await db
+      .collection("users")
+      .findOneAndUpdate(
+        { email: session.user.email },
+        { $set: updateData },
+        { returnDocument: "after" },
+      );
 
     return NextResponse.json(result);
   } catch (error: any) {

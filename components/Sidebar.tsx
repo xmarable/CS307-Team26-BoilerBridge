@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Map,
+  List,
   TrendingUp,
   MessageSquare,
   DollarSign,
@@ -13,11 +14,12 @@ import {
 
 const navItems = [
   { name: "My Trips", href: "/dashboard", icon: Map },
+  { name: "All Trips", href: "/alltrips", icon: List },
   { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/discover", icon: TrendingUp },
-  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare, badge: 11 },
+  { name: "Messages", href: "/messages", icon: MessageSquare, badge: 11 },
   { name: "Expenses", href: "/expenses", icon: DollarSign },
-  { name: "Settings", href: "/dashboard/profile", icon: Settings },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {

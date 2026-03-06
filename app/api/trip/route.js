@@ -5,6 +5,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
+const mustHaveSchema = z.object({
+  name: z.string().min(1).trim(),
+  address: z.string().trim().optional(),
+});
+
 const tripSchema = z.object({
     fromCity: z.string().min(1),
     toCity: z.string().min(1),
@@ -12,7 +17,8 @@ const tripSchema = z.object({
     toDate: z.coerce.date(),
     mode: z.enum(["flight", "train", "bus", "taxi"]),
     budget: z.coerce.number(),
-    tripConfirmed: z.boolean()
+    tripConfirmed: z.boolean(),
+    mustHaves: z.array(mustHaveSchema).optional().default([]),
 });
 
 export async function POST(req) {
@@ -34,7 +40,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Invalid input data" }, { status: 400 });
     }
     else{
-      const { fromCity, toCity, fromDate, toDate, mode, budget, tripConfirmed } = result.data;
+      const { fromCity, toCity, fromDate, toDate, mode, budget, tripConfirmed, mustHaves } = result.data;
 
     const trip = await Trip.create({
       userId,
@@ -45,6 +51,7 @@ export async function POST(req) {
       mode,
       budget: Number(budget),
       tripConfirmed: tripConfirmed ?? false,
+      mustHaves: Array.isArray(mustHaves) ? mustHaves : [],
     });
 
     return NextResponse.json(trip, { status: 201 });
