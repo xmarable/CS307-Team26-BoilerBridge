@@ -51,13 +51,18 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.UUID,
     },
   ],
+  passwordReset: {
+    tokenHash: { type: String, default: null },
+    expiresAt: { type: Date, default: null },
+    requestedAt: { type: Date, default: new Date() }
+  },
   preferences: { type: Map, of: Boolean },
   settings: {
     type: {
       notifications: {
         tripReminders: { type: Boolean, default: false },
-        friendRequests: { type: Boolean, default: false },
-        groupInvite: { type: Boolean, default: false },
+        friendRequests: { type: Boolean, defualt: false },
+        groupInvite: { type: Boolean, default: false }
       },
       deletion: {
         requested: { type: Boolean, default: false },

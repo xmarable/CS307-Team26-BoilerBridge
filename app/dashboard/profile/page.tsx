@@ -38,9 +38,7 @@ export default async function MePage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <Navbar session={session} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
         <main className="flex-1 overflow-y-auto p-8 md:p-12 flex justify-center items-start">
           <ProfilePage initialData={initialData} />
         </main>

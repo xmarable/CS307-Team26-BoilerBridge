@@ -1,3 +1,18 @@
+<<<<<<< HEAD
+// jest.config.cjs
+
+/** @type {import('jest').Config} */
+module.exports = {
+  testEnvironment: "node",
+
+  // Required for ESM support in Jest
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
+
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+
+  transform: {
+    "^.+\\.(t|j)sx?$": [
+=======
 /* eslint-disable import/no-anonymous-default-export */
 // CommonJS config so Jest receives a mutable config (avoids "object is not extensible")
 module.exports = {
@@ -36,7 +51,18 @@ module.exports = {
           "@babel/preset-typescript",
           ["@babel/preset-react", { runtime: "automatic" }],
         ],
+        plugins: ["@babel/plugin-syntax-top-level-await"],
       },
     ],
   },
+<<<<<<< HEAD
+
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/$1",
+    "^(\\.{1,2}/.*)\\.js$": "$1",
+  },
+
+  transformIgnorePatterns: [
+    "/node_modules/(?!(bson|mongodb|mongoose|@mongodb-js|next-auth)/)",
+  ],
 };
