@@ -101,7 +101,7 @@ export default function CreateGroupPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 text-gray-900">
           <div>
             <Label htmlFor="groupName">Group name *</Label>
             <Input
