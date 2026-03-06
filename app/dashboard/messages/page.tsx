@@ -2,19 +2,23 @@ import { Messages } from "@/components/Messages";
 import { authOptions } from "@/lib/auth";
 import { getUserGroups } from "@/lib/user";
 import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 export default async function MessagesPage() {
     const groups = await getUserGroups();
     const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.userId as string;
 
     if (groups == null) {
-        return <div>Sign In</div>
+        redirect("/signin");
+        return null;
     }
 
-    if (groups.length == 0) {
-        return <div>No Groups</div>
+    if (!session) {
+        redirect("/signin");
+        return null;
     }
 
-    return <Messages groups={groups} userId={(session?.user as any)?.userId}/>;
+    return <Messages groups={groups} userId={userId}/>;
 }

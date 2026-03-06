@@ -16,7 +16,7 @@ export async function getUserGroups() {
 
     const groups = await TravelGroup.find(
         { membersList: userId },
-        { groupID: 1, groupName: 1, leaderID: 1}
+        { groupID: 1, groupName: 1, leaderID: 1, membersList: 1}
     ).lean();
 
     return groups.map((g) => ({
