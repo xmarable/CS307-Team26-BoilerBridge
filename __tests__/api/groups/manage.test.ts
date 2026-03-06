@@ -767,7 +767,7 @@ describe("POST /api/groups/[groupId]/leave", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
     const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: "507f1f77bcf86cd799439011" }),
+      params: paramsManage({ groupId: "507f1f77bcf86cd799439011" }),
     });
     const data = await res.json();
     expect(res.status).toBe(401);
@@ -798,7 +798,7 @@ describe("POST /api/groups/[groupId]/leave", () => {
       expires: "",
     });
     const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -837,7 +837,7 @@ describe("POST /api/groups/[groupId]/leave", () => {
       expires: "",
     });
     const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -872,7 +872,7 @@ describe("POST /api/groups/[groupId]/leave", () => {
       expires: "",
     });
     const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     expect(res.status).toBe(200);
     const deleted = await TravelGroup.findById(group._id);
@@ -904,15 +904,15 @@ describe("POST /api/groups/[groupId]/leave", () => {
       expires: "",
     });
     const leaveRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     expect(leaveRes.status).toBe(200);
     const getRes = await GETGroup(new Request("http://localhost"), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     expect(getRes.status).toBe(403);
     const leaveAgainRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     expect(leaveAgainRes.status).toBe(403);
     await TravelGroup.deleteOne({ _id: group._id });
