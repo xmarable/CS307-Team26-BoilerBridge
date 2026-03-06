@@ -43,27 +43,58 @@ export async function POST(
     }
 
     const leaderIDStr = (group.leaderID as mongoose.Types.ObjectId).toString();
+    const isLeader = leaderIDStr === userId;
+    const memberCount = memberIds.length;
 
-    // account for the case when the user is the leader
-    if (leaderIDStr === userId) {
-      const memberCount = memberIds.length;
-      if (memberCount > 1) {
+    if (isLeader) {
+      // Sole member: delete the group entirely
+      if (memberCount === 1) {
+        await TravelGroup.findByIdAndDelete(groupId);
         return NextResponse.json(
-          {
-            error: "Transfer leadership to another member before leaving.",
-          },
+          { message: "Group deleted" },
+          { status: 200 }
+        );
+      }
+
+      // Leader with other members: auto-transfer leadership to the first other member
+      const newLeaderId = memberIds.find((id) => id !== userId);
+      if (!newLeaderId) {
+        return NextResponse.json(
+          { error: "No eligible member to transfer leadership" },
           { status: 400 }
         );
       }
-      return NextResponse.json(
+
+      const updated = await TravelGroup.findByIdAndUpdate(
+        groupId,
         {
-          error:
-            "You are the only member. Transfer leadership before leaving.",
+          $set: { leaderID: new mongoose.Types.ObjectId(newLeaderId) },
+          $pull: { membersList: new mongoose.Types.ObjectId(userId) },
         },
-        { status: 400 }
+        { new: true }
+      ).lean();
+
+      if (!updated) {
+        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      }
+
+      const updatedMemberIds = (updated.membersList as mongoose.Types.ObjectId[]).map(
+        (m) => m.toString()
       );
+
+      return NextResponse.json({
+        group: {
+          _id: updated._id.toString(),
+          groupID: updated.groupID,
+          groupName: updated.groupName,
+          description: updated.description,
+          leaderID: (updated.leaderID as mongoose.Types.ObjectId).toString(),
+          membersList: updatedMemberIds,
+        },
+      });
     }
 
+    // Non-leader: simply remove from membersList
     const updated = await TravelGroup.findByIdAndUpdate(
       groupId,
       { $pull: { membersList: new mongoose.Types.ObjectId(userId) } },

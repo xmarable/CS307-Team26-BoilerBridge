@@ -247,6 +247,9 @@ export default function GroupPage() {
   }
 
   const isLeader = group.isLeader === true;
+  const memberCount = group.membersList?.length ?? 0;
+  const isOnlyMember = isLeader && memberCount === 1;
+  const isLeaderWithOthers = isLeader && memberCount > 1;
   const members = group.members ?? [];
 
   return (
@@ -481,9 +484,15 @@ export default function GroupPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Leave group?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isOnlyMember ? "Delete group?" : "Leave group?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure? You will lose access to this group.
+              {isOnlyMember
+                ? "Leaving this group will delete it and you will lose access to the group and its data. Are you sure you want to continue?"
+                : isLeaderWithOthers
+                  ? "You are the group leader. If you leave now, leadership will automatically be transferred to another member and you will leave the group. To choose a specific leader, transfer leadership first."
+                  : "Are you sure? You will lose access to this group."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

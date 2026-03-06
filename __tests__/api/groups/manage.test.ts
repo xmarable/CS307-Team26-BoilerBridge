@@ -823,18 +823,21 @@ describe("POST /api/groups/[groupId]/leave", () => {
       params: params({ groupId: group._id.toString() }),
     });
     const data = await res.json();
-    expect(res.status).toBe(400);
-    expect(data.error).toMatch(/transfer leadership/i);
-    const unchanged = await TravelGroup.findById(group._id);
-    expect(unchanged!.membersList).toHaveLength(2);
-    expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+    expect(res.status).toBe(200);
+    expect(data.group).toBeDefined();
+    expect(data.group.leaderID).toBe(member._id.toString());
+    const updated = await TravelGroup.findById(group._id);
+    expect((updated!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      member._id.toString()
+    );
+    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).not.toContain(
       leader._id.toString()
     );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
   });
 
-  it("returns 400 when sole member (leader) tries to leave", async () => {
+  it("returns 200 and deletes group when sole member (leader) leaves", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
       username: "leave_sole",
@@ -854,12 +857,9 @@ describe("POST /api/groups/[groupId]/leave", () => {
     const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
       params: params({ groupId: group._id.toString() }),
     });
-    const data = await res.json();
-    expect(res.status).toBe(400);
-    expect(data.error).toMatch(/only member|transfer leadership/i);
-    const unchanged = await TravelGroup.findById(group._id);
-    expect(unchanged!.membersList).toHaveLength(1);
-    await TravelGroup.deleteOne({ _id: group._id });
+    expect(res.status).toBe(200);
+    const deleted = await TravelGroup.findById(group._id);
+    expect(deleted).toBeNull();
     await User.deleteOne({ _id: leader._id });
   });
 
