@@ -63,7 +63,14 @@ export default function ActivityPage() {
         <p className="text-sm text-gray-500 mb-6">Summary and reviews</p>
         <div className="space-y-6">
           <ActivitySummaryCard activityId={activityId} />
-          <ActivityReviews activityId={activityId} />
+          <ActivityReviews
+          activityId={activityId}
+          currentUserDisplayName={
+            (session?.user as { name?: string })?.name ||
+            (session?.user as { username?: string })?.username ||
+            null
+          }
+        />
         </div>
       </main>
     </div>

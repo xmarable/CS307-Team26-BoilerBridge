@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Star, MessageSquare } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Star, MessageSquare, PenLine } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/utils";
 
 interface Review {
@@ -62,12 +65,41 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
 interface ActivityReviewsProps {
   activityId: string;
   className?: string;
+  /** When set, show "Write a review" form using this name as author */
+  currentUserDisplayName?: string | null;
 }
 
-export function ActivityReviews({ activityId, className }: ActivityReviewsProps) {
+function fetchReviews(activityId: string): Promise<ReviewsResponse> {
+  return fetch(`/api/activities/${activityId}/reviews`, { credentials: "include" }).then(
+    (res) => {
+      if (!res.ok) {
+        return res.json().then((body) => {
+          throw new Error(body?.error ?? `Failed to load reviews (${res.status})`);
+        });
+      }
+      return res.json();
+    }
+  );
+}
+
+export function ActivityReviews({ activityId, className, currentUserDisplayName }: ActivityReviewsProps) {
   const [data, setData] = useState<ReviewsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [writeRating, setWriteRating] = useState(0);
+  const [writeText, setWriteText] = useState("");
+
+  const loadReviews = useCallback(() => {
+    if (!activityId) return;
+    setLoading(true);
+    setError(null);
+    fetchReviews(activityId)
+      .then(setData)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [activityId]);
 
   useEffect(() => {
     if (!activityId) {
@@ -75,21 +107,32 @@ export function ActivityReviews({ activityId, className }: ActivityReviewsProps)
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError(null);
-    fetch(`/api/activities/${activityId}/reviews`, { credentials: "include" })
+    loadReviews();
+  }, [activityId, loadReviews]);
+
+  const handleSubmitReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activityId || writeRating < 1 || writeRating > 5 || !writeText.trim()) return;
+    setSubmitError(null);
+    setSubmitting(true);
+    fetch(`/api/activities/${activityId}/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ text: writeText.trim(), rating: writeRating }),
+    })
       .then((res) => {
-        if (!res.ok) {
-          return res.json().then((body) => {
-            throw new Error(body?.error ?? `Failed to load reviews (${res.status})`);
-          });
-        }
+        if (!res.ok) return res.json().then((body: { error?: string }) => { throw new Error(body?.error ?? "Failed to submit"); });
         return res.json();
       })
-      .then((body: ReviewsResponse) => setData(body))
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [activityId]);
+      .then(() => {
+        setWriteText("");
+        setWriteRating(0);
+        loadReviews();
+      })
+      .catch((err: Error) => setSubmitError(err.message))
+      .finally(() => setSubmitting(false));
+  };
 
   if (loading) {
     return (
@@ -123,21 +166,84 @@ export function ActivityReviews({ activityId, className }: ActivityReviewsProps)
   const rating = data?.rating ?? null;
   const reviewCount = data?.reviewCount ?? 0;
 
+  const WriteReviewForm = currentUserDisplayName ? (
+    <Card className={cn("overflow-hidden", className)}>
+      <CardHeader className="border-b">
+        <CardTitle className="text-base flex items-center gap-2">
+          <PenLine className="h-4 w-4" />
+          Write a review
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <form onSubmit={handleSubmitReview} className="space-y-4">
+          <div>
+            <Label className="text-sm">Your rating</Label>
+            <div className="flex gap-1 mt-1">
+              {[1, 2, 3, 4, 5].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setWriteRating(r)}
+                  className="p-1 rounded focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  aria-label={`${r} stars`}
+                >
+                  <Star
+                    className={cn(
+                      "h-8 w-8 transition-colors",
+                      r <= writeRating ? "fill-amber-500 text-amber-500" : "text-gray-200"
+                    )}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="review-text" className="text-sm">Your review</Label>
+            <Textarea
+              id="review-text"
+              value={writeText}
+              onChange={(e) => setWriteText(e.target.value)}
+              placeholder="Share your experience..."
+              rows={4}
+              maxLength={2000}
+              className="mt-1 resize-none"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">{writeText.length}/2000</p>
+          </div>
+          {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+          <Button
+            type="submit"
+            disabled={submitting || writeRating < 1 || !writeText.trim()}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            {submitting ? "Submitting…" : "Submit review"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  ) : null;
+
   if (reviews.length === 0) {
     return (
-      <Card className={cn("overflow-hidden", className)}>
-        <CardContent className="py-8">
-          <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
-            <MessageSquare className="h-10 w-10 text-gray-300" />
-            <p className="text-center">No reviews yet for this place.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        {WriteReviewForm}
+        <Card className={cn("overflow-hidden", className)}>
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
+              <MessageSquare className="h-10 w-10 text-gray-300" />
+              <p className="text-center">No reviews yet for this place.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
   return (
-    <Card className={cn("overflow-hidden", className)}>
+    <>
+      {WriteReviewForm}
+      <Card className={cn("overflow-hidden", className)}>
       <CardHeader className="border-b">
         <div className="flex items-center gap-3">
           {rating != null && (
@@ -178,5 +284,6 @@ export function ActivityReviews({ activityId, className }: ActivityReviewsProps)
         </ScrollArea>
       </CardContent>
     </Card>
+    </>
   );
 }
