@@ -141,7 +141,7 @@ export function Dashboard({ initialData }: DashboardProps) {
                 Create Group
               </Button>
             </Link>
-            <Link href="/trip/new">
+            <Link href="/trip">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Create Trip
