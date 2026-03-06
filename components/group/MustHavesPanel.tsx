@@ -47,7 +47,6 @@ export default function MustHavesPanel({ groupId }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Create form state
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [address, setAddress] = useState("");
@@ -55,12 +54,10 @@ export default function MustHavesPanel({ groupId }: Props) {
   const [priority, setPriority] = useState<string>("3");
   const [creating, setCreating] = useState(false);
 
-  // Filters
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
 
-  // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editItem, setEditItem] = useState<MustHave | null>(null);
   const [editNotes, setEditNotes] = useState("");
@@ -113,24 +110,20 @@ export default function MustHavesPanel({ groupId }: Props) {
           address: address.trim() || undefined,
           notes: notes.trim() || undefined,
           priority: Number(priority),
-          // status optional (defaults to proposed server-side)
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        // helpful: 409 duplicate
         throw new Error(data?.error || "Failed to create must-have");
       }
 
-      // reset form
       setName("");
       setCategory("");
       setAddress("");
       setNotes("");
       setPriority("3");
 
-      // refresh list
       await fetchMustHaves();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to create must-have");
@@ -153,18 +146,15 @@ export default function MustHavesPanel({ groupId }: Props) {
       setSavingEdit(true);
       setErr(null);
 
-      const res = await fetch(
-        `/api/groups/${groupId}/must-haves/${editItem._id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            notes: editNotes.trim(),
-            priority: Number(editPriority),
-            status: editStatus,
-          }),
-        }
-      );
+      const res = await fetch(`/api/groups/${groupId}/must-haves/${editItem._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notes: editNotes.trim(),
+          priority: Number(editPriority),
+          status: editStatus,
+        }),
+      });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to update must-have");
@@ -206,29 +196,49 @@ export default function MustHavesPanel({ groupId }: Props) {
       <Card className="p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-900">
           <div>
-            <Label>Name *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Place / activity name" />
+            <Label className="text-gray-800">Name *</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Place / activity name"
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div>
-            <Label>Category</Label>
-            <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Food, museum, hike..." />
+            <Label className="text-gray-800">Category</Label>
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Food, museum, hike..."
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div className="md:col-span-2">
-            <Label>Address</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St..." />
+            <Label className="text-gray-800">Address</Label>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="123 Main St..."
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div className="md:col-span-2">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Why is this a must-have?" />
+            <Label className="text-gray-800">Notes</Label>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Why is this a must-have?"
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div>
-            <Label>Priority (1–5)</Label>
+            <Label className="text-gray-800">Priority (1–5)</Label>
             <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger>
+              <SelectTrigger className="text-gray-900">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="text-black bg-white">
@@ -255,12 +265,11 @@ export default function MustHavesPanel({ groupId }: Props) {
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       </Card>
 
-      {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 mb-4">
         <div className="w-full md:w-56 text-gray-900">
           <Label>Status</Label>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger>
+            <SelectTrigger className="text-gray-900">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="text-black bg-white">
@@ -275,7 +284,7 @@ export default function MustHavesPanel({ groupId }: Props) {
         <div className="w-full md:w-56 text-gray-900">
           <Label>Priority</Label>
           <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger>
+            <SelectTrigger className="text-gray-900">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="text-black bg-white">
@@ -295,11 +304,11 @@ export default function MustHavesPanel({ groupId }: Props) {
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             placeholder="Filter by category…"
+            className="text-gray-900 placeholder:text-gray-500"
           />
         </div>
       </div>
 
-      {/* List */}
       {loading ? (
         <p className="text-gray-700">Loading must-haves…</p>
       ) : items.length === 0 ? (
@@ -356,7 +365,6 @@ export default function MustHavesPanel({ groupId }: Props) {
         </ul>
       )}
 
-      {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -365,9 +373,12 @@ export default function MustHavesPanel({ groupId }: Props) {
 
           <div className="space-y-4">
             <div>
-              <Label>Status</Label>
-              <Select value={editStatus} onValueChange={(v) => setEditStatus(v as MustHave["status"])}>
-                <SelectTrigger>
+              <Label className="text-gray-800">Status</Label>
+              <Select
+                value={editStatus}
+                onValueChange={(v) => setEditStatus(v as MustHave["status"])}
+              >
+                <SelectTrigger className="text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -379,9 +390,9 @@ export default function MustHavesPanel({ groupId }: Props) {
             </div>
 
             <div>
-              <Label>Priority (1–5)</Label>
+              <Label className="text-gray-800">Priority (1–5)</Label>
               <Select value={editPriority} onValueChange={setEditPriority}>
-                <SelectTrigger>
+                <SelectTrigger className="text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -395,15 +406,23 @@ export default function MustHavesPanel({ groupId }: Props) {
             </div>
 
             <div>
-              <Label>Notes</Label>
-              <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+              <Label className="text-gray-800">Notes</Label>
+              <Input
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                className="text-gray-900 placeholder:text-gray-500"
+              />
             </div>
 
             {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingEdit}>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={savingEdit}
+            >
               Cancel
             </Button>
             <Button onClick={saveEdit} disabled={savingEdit}>
