@@ -61,6 +61,10 @@ export const authOptions: NextAuthOptions = {
       if (trigger === "update" && session) {
         token.name = session.name || token.name;
         token.picture = session.image || token.picture;
+
+        token.isStudentVerified =
+          session.user?.isStudentVerified ?? token.isStudentVerified;
+        token.eduEmail = session.user?.eduEmail ?? token.eduEmail;
       }
 
       // always get latest profile data from BoilerBridge DB to keep Navbar in sync
@@ -74,6 +78,9 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           token.name = dbUser.name || token.name;
           token.picture = dbUser.image || token.picture;
+          token.isStudentVerified =
+            dbUser.settings?.security?.isStudentVerified ?? false;
+          token.eduEmail = dbUser.eduEmail || null;
         }
       } catch (error) {
         console.error("Auth Callback DB Error:", error);
@@ -88,6 +95,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).username = token.username as string;
         session.user.image = token.picture as string;
         session.user.name = token.name;
+        (session.user as any).isStudentVerified = token.isStudentVerified;
+        (session.user as any).eduEmail = token.eduEmail;
       }
       return session;
     },

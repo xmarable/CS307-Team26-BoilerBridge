@@ -31,6 +31,17 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  eduEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    validate: {
+      validator: function (v: string) {
+        return !v || v.endsWith(".edu");
+      },
+      message: (props: any) => `${props.value} is not a valid .edu email!`,
+    },
+  },
   passwordHash: { type: String, required: true },
   school: { type: String, trim: true },
   location: { type: String, trim: true },
