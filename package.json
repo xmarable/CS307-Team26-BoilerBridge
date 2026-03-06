@@ -23,6 +23,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@auth/mongodb-adapter": "^3.11.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -94,9 +97,6 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "babel-jest": "^29.7.0",
     "dotenv": "^17.3.1",
     "eslint": "^10.0.1",
