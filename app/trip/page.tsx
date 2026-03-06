@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Plus, Trash2, ChevronLeft } from "lucide-react";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +19,17 @@ interface MustHaveRow {
 }
 
 export default function TripPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([]);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/signin");
+    }
+  }, [status, router]);
 
   const addMustHave = () => {
     setMustHaves((prev) => [
@@ -92,127 +104,159 @@ export default function TripPage() {
     }
   };
 
+  if (status === "loading" || !session) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-900">
+        <p className="text-gray-700">Loading…</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Trip</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="fromCity">From City</Label>
-            <Input id="fromCity" name="fromCity" placeholder="e.g. Chicago" required className="mt-1" />
-          </div>
-          <div>
-            <Label htmlFor="toCity">To City</Label>
-            <Input id="toCity" name="toCity" placeholder="e.g. Miami" required className="mt-1" />
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="fromDate">From Date</Label>
-            <Input id="fromDate" name="fromDate" type="date" required className="mt-1" />
-          </div>
-          <div>
-            <Label htmlFor="toDate">To Date</Label>
-            <Input id="toDate" name="toDate" type="date" required className="mt-1" />
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="mode">Transport</Label>
-          <select
-            id="mode"
-            name="mode"
-            defaultValue="flight"
-            required
-            className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          >
-            <option value="flight">Flight</option>
-            <option value="train">Train</option>
-            <option value="bus">Bus</option>
-            <option value="taxi">Taxi</option>
-          </select>
-        </div>
-
-        <div>
-          <Label htmlFor="budget">Budget</Label>
-          <Input
-            id="budget"
-            name="budget"
-            type="number"
-            placeholder="e.g. 500"
-            min={1}
-            step={1}
-            required
-            className="mt-1"
-          />
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <Label className="text-base font-medium">Must-have activities</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addMustHave}
-              className="gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Add
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <Navbar session={session} />
+      <main className="max-w-xl mx-auto p-4 md:p-8">
+        <div className="mb-6">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-gray-700 hover:text-gray-900 hover:bg-gray-200/60">
+              <ChevronLeft className="h-4 w-4" />
+              Back to dashboard
             </Button>
-          </div>
-          <p className="text-sm text-gray-500 mb-4">
-            Add places or activities you don’t want to miss on this trip.
-          </p>
-          {mustHaves.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">No activities added yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {mustHaves.map((row) => (
-                <li key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="flex-1 grid gap-2 sm:grid-cols-2">
-                    <Input
-                      placeholder="Activity or place name"
-                      value={row.name}
-                      onChange={(e) => updateMustHave(row.id, "name", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Address (optional)"
-                      value={row.address}
-                      onChange={(e) => updateMustHave(row.id, "address", e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeMustHave(row.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
-                    aria-label="Remove"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          </Link>
         </div>
 
-        <label className="flex items-center gap-2">
-          <input name="tripConfirmed" type="checkbox" className="rounded border-gray-300" />
-          <span className="text-sm font-medium">Trip confirmed?</span>
-        </label>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Trip</h1>
+          <p className="text-gray-600 mb-6">
+            Set your route, dates, budget, and must-have activities.
+          </p>
 
-        {error && (
-          <p className="text-sm text-red-600" role="alert">{error}</p>
-        )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fromCity">From City</Label>
+                <Input id="fromCity" name="fromCity" placeholder="e.g. Chicago" required className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="toCity">To City</Label>
+                <Input id="toCity" name="toCity" placeholder="e.g. Miami" required className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300" />
+              </div>
+            </div>
 
-        <Button type="submit" disabled={loading} className="w-full bg-amber-600 hover:bg-amber-700">
-          {loading ? "Creating…" : "Create Trip"}
-        </Button>
-      </form>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fromDate">From Date</Label>
+                <Input id="fromDate" name="fromDate" type="date" required className="mt-1 text-gray-900 bg-white border-gray-300" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="toDate">To Date</Label>
+                <Input id="toDate" name="toDate" type="date" required className="mt-1 text-gray-900 bg-white border-gray-300" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mode">Transport</Label>
+              <select
+                id="mode"
+                name="mode"
+                defaultValue="flight"
+                required
+                className="flex h-9 w-full rounded-md border border-gray-300 bg-white text-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-amber-500 focus-visible:ring-amber-500/30 focus-visible:ring-[3px]"
+              >
+                <option value="flight">Flight</option>
+                <option value="train">Train</option>
+                <option value="bus">Bus</option>
+                <option value="taxi">Taxi</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="budget">Budget</Label>
+              <Input
+                id="budget"
+                name="budget"
+                type="number"
+                placeholder="e.g. 500"
+                min={1}
+                step={1}
+                required
+                className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
+              />
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-medium text-gray-900">Must-have activities</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addMustHave}
+                  className="gap-1 rounded-xl border-amber-500/50 text-amber-700 hover:bg-amber-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Add places or activities you don’t want to miss on this trip.
+              </p>
+              {mustHaves.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">No activities added yet.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {mustHaves.map((row) => (
+                    <li key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="flex-1 grid gap-2 sm:grid-cols-2">
+                        <Input
+                          placeholder="Activity or place name"
+                          value={row.name}
+                          onChange={(e) => updateMustHave(row.id, "name", e.target.value)}
+                          className="text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
+                        />
+                        <Input
+                          placeholder="Address (optional)"
+                          value={row.address}
+                          onChange={(e) => updateMustHave(row.id, "address", e.target.value)}
+                          className="text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeMustHave(row.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0 rounded-xl"
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input name="tripConfirmed" type="checkbox" className="rounded border-gray-300 text-amber-600 focus:ring-amber-500" />
+              <span className="text-sm font-medium text-gray-700">Trip confirmed?</span>
+            </label>
+
+            {error && (
+              <p className="text-sm text-red-600" role="alert">{error}</p>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all"
+            >
+              <Plus className="mr-2" size={18} />
+              {loading ? "Creating…" : "Create Trip"}
+            </Button>
+          </form>
+        </div>
+      </main>
     </div>
   );
 }

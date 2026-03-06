@@ -118,18 +118,13 @@ export function Dashboard({ initialData }: DashboardProps) {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/activities/new">
-              <Button
-                variant="outline"
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
-              >
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                <Plus className="mr-2" size={18} />
                 Add Activity
               </Button>
             </Link>
             <Link href="/activities">
-              <Button
-                variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
-              >
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 Browse Activities
               </Button>
             </Link>
