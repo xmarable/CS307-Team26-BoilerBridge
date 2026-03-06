@@ -227,7 +227,7 @@ export default function GroupPage() {
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 text-black">
             {isLeader ? (
               <div>
                 <Label htmlFor="group-name" className="text-gray-700">
@@ -263,7 +263,7 @@ export default function GroupPage() {
             <p className="mt-2 text-gray-600">{group.description}</p>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3 text-black">
             <Link href="/dashboard">
               <Button variant="outline">Back to dashboard</Button>
             </Link>
@@ -297,7 +297,7 @@ export default function GroupPage() {
                     <p className="text-sm text-gray-500 truncate">{m.email}</p>
                   </div>
                   {group.leaderID === m.id && (
-                    <Badge variant="secondary" className="shrink-0">
+                    <Badge variant="secondary" className="shrink-0 text-black">
                       Leader
                     </Badge>
                   )}
@@ -321,7 +321,7 @@ export default function GroupPage() {
               <Label htmlFor="add-email" className="text-gray-700">
                 Add member by email
               </Label>
-              <div className="mt-1 flex gap-2">
+              <div className="mt-1 flex gap-2 text-gray-700">
                 <Input
                   id="add-email"
                   type="email"

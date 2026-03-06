@@ -214,14 +214,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4 text-gray-700">
         <h2 className="text-lg font-semibold text-gray-900">Calendar</h2>
         <Badge variant="secondary">{events.length} events</Badge>
       </div>
 
       {/* Range */}
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-900">
           <div>
             <Label>From</Label>
             <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -243,7 +243,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       <Card className="p-4 mb-6">
         <h3 className="font-semibold text-gray-900 mb-3">Add event</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-900">
           <div className="md:col-span-2">
             <Label>Title *</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Dinner reservation, museum, flight..." />

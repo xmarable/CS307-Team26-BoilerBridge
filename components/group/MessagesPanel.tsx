@@ -2,8 +2,8 @@
 
 import { MessageSquare, Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 
 type GroupSummary = {
     groupID: string;

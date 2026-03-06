@@ -1,4 +1,4 @@
-import { Messages } from "@/components/Messages";
+import { Messages } from "@/components/group/Messages";
 import { authOptions } from "@/lib/auth";
 import { getUserGroups } from "@/lib/user";
 import { getServerSession } from "next-auth";
