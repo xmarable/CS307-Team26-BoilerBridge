@@ -31,6 +31,7 @@ export function ForgotPassword() {
         ? data.message ?? "If an account exists for that email, a reset link has been sent." 
         : data.error ?? "Invalid Link"
     );
+    setEmail("")
   }
 
   return (
@@ -87,6 +88,7 @@ export function ForgotPassword() {
                     id="email"
                     name="email"
                     type="email"
+                    value={email}
                     placeholder="you@university.edu"
                     className="mt-1.5 bg-white text-black placeholder:text-gray-400"
                     autoComplete="off"
