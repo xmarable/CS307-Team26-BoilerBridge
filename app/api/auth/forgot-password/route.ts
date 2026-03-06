@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     await user.save();
-    const url = `https://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+    const url = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
     console.log(`Password Reset Link: ${url}`);
     return response;
 }
