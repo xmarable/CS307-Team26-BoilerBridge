@@ -119,7 +119,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
   return (
     <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="mb-8 text-center sm:text-left">
-        <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Profile Settings</h1>
         <p className="text-gray-500 text-sm">
           Update your public profile, display name, and location details.
         </p>

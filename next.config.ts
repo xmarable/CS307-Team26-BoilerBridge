@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     // YOU CAN CHANGE THE LINK TO BE ANYTHING HERE IF YOU DONT LIKE THE ROUTE
     return [
       {
-        source: "/settings", // what you want it to be
+        source: "/dashboard/settings", // what you want it to be
         destination: "/user/me", // what the current route is (the page that actually exists)
       },
     ];
