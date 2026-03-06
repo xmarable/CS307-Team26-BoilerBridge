@@ -4,9 +4,8 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package*.json ./
 
-RUN npm config set python /usr/bin/python3
-
 RUN npm ci --legacy-peer-deps
+
 COPY . .
 
 ARG MONGODB_URI
