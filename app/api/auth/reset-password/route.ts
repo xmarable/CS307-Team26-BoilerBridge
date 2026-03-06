@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const info = ResetPassSchema.safeParse(body);
 
     if (!info.success) {
-        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+        return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
     const { email, token, newPassword } = info.data;
