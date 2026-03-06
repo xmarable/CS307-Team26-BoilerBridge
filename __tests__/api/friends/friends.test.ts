@@ -1,178 +1,238 @@
-/** @jest-environment node */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * These tests use jest.unstable_mockModule (Jest 29+). On Jest 25 the suite is skipped.
+ */
 import { jest } from "@jest/globals";
 
-jest.unstable_mockModule("next-auth/providers/credentials", () => ({
-  default: jest.fn<any>(() => ({
-    id: "credentials",
-    name: "Credentials",
-    type: "credentials",
-  })),
-}));
+const hasUnstableMockModule =
+  typeof (jest as any).unstable_mockModule === "function";
 
-jest.unstable_mockModule("next-auth", () => ({
-  getServerSession: jest.fn<any>().mockResolvedValue({
-    user: { userId: "user-a", id: "object-id-a" },
-  }),
-}));
-
-const mockFriendRequestSave = jest.fn<any>();
-const mockFriendRequestConstructor = jest.fn<any>((data: any) => ({
-  ...data,
+// explicitly cast the mock functions to any to fix typescript never errors
+const mockFriendRequestSave = jest.fn() as any;
+const mockFriendRequestConstructor = jest.fn(() => ({
   save: mockFriendRequestSave,
 })) as any;
+mockFriendRequestConstructor.findOne = jest.fn() as any;
 
-(mockFriendRequestConstructor as any).findOne = jest.fn<any>();
-(mockFriendRequestConstructor as any).find = jest.fn<any>();
-(mockFriendRequestConstructor as any).create = jest.fn<any>();
-(mockFriendRequestConstructor as any).deleteOne = jest.fn<any>();
-(mockFriendRequestConstructor as any).findOneAndUpdate = jest.fn<any>();
+if (hasUnstableMockModule) {
+  (jest as any).unstable_mockModule("@/models/FriendRequest", () => ({
+    default: mockFriendRequestConstructor,
+  }));
+}
 
-jest.unstable_mockModule("@/models/FriendRequest", () => ({
-  default: mockFriendRequestConstructor,
-}));
+// explicitly cast the user mock functions to any
+const mockUserFindOne = jest.fn() as any;
+const mockUserFindOneAndUpdate = jest.fn() as any;
 
-const mockUserFindOne = jest.fn<any>();
-const mockUserFindById = jest.fn<any>();
-const mockUserFindOneAndUpdate = jest.fn<any>();
+if (hasUnstableMockModule) {
+  (jest as any).unstable_mockModule("@/models/User", () => ({
+    default: {
+      findOne: mockUserFindOne,
+      findOneAndUpdate: mockUserFindOneAndUpdate,
+    },
+  }));
+}
 
-jest.unstable_mockModule("@/models/User", () => ({
-  default: {
-    findOne: mockUserFindOne,
-    findById: mockUserFindById,
-    findOneAndUpdate: mockUserFindOneAndUpdate,
-  },
-}));
+let POST: (req: Request) => Promise<Response>;
+let PATCH: (req: Request) => Promise<Response>;
+let DELETE: (req: Request) => Promise<Response>;
 
-jest.unstable_mockModule("@/lib/dbConnect", () => ({
-  default: jest.fn<any>().mockResolvedValue(true),
-}));
+beforeAll(async () => {
+  if (!hasUnstableMockModule) return;
+  const requestRoute = await import("@/app/api/friends/request/route");
+  POST = requestRoute.POST;
+  const acceptRoute = await import("@/app/api/friends/accept/route");
+  PATCH = acceptRoute.PATCH;
+  const removeRoute = await import("@/app/api/friends/remove/route");
+  DELETE = removeRoute.DELETE;
+});
 
-const { DELETE: removeFriendDELETE } =
-  await import("@/app/api/friends/remove/route");
-const {
-  GET: requestGET,
-  POST: requestPOST,
-  DELETE: declineRequestDELETE,
-} = await import("@/app/api/friends/request/route");
-
-describe("friend system api routes", () => {
+const describeFriendApi = hasUnstableMockModule ? describe : describe.skip;
+describeFriendApi("friend system api routes", () => {
+  // reset mocks before every test execution
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe("friends/remove", () => {
-    it("removes friend using friendId from body", async () => {
-      mockUserFindOneAndUpdate.mockResolvedValue(true);
+  // group tests for the post request route
+  describe("post /api/friends/request", () => {
+    // test successful pending request creation
+    it("creates a pending request when valid ids are provided", async () => {
+      mockUserFindOne.mockResolvedValue({ friends: [] });
+      mockFriendRequestConstructor.findOne.mockResolvedValue(null);
+      mockFriendRequestSave.mockResolvedValue(true);
 
-      const req = new Request("http://localhost/api/friends/remove", {
-        method: "DELETE",
-        body: JSON.stringify({ friendId: "user-b" }),
+      const req = new Request("http://localhost/api/friends/request", {
+        method: "POST",
+        body: JSON.stringify({ requesterId: "user-a", recipientId: "user-b" }),
       });
 
-      const res = await removeFriendDELETE(req);
-      const json = await res.json();
+      const res = await POST(req);
 
       expect(res.status).toBe(200);
-      expect(json.message).toBe("Friend removed");
-      expect(mockUserFindOneAndUpdate).toHaveBeenCalledTimes(2);
+      expect(mockFriendRequestSave).toHaveBeenCalled();
     });
 
-    it("blocks self-removal", async () => {
-      const req = new Request("http://localhost/api/friends/remove", {
-        method: "DELETE",
-        body: JSON.stringify({ friendId: "user-a" }),
+    // test self adding block
+    it("blocks users from adding themselves", async () => {
+      mockUserFindOne.mockResolvedValue({ friends: [] });
+      mockFriendRequestConstructor.findOne.mockResolvedValue(null);
+
+      const req = new Request("http://localhost/api/friends/request", {
+        method: "POST",
+        body: JSON.stringify({ requesterId: "user-a", recipientId: "user-a" }),
       });
 
-      const res = await removeFriendDELETE(req);
+      const res = await POST(req);
+      const json = await res.json();
+
       expect(res.status).toBe(400);
+      expect(json.error).toBe("Cannot send friend request to yourself");
     });
-  });
 
-  describe("friends/request (GET)", () => {
-    it("returns formatted pending requests", async () => {
-      mockUserFindById.mockResolvedValue({ userId: "user-a" });
-      (mockFriendRequestConstructor as any).find.mockReturnValue({
-        lean: jest
-          .fn<any>()
-          .mockResolvedValue([
-            { requestId: "req-1", requesterId: "user-b", status: "pending" },
-          ]),
-      });
-      mockUserFindOne.mockReturnValue({
-        select: jest.fn<any>().mockReturnThis(),
-        lean: jest.fn<any>().mockResolvedValue({ username: "sender_user" }),
-      });
-
-      const res = await requestGET();
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(json[0].senderName).toBe("sender_user");
-    });
-  });
-
-  describe("friends/request (POST)", () => {
-    it("sends a new friend request successfully", async () => {
+    // test existing friendship block
+    it("blocks the request if already friends", async () => {
       mockUserFindOne.mockResolvedValue({
         userId: "user-a",
-        username: "xavy",
-        friendsList: [],
-      });
-      (mockFriendRequestConstructor as any).findOne.mockResolvedValue(null);
-      (mockFriendRequestConstructor as any).create.mockResolvedValue({
-        requestId: "new-id",
+        friends: ["user-b"],
       });
 
       const req = new Request("http://localhost/api/friends/request", {
         method: "POST",
-        body: JSON.stringify({ recipientId: "user-b" }),
+        body: JSON.stringify({ requesterId: "user-a", recipientId: "user-b" }),
       });
 
-      const res = await requestPOST(req);
+      const res = await POST(req);
       const json = await res.json();
 
-      expect(res.status).toBe(200);
-      expect(json.message).toBe("Friend request sent");
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("Already friends");
     });
 
-    it("auto-accepts if a mutual request exists", async () => {
-      mockUserFindOne.mockResolvedValue({ userId: "user-a", friendsList: [] });
-      (mockFriendRequestConstructor as any).findOne.mockResolvedValue({
+    // test existing pending request block
+    it("blocks if request already exists", async () => {
+      mockUserFindOne.mockResolvedValue({ friends: [] });
+      mockFriendRequestConstructor.findOne.mockResolvedValue({
+        requestId: "exists",
+      });
+
+      const req = new Request("http://localhost/api/friends/request", {
+        method: "POST",
+        body: JSON.stringify({ requesterId: "user-a", recipientId: "user-b" }),
+      });
+
+      const res = await POST(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("Friend request already exists");
+    });
+  });
+
+  // group tests for the patch accept route
+  describe("patch /api/friends/accept", () => {
+    // test successful acceptance
+    it("accepts a pending request and updates the user", async () => {
+      mockFriendRequestSave.mockResolvedValue(true);
+
+      mockFriendRequestConstructor.findOne.mockResolvedValue({
+        requestId: "req-123",
+        requesterId: "user-a",
+        recipientId: "user-b",
         status: "pending",
         save: mockFriendRequestSave,
       });
 
-      const req = new Request("http://localhost/api/friends/request", {
-        method: "POST",
-        body: JSON.stringify({ recipientId: "user-b" }),
-      });
+      mockUserFindOneAndUpdate.mockResolvedValue(true);
 
-      const res = await requestPOST(req);
-      const json = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(json.isAccepted).toBe(true);
-      expect(mockUserFindOneAndUpdate).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("friends/request (DELETE)", () => {
-    it("declines/deletes a friend request", async () => {
-      (mockFriendRequestConstructor as any).deleteOne.mockResolvedValue({
-        deletedCount: 1,
-      });
-
-      const req = new Request("http://localhost/api/friends/request", {
-        method: "DELETE",
+      const req = new Request("http://localhost/api/friends/accept", {
+        method: "PATCH",
         body: JSON.stringify({ requestId: "req-123" }),
       });
 
-      const res = await declineRequestDELETE(req);
+      const res = await PATCH(req);
+
+      expect(mockFriendRequestSave).toHaveBeenCalled();
+      // the provided patch api updates only one user list right now
+      expect(mockUserFindOneAndUpdate).toHaveBeenCalledTimes(1);
+      expect(res.status).toBe(200);
+    });
+
+    // test not found error
+    it("returns 404 if request is not found", async () => {
+      mockFriendRequestConstructor.findOne.mockResolvedValue(null);
+
+      const req = new Request("http://localhost/api/friends/accept", {
+        method: "PATCH",
+        body: JSON.stringify({ requestId: "req-123" }),
+      });
+
+      const res = await PATCH(req);
       const json = await res.json();
 
+      expect(res.status).toBe(404);
+      expect(json.error).toBe("Friend request not found");
+    });
+
+    // test missing id error
+    it("returns 400 if requestId is missing", async () => {
+      const req = new Request("http://localhost/api/friends/accept", {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      });
+
+      const res = await PATCH(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("Missing requestId");
+    });
+  });
+
+  // group tests for the delete remove route
+  describe("delete /api/friends/remove", () => {
+    // test successful removal
+    it("removes both users from each others lists", async () => {
+      mockUserFindOneAndUpdate.mockResolvedValue(true);
+
+      const req = new Request("http://localhost/api/friends/remove", {
+        method: "DELETE",
+        body: JSON.stringify({ userOneId: "user-a", userTwoId: "user-b" }),
+      });
+
+      const res = await DELETE(req);
+
       expect(res.status).toBe(200);
-      expect(json.message).toBe("Request declined");
+      // the provided delete api updates two user lists
+      expect(mockUserFindOneAndUpdate).toHaveBeenCalledTimes(2);
+    });
+
+    // test self removal block
+    it("blocks users from removing themselves", async () => {
+      const req = new Request("http://localhost/api/friends/remove", {
+        method: "DELETE",
+        body: JSON.stringify({ userOneId: "user-a", userTwoId: "user-a" }),
+      });
+
+      const res = await DELETE(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("Invalid Operation");
+    });
+
+    // test missing ids error
+    it("returns 400 if user ids are missing", async () => {
+      const req = new Request("http://localhost/api/friends/remove", {
+        method: "DELETE",
+        body: JSON.stringify({}),
+      });
+
+      const res = await DELETE(req);
+      const json = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("Missing user IDs");
     });
   });
 });

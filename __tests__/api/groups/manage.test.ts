@@ -27,6 +27,10 @@ let PATCHLeader: (
   req: Request,
   ctx: { params: Promise<{ groupId: string }> }
 ) => Promise<Response>;
+let POSTLeave: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> }
+) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
@@ -45,6 +49,8 @@ beforeAll(async () => {
   DELETEMember = memberIdRoute.DELETE;
   const leaderRoute = await import("@/app/api/groups/[groupId]/leader/route");
   PATCHLeader = leaderRoute.PATCH;
+  const leaveRoute = await import("@/app/api/groups/[groupId]/leave/route");
+  POSTLeave = leaveRoute.POST;
 });
 
 afterAll(async () => {
@@ -735,6 +741,163 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
     expect((updated!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
       member._id.toString()
     );
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+});
+
+describe("POST /api/groups/[groupId]/leave", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: "507f1f77bcf86cd799439011" }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(401);
+    expect(data.error).toMatch(/logged in/i);
+  });
+
+  it("returns 200 and removes member when non-leader leaves", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "leave_leader",
+      email: "leave_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "leave_member",
+      email: "leave_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: member._id.toString() },
+      expires: "",
+    });
+    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.group).toBeDefined();
+    expect(data.group.membersList).not.toContain(member._id.toString());
+    const updated = await TravelGroup.findById(group._id);
+    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).not.toContain(
+      member._id.toString()
+    );
+    expect(updated!.membersList).toHaveLength(1);
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+
+  it("returns 400 when leader tries to leave and other members exist", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "leave_lead_leader",
+      email: "leave_lead_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "leave_lead_member",
+      email: "leave_lead_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: leader._id.toString() },
+      expires: "",
+    });
+    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/transfer leadership/i);
+    const unchanged = await TravelGroup.findById(group._id);
+    expect(unchanged!.membersList).toHaveLength(2);
+    expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
+      leader._id.toString()
+    );
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
+  });
+
+  it("returns 400 when sole member (leader) tries to leave", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "leave_sole",
+      email: "leave_sole@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: leader._id.toString() },
+      expires: "",
+    });
+    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/only member|transfer leadership/i);
+    const unchanged = await TravelGroup.findById(group._id);
+    expect(unchanged!.membersList).toHaveLength(1);
+    await TravelGroup.deleteOne({ _id: group._id });
+    await User.deleteOne({ _id: leader._id });
+  });
+
+  it("returns 403 when user who left tries to access group or leave again", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const leader = await User.create({
+      username: "leave_403_leader",
+      email: "leave_403_leader@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const member = await User.create({
+      username: "leave_403_member",
+      email: "leave_403_member@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "G",
+      leaderID: leader._id,
+      membersList: [leader._id, member._id],
+    });
+    mockGetServerSession.mockResolvedValue({
+      user: { id: member._id.toString() },
+      expires: "",
+    });
+    const leaveRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    expect(leaveRes.status).toBe(200);
+    const getRes = await GETGroup(new Request("http://localhost"), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    expect(getRes.status).toBe(403);
+    const leaveAgainRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
+      params: params({ groupId: group._id.toString() }),
+    });
+    expect(leaveAgainRes.status).toBe(403);
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
   });
