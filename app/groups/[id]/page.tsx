@@ -19,6 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import MustHavesPanel from "@/components/group/MustHavesPanel";
+
 type Member = { id: string; username: string; email: string };
 
 type GroupState = {
@@ -365,6 +367,10 @@ export default function GroupPage() {
             );
           })()}
         </div>
+        {/* ----------- Must-Haves UI ---------------- */}
+        {/* Must-haves */}
+        <MustHavesPanel groupId={group._id} />
+        {/* ----------------------------------------- */}
       </div>
 
       <AlertDialog
