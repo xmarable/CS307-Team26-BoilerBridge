@@ -92,7 +92,7 @@ export default function CreateGroupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="p-6 lg:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Create a travel group</h1>
@@ -103,49 +103,61 @@ export default function CreateGroupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <Label htmlFor="groupName">Group name *</Label>
+            <Label htmlFor="groupName" className="text-gray-900 font-medium">
+              Group name *
+            </Label>
             <Input
               id="groupName"
               type="text"
               placeholder="e.g. Spring Break 2026"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="mt-1.5"
+              className="mt-1.5 placeholder:text-gray-500 text-gray-900"
               aria-invalid={!!error}
               disabled={isSubmitting}
             />
           </div>
 
           <div>
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description" className="text-gray-900 font-medium">
+              Description (optional)
+            </Label>
             <Input
               id="description"
               type="text"
               placeholder="e.g. Trip to Miami"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1.5"
+              className="mt-1.5 placeholder:text-gray-500 text-gray-900"
               disabled={isSubmitting}
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
+            {error && (
+              <p className="text-sm text-red-600" role="alert">
+                {error}
+              </p>
+            )}
 
-          <div className="flex gap-3 pt-2">
-            <Button type="submit" disabled={isSubmitting} className="flex-1">
-              {isSubmitting ? "Creating…" : "Create group"}
-            </Button>
-            <Link href="/dashboard">
-              <Button type="button" variant="outline">
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all"
+              >
+                {isSubmitting ? "Creating…" : "Create group"}
+              </Button>
+              <Link href="/dashboard">
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-white border-amber-500 text-amber-700 hover:bg-amber-50 hover:text-amber-800 rounded-xl"
+              >
                 Cancel
               </Button>
-            </Link>
-          </div>
-        </form>
+              </Link>
+            </div>
+          </form>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,12 @@ export default function GroupPage() {
   const [transferToMemberId, setTransferToMemberId] = useState<string | null>(null);
   const [transferring, setTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
+
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  const router = useRouter();
 
   const fetchGroup = useCallback(async () => {
     if (!id) return;
@@ -191,6 +197,29 @@ export default function GroupPage() {
     }
   };
 
+  const handleLeaveGroup = async () => {
+    if (!id || leaving) return;
+    setLeaveError(null);
+    setLeaving(true);
+    try {
+      const res = await fetch(`/api/groups/${id}/leave`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLeaveConfirmOpen(false);
+        router.push("/groups");
+        return;
+      }
+      setLeaveError(data?.error ?? "You are not allowed to leave.");
+    } catch {
+      setLeaveError("Failed to leave group.");
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   if (!id) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -221,6 +250,9 @@ export default function GroupPage() {
   }
 
   const isLeader = group.isLeader === true;
+  const memberCount = group.membersList?.length ?? 0;
+  const isOnlyMember = isLeader && memberCount === 1;
+  const isLeaderWithOthers = isLeader && memberCount > 1;
   const members = group.members ?? [];
 
   return (
@@ -273,6 +305,16 @@ export default function GroupPage() {
             <Link href="/groups/new">
               <Button variant="outline">Create another group</Button>
             </Link>
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50"
+              onClick={() => {
+                setLeaveError(null);
+                setLeaveConfirmOpen(true);
+              }}
+            >
+              Leave group
+            </Button>
           </div>
         </div>
 
@@ -438,6 +480,44 @@ export default function GroupPage() {
               disabled={transferring}
             >
               {transferring ? "Transferring…" : "Transfer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={leaveConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLeaveConfirmOpen(false);
+            setLeaveError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isOnlyMember ? "Delete group?" : "Leave group?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isOnlyMember
+                ? "Leaving this group will delete it and you will lose access to the group and its data. Are you sure you want to continue?"
+                : isLeaderWithOthers
+                  ? "You are the group leader. If you leave now, leadership will automatically be transferred to another member and you will leave the group. To choose a specific leader, transfer leadership first."
+                  : "Are you sure? You will lose access to this group."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {leaveError && (
+              <p className="text-sm text-red-600 mr-auto">{leaveError}</p>
+            )}
+            <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLeaveGroup}
+              disabled={leaving}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {leaving ? "Leaving…" : "Leave"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
