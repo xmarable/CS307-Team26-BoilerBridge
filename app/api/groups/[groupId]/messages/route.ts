@@ -13,7 +13,8 @@ const MessageSchema = z.object({
 async function verifyUser(params: Promise<any>) {
     // Verify user logged in
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id as string | undefined;
+    const mongoId = (session?.user as any)?.id as string | undefined;
+    const userId = (session?.user as any)?.userId as string | undefined;
     if (!userId) {
         return null;
     }
@@ -35,7 +36,7 @@ async function verifyUser(params: Promise<any>) {
 
     // Verify user in member list
     const members = group?.membersList ?? [];
-    if (!members.includes(userId)) {
+    if (!members.includes(mongoId)) {
         return null;
     }
 
