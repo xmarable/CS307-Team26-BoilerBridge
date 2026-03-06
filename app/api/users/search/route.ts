@@ -1,29 +1,56 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
+import dbConnect from "@/lib/dbConnect";
 
 export async function GET(req: Request) {
   try {
     await dbConnect();
-
     const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email");
+    const searchTerm = (
+      searchParams.get("query") ||
+      searchParams.get("email") ||
+      ""
+    ).trim();
 
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    if (!searchTerm || searchTerm.length < 3) {
+      return NextResponse.json([]);
     }
 
-    // finds users, excludes sensitive fields, and limits to 10 for performance
-    const users = await User.find({
-      email: { $regex: email, $options: "i" },
-    })
-      .select("userId username email school")
-      .limit(10);
+    // 1. If it starts with @ or is just a domain, block it
+    if (
+      searchTerm.startsWith("@") ||
+      searchTerm.toLowerCase().endsWith("purdue.edu")
+    ) {
+      // Only allow it if there's a significant prefix before the @
+      if (!searchTerm.includes("@") || searchTerm.indexOf("@") < 2) {
+        return NextResponse.json([]);
+      }
+    }
 
-    return NextResponse.json(users, { status: 200 });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (error: any) {
-    console.error("Error message: ", error.message);
+    // 2. Refined Query Logic
+    let query;
+    if (searchTerm.includes("@")) {
+      // If there is an @, look for an EXACT email match only
+      // This prevents "@purdue" from returning every user
+      query = { email: searchTerm.toLowerCase() };
+    } else {
+      // If no @, use the fuzzy search for username or the start of an email
+      query = {
+        $or: [
+          { username: { $regex: searchTerm, $options: "i" } },
+          { email: { $regex: `^${searchTerm}`, $options: "i" } }, // ^ ensures it matches the START of the email
+        ],
+      };
+    }
+
+    const users = await User.find(query)
+      .select("username email userId school")
+      .limit(10)
+      .lean();
+
+    return NextResponse.json(users);
+  } catch (error) {
+    console.error("Search API error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

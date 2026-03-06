@@ -13,7 +13,7 @@ import {
 
 const navItems = [
   { name: "My Trips", href: "/dashboard", icon: Map },
-  { name: "Find Friends", href: "/dashboard/friends", icon: Users },
+  { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/discover", icon: TrendingUp },
   { name: "Messages", href: "/messages", icon: MessageSquare, badge: 11 },
   { name: "Expenses", href: "/expenses", icon: DollarSign },

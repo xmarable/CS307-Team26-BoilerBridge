@@ -4,4 +4,4 @@ import NextAuth from "next-auth";
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
-export { authOptions } from "@/lib/auth";
+// export { authOptions } from "@/lib/auth"; just import it directly where you need it, no need to re-export
