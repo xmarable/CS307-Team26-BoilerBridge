@@ -368,13 +368,14 @@ export default function GroupPage() {
             );
           })()}
         </div>
+        
         {/* ----------- Must-Haves & CalendarEvents UI ---------------- */}
         {/* Calendar */}
         <CalendarEventsPanel groupId={group._id} />
 
         {/* Must-haves */}
         <MustHavesPanel groupId={group._id} />
-        
+
         {/* ----------------------------------------- */}
       </div>
 
