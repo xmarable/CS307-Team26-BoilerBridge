@@ -14,6 +14,12 @@ export interface IActivity extends Document {
   rating?: number;
   reviewCount: number;
   reviews: IReview[];
+  /** Cached summary fields */
+  sentimentSummary?: string;
+  highlights?: string[];
+  pros?: string[];
+  cons?: string[];
+  summaryCachedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +45,11 @@ const ActivitySchema = new Schema<IActivity>(
       type: [ReviewSchema],
       default: [],
     },
+    sentimentSummary: { type: String },
+    highlights: [{ type: String }],
+    pros: [{ type: String }],
+    cons: [{ type: String }],
+    summaryCachedAt: { type: Date },
   },
   { timestamps: true }
 );
