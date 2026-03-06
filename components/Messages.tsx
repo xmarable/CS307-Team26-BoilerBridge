@@ -159,8 +159,8 @@ export function Messages({ groups, userId }: { groups: any[], userId: string }) 
                                     {activeGroup ? (
                                         <div className="space-y-4">
                                             {/* Placeholder messages */}
-                                            {messages.map((m) => (
-                                                <div className={`flex ${m.senderID === userId ? "justify-end" : "justify-start"}`}>
+                                            {messages.map((m, i) => (
+                                                <div key={`${m.senderID}-${i}`} className={`flex ${m.senderID === userId ? "justify-end" : "justify-start"}`}>
                                                     <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
                                                         m.senderID === userId
                                                             ? "bg-amber-500 text-white"

@@ -85,7 +85,7 @@ export async function Navbar({ session }: { session?: any }) {
 
               <DropdownMenuItem asChild>
                 <Link
-                  href="/settings"
+                  href="/account-settings"
                   className="flex items-center w-full px-2 py-2 text-sm text-gray-700 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />
