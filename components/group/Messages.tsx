@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { MessageSquare, Send } from "lucide-react";
-import { Input } from "./ui/input";
+import { Input } from "../ui/input";
 import GroupList from "./GroupList";
 import MessagesPanel from "./MessagesPanel";
 

@@ -192,8 +192,9 @@ export default function MustHavesPanel({ groupId }: Props) {
         </div>
       </div>
 
-      <Card className="p-4 mb-6 bg-white border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Create */}
+      <Card className="p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-900">
           <div>
             <Label className="text-gray-800">Name *</Label>
             <Input
@@ -240,7 +241,7 @@ export default function MustHavesPanel({ groupId }: Props) {
               <SelectTrigger className="text-gray-900">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-black bg-white">
                 <SelectItem value="1">1 (low)</SelectItem>
                 <SelectItem value="2">2</SelectItem>
                 <SelectItem value="3">3</SelectItem>
@@ -265,13 +266,13 @@ export default function MustHavesPanel({ groupId }: Props) {
       </Card>
 
       <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <div className="w-full md:w-56">
-          <Label className="text-gray-800">Status</Label>
+        <div className="w-full md:w-56 text-gray-900">
+          <Label>Status</Label>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="text-gray-900">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-black bg-white">
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="proposed">Proposed</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
@@ -280,13 +281,13 @@ export default function MustHavesPanel({ groupId }: Props) {
           </Select>
         </div>
 
-        <div className="w-full md:w-56">
-          <Label className="text-gray-800">Priority</Label>
+        <div className="w-full md:w-56 text-gray-900">
+          <Label>Priority</Label>
           <Select value={filterPriority} onValueChange={setFilterPriority}>
             <SelectTrigger className="text-gray-900">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="text-black bg-white">
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="1">1</SelectItem>
               <SelectItem value="2">2</SelectItem>
@@ -297,8 +298,8 @@ export default function MustHavesPanel({ groupId }: Props) {
           </Select>
         </div>
 
-        <div className="w-full md:flex-1">
-          <Label className="text-gray-800">Category</Label>
+        <div className="w-full md:flex-1 text-gray-900">
+          <Label>Category</Label>
           <Input
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
@@ -309,9 +310,9 @@ export default function MustHavesPanel({ groupId }: Props) {
       </div>
 
       {loading ? (
-        <p className="text-gray-600">Loading must-haves…</p>
+        <p className="text-gray-700">Loading must-haves…</p>
       ) : items.length === 0 ? (
-        <p className="text-gray-600">No must-haves yet.</p>
+        <p className="text-gray-700">No must-haves yet.</p>
       ) : (
         <ul className="space-y-3">
           {items.map((it) => (
@@ -328,7 +329,7 @@ export default function MustHavesPanel({ groupId }: Props) {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary">P{it.priority}</Badge>
+                  <Badge variant="secondary" className="text-gray-700">P{it.priority}</Badge>
                   <Badge
                     variant="secondary"
                     className={
