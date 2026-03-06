@@ -118,18 +118,13 @@ export function Dashboard({ initialData }: DashboardProps) {
           </div>
           <div className="flex gap-2">
             <Link href="/groups">
-              <Button
-                variant="outline"
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
-              >
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 My Groups
               </Button>
             </Link>
             <Link href="/groups/new">
-              <Button
-                variant="outline"
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
-              >
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                <Plus className="mr-2" size={18} />
                 Create Group
               </Button>
             </Link>

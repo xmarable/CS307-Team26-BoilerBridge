@@ -1,31 +1,45 @@
+import { jest } from "@jest/globals";
+import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
-import dbConnect from "@/lib/dbConnect";
-import User from "@/models/User";
-import TravelGroup from "@/models/TravelGroup";
 
-jest.mock("next-auth", () => ({
+await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
+await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = require("next-auth");
-const mockGetServerSession = nextAuth.getServerSession;
+const nextAuth = await import("next-auth");
+const { default: bcrypt } = await import("bcryptjs");
+const { default: dbConnect } = await import("@/lib/dbConnect");
+const { default: User } = await import("@/models/User");
+const { default: TravelGroup } = await import("@/models/TravelGroup");
+
+const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
+  typeof nextAuth.getServerSession
+>;
 
 let GETGroups: () => Promise<Response>;
-let GETGroup: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let PATCHGroup: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let POSTMember: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
+let GETGroup: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let PATCHGroup: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let POSTMember: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
 let DELETEMember: (
   req: Request,
-  ctx: { params: Promise<{ groupId: string; memberId: string }> }
+  ctx: { params: Promise<{ groupId: string; memberId: string }> },
 ) => Promise<Response>;
 let PATCHLeader: (
   req: Request,
-  ctx: { params: Promise<{ groupId: string }> }
+  ctx: { params: Promise<{ groupId: string }> },
 ) => Promise<Response>;
 let POSTLeave: (
   req: Request,
@@ -43,9 +57,8 @@ beforeAll(async () => {
   PATCHGroup = groupIdRoute.PATCH;
   const membersRoute = await import("@/app/api/groups/[groupId]/members/route");
   POSTMember = membersRoute.POST;
-  const memberIdRoute = await import(
-    "@/app/api/groups/[groupId]/members/[memberId]/route"
-  );
+  const memberIdRoute =
+    await import("@/app/api/groups/[groupId]/members/[memberId]/route");
   DELETEMember = memberIdRoute.DELETE;
   const leaderRoute = await import("@/app/api/groups/[groupId]/leader/route");
   PATCHLeader = leaderRoute.PATCH;
@@ -60,7 +73,7 @@ afterAll(async () => {
     await mongoose.connection.close();
   }
   await new Promise((resolve) =>
-    setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS)
+    setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS),
   );
 });
 
@@ -68,8 +81,8 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-function params(p: { groupId?: string; memberId?: string }) {
-  return Promise.resolve(p);
+function paramsManage(p: { groupId: string; memberId?: string }) {
+  return Promise.resolve(p as { groupId: string; memberId: string });
 }
 
 describe("GET /api/groups", () => {
@@ -149,7 +162,7 @@ describe("GET /api/groups/[groupId]", () => {
       membersList: [user._id],
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const data = await res.json();
     expect(res.status).toBe(401);
@@ -181,7 +194,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const data = await res.json();
     expect(res.status).toBe(403);
@@ -214,7 +227,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -228,7 +241,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const resMember = await GETGroup(new Request("http://localhost"), {
-      params: params({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group._id.toString() }),
     });
     const dataMember = await resMember.json();
     expect(resMember.status).toBe(200);
@@ -268,7 +281,7 @@ describe("PATCH /api/groups/[groupId]", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groupName: "Hacked" }),
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(403);
@@ -302,7 +315,7 @@ describe("PATCH /api/groups/[groupId]", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groupName: "After" }),
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -350,13 +363,17 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: newUser.email }),
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(403);
     expect(data.error).toMatch(/leader/i);
     const unchanged = await TravelGroup.findById(group._id);
-    expect(unchanged!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).toHaveLength(2);
+    expect(
+      unchanged!.membersList.map((id: mongoose.Types.ObjectId) =>
+        id.toString(),
+      ),
+    ).toHaveLength(2);
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({
       _id: { $in: [leader._id, member._id, newUser._id] },
@@ -392,7 +409,7 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: member.email }),
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(400);
@@ -430,15 +447,15 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: newUser.email }),
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(201);
     expect(data.group.membersList).toContain(newUser._id.toString());
     const updated = await TravelGroup.findById(group._id);
-    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).toContain(
-      newUser._id.toString()
-    );
+    expect(
+      updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString()),
+    ).toContain(newUser._id.toString());
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, newUser._id] } });
   });
@@ -469,7 +486,7 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
       expires: "",
     });
     const res = await DELETEMember(new Request("http://localhost"), {
-      params: params({
+      params: paramsManage({
         groupId: group._id.toString(),
         memberId: leader._id.toString(),
       }),
@@ -498,7 +515,7 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
       expires: "",
     });
     const res = await DELETEMember(new Request("http://localhost"), {
-      params: params({
+      params: paramsManage({
         groupId: group._id.toString(),
         memberId: leader._id.toString(),
       }),
@@ -534,7 +551,7 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
       expires: "",
     });
     const res = await DELETEMember(new Request("http://localhost"), {
-      params: params({
+      params: paramsManage({
         groupId: group._id.toString(),
         memberId: member._id.toString(),
       }),
@@ -543,9 +560,9 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
     expect(res.status).toBe(200);
     expect(data.group.membersList).not.toContain(member._id.toString());
     const updated = await TravelGroup.findById(group._id);
-    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).not.toContain(
-      member._id.toString()
-    );
+    expect(
+      updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString()),
+    ).not.toContain(member._id.toString());
     expect(updated!.membersList).toHaveLength(1);
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
@@ -561,7 +578,7 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
         body: JSON.stringify({ newLeaderId: "507f1f77bcf86cd799439011" }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: params({ groupId: "507f1f77bcf86cd799439011" }) }
+      { params: paramsManage({ groupId: "507f1f77bcf86cd799439011" }) },
     );
     const data = await res.json();
     expect(res.status).toBe(401);
@@ -597,14 +614,14 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
         body: JSON.stringify({ newLeaderId: leader._id.toString() }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(403);
     expect(data.error).toMatch(/only the group leader/i);
     const unchanged = await TravelGroup.findById(group._id);
     expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
-      leader._id.toString()
+      leader._id.toString(),
     );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
@@ -639,14 +656,14 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
         body: JSON.stringify({ newLeaderId: leader._id.toString() }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(400);
     expect(data.error).toMatch(/yourself/i);
     const unchanged = await TravelGroup.findById(group._id);
     expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
-      leader._id.toString()
+      leader._id.toString(),
     );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
@@ -687,14 +704,14 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
         body: JSON.stringify({ newLeaderId: outsider._id.toString() }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(400);
     expect(data.error).toMatch(/not a member/i);
     const unchanged = await TravelGroup.findById(group._id);
     expect((unchanged!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
-      leader._id.toString()
+      leader._id.toString(),
     );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({
@@ -731,7 +748,7 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
         body: JSON.stringify({ newLeaderId: member._id.toString() }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: params({ groupId: group._id.toString() }) }
+      { params: paramsManage({ groupId: group._id.toString() }) },
     );
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -739,7 +756,7 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
     expect(data.group.leaderID).toBe(member._id.toString());
     const updated = await TravelGroup.findById(group._id);
     expect((updated!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
-      member._id.toString()
+      member._id.toString(),
     );
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });

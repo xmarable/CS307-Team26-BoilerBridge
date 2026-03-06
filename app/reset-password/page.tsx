@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { ForgotPassword } from "@/components/ForgotPassword";
+import { ResetPassword } from "@/components/ResetPassword";
 
 export default async function ResetPasswordPage() {
     const session = await getServerSession(authOptions);
@@ -13,7 +13,7 @@ export default async function ResetPasswordPage() {
     return (
         <div>
             <Header />
-            <ForgotPassword />
+            <ResetPassword />
         </div>
     )
 }

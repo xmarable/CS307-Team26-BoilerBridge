@@ -31,6 +31,17 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  eduEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    validate: {
+      validator: function (v: string) {
+        return !v || v.endsWith(".edu");
+      },
+      message: (props: any) => `${props.value} is not a valid .edu email!`,
+    },
+  },
   passwordHash: { type: String, required: true },
   school: { type: String, trim: true },
   location: { type: String, trim: true },
@@ -40,13 +51,18 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.UUID,
     },
   ],
+  passwordReset: {
+    tokenHash: { type: String, default: null },
+    expiresAt: { type: Date, default: null },
+    requestedAt: { type: Date, default: new Date() }
+  },
   preferences: { type: Map, of: Boolean },
   settings: {
     type: {
       notifications: {
         tripReminders: { type: Boolean, default: false },
-        friendRequests: { type: Boolean, default: false },
-        groupInvite: { type: Boolean, default: false },
+        friendRequests: { type: Boolean, defualt: false },
+        groupInvite: { type: Boolean, default: false }
       },
       deletion: {
         requested: { type: Boolean, default: false },

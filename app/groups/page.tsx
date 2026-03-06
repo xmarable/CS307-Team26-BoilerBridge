@@ -37,19 +37,21 @@ export default function MyGroupsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="p-6 lg:p-8 flex items-center justify-center">
         <p className="text-gray-600">Loading your groups…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="p-6 lg:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">My groups</h1>
+          <h1 className="text-3xl font-bold text-gray-900">My groups</h1>
           <Link href="/groups/new">
-            <Button>Create group</Button>
+            <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+              Create group
+            </Button>
           </Link>
         </div>
 
@@ -57,7 +59,11 @@ export default function MyGroupsPage() {
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
             <Link href="/dashboard" className="inline-block mt-2">
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white border-amber-500 text-amber-700 hover:bg-amber-50 hover:text-amber-800 rounded-xl"
+              >
                 Back to dashboard
               </Button>
             </Link>
@@ -68,7 +74,9 @@ export default function MyGroupsPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
             <p className="text-gray-600 mb-4">You’re not in any groups yet.</p>
             <Link href="/groups/new">
-              <Button>Create your first group</Button>
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                Create your first group
+              </Button>
             </Link>
           </div>
         )}
@@ -100,7 +108,12 @@ export default function MyGroupsPage() {
 
         <div className="mt-6">
           <Link href="/dashboard">
-            <Button variant="outline">Back to dashboard</Button>
+            <Button
+              variant="outline"
+              className="bg-white border-amber-500 text-amber-700 hover:bg-amber-50 hover:text-amber-800 rounded-xl"
+            >
+              Back to dashboard
+            </Button>
           </Link>
         </div>
       </div>

@@ -23,6 +23,7 @@ const messageSchema = new mongoose.Schema(
       sparse: true, // added to allow multiple nulls in unique index
     },
     senderID: { type: String },
+    senderName: { type: String, required: true },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },
   },
@@ -48,7 +49,10 @@ const travelGroupSchema = new mongoose.Schema({
     },
   ],
   ledger: [expenseSchema],
-  chatLogs: [messageSchema],
+  chatLogs: {
+    type: [messageSchema],
+    default: []
+  }
 });
 
 const TravelGroup =

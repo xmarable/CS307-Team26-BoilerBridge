@@ -1,17 +1,25 @@
+import { jest } from "@jest/globals";
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 import type { Types } from "mongoose";
 
-jest.mock("next-auth", () => ({
+await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
+await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = require("next-auth");
-const mockGetServerSession = nextAuth.getServerSession;
+const nextAuth = await import("next-auth");
+const { default: bcrypt } = await import("bcryptjs");
+const { default: dbConnect } = await import("@/lib/dbConnect");
+const { default: User } = await import("@/models/User");
+const { default: TravelGroup } = await import("@/models/TravelGroup");
+
+// Properly type the mock to avoid "never" or assignment errors
+const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
+  typeof nextAuth.getServerSession
+>;
 
 let POST: (req: Request) => Promise<Response>;
 
@@ -19,17 +27,41 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
+
+  // Sync indexes for both models to manage race conditions
+  await User.syncIndexes();
+  await TravelGroup.syncIndexes();
+
+  try {
+    const db = mongoose.connection.db;
+    if (db) {
+      await db.collection("travelgroups").dropIndex("chatLogs.messageID_1");
+    }
+  } catch (error) {
+    // index might not exist
+  }
   const createRoute = await import("@/app/api/groups/create/route");
   POST = createRoute.POST;
 });
 
 afterAll(async () => {
-  if (mongoose.connection.readyState === 1) {
-    await TravelGroup.deleteMany({});
-    await User.deleteMany({});
-    await mongoose.connection.close();
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
+
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
   }
-  await new Promise((resolve) => setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS));
+
+  if ((global as any).mongoose) {
+    (global as any).mongoose.conn = null;
+    (global as any).mongoose.promise = null;
+  }
+
+  jest.resetModules();
+  jest.clearAllMocks();
 });
 
 beforeEach(() => {
@@ -64,8 +96,8 @@ describe("POST /api/groups/create", () => {
     const userId = user._id.toString();
 
     mockGetServerSession.mockResolvedValue({
-      user: { id: userId },
-      expires: "",
+      user: { id: userId, email: "leader@test.com", name: "groupleader" },
+      expires: "9999-12-31T23:59:59.999Z",
     });
 
     const req = new Request("http://localhost/api/groups/create", {
@@ -105,8 +137,8 @@ describe("POST /api/groups/create", () => {
     const userId = user._id.toString();
 
     mockGetServerSession.mockResolvedValue({
-      user: { id: userId },
-      expires: "",
+      user: { id: userId, email: "dup@test.com", name: "duplicateuser" },
+      expires: "9999-12-31T23:59:59.999Z",
     });
 
     const body = JSON.stringify({ groupName: "Same Name Group" });
