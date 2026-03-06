@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { CheckCircle2, GraduationCap } from "lucide-react";
 
 interface ProfilePageProps {
   initialData?: {
@@ -14,8 +13,6 @@ interface ProfilePageProps {
     username?: string | null;
     school?: string | null;
     location?: string | null;
-    isStudentVerified?: boolean;
-    eduEmail?: string | null;
   };
 }
 
@@ -25,14 +22,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const [isVerified, setIsVerified] = useState(
-    initialData?.isStudentVerified || false,
-  );
-  const [step, setStep] = useState<"idle" | "email" | "code">("idle");
-  const [eduEmail, setEduEmail] = useState(initialData?.eduEmail || "");
-  const [vCode, setVCode] = useState("");
-  const [vLoading, setVLoading] = useState(false);
-
+  // username auto-fills, name stays empty if not provided in initialData
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     username: initialData?.username || "",
@@ -50,57 +40,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
         location: initialData.location || "",
         profileImage: initialData.image || "",
       });
-      setIsVerified(initialData.isStudentVerified || false);
     }
   }, [initialData]);
-
-  const handleRequestCode = async () => {
-    if (!eduEmail.endsWith(".edu")) return alert("Please use a .edu email");
-    setVLoading(true);
-    try {
-      const res = await fetch("/api/auth/verify-student", {
-        method: "POST",
-        body: JSON.stringify({ action: "request", email: eduEmail }),
-      });
-      if (res.ok) setStep("code");
-      else alert("Failed to send code");
-    } catch (error) {
-      alert("Error sending code");
-    } finally {
-      setVLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    setVLoading(true);
-    try {
-      const res = await fetch("/api/auth/verify-student", {
-        method: "POST",
-        body: JSON.stringify({ action: "confirm", code: vCode }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIsVerified(true);
-        setEduEmail(data.eduEmail);
-        setStep("idle");
-
-        await update({
-          ...session,
-          user: {
-            ...session?.user,
-            isStudentVerified: true,
-            eduEmail: data.eduEmail,
-          },
-        });
-      } else {
-        alert(data.error || "Invalid code");
-      }
-    } catch (error) {
-      alert("Error verifying code");
-    } finally {
-      setVLoading(false);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -122,6 +63,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if anything actually changed before hitting the API
     const hasChanged =
       formData.name !== (initialData?.name || "") ||
       formData.username !== (initialData?.username || "") ||
@@ -135,13 +78,17 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
     }
 
     setLoading(true);
+    setSuccess(false);
+
     try {
       const res = await fetch("/api/users/me/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
+
       const data = await res.json();
+
       if (res.ok) {
         await update({
           ...session,
@@ -154,39 +101,33 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
         });
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
+      } else {
+        alert(data.error || "Update failed");
       }
     } catch (error) {
+      console.error("Error updating profile:", error);
       alert("An error occurred while saving.");
     } finally {
       setLoading(false);
     }
   };
 
+  // High contrast: User text is bold black, placeholders are faint gray
   const inputStyles =
     "rounded-xl border-gray-300 text-black font-medium placeholder:text-gray-300 placeholder:font-normal focus:ring-amber-500 focus:border-amber-500 bg-white opacity-100";
 
   return (
     <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div className="mb-8 flex justify-between items-start">
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-500 text-sm">
-            Update your public profile and verification status.
-          </p>
-        </div>
-        {isVerified && (
-          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
-            <CheckCircle2 size={16} />
-            <span className="text-xs font-bold uppercase tracking-wider">
-              Verified Student
-            </span>
-          </div>
-        )}
+      <div className="mb-8 text-center sm:text-left">
+        <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
+        <p className="text-gray-500 text-sm">
+          Update your public profile, display name, and location details.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex flex-col items-center gap-4 mb-8">
-          <label className="align-center font-semibold text-gray-700">
+        <div className="flex flex-col items-center sm:items-start gap-4 mb-8">
+          <label className="text-sm font-semibold text-gray-700">
             Profile Picture
           </label>
           <div className="relative group">
@@ -204,6 +145,23 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
                   .toUpperCase()}
               </AvatarFallback>
             </Avatar>
+            <div className="absolute bottom-1 right-1 bg-white p-1.5 rounded-full shadow-sm border border-gray-100 cursor-pointer">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-gray-600"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </div>
           </div>
           <input
             type="file"
@@ -228,6 +186,9 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
               className={inputStyles}
               placeholder="e.g. Xavion Marable"
             />
+            <p className="text-[10px] text-gray-400 px-1 italic">
+              Public name, can be changed anytime.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -246,67 +207,9 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
               className={inputStyles}
               placeholder="username"
             />
-          </div>
-
-          <div className="p-5 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 space-y-4">
-            <div className="flex items-center gap-2">
-              <GraduationCap className="text-amber-600" size={20} />
-              <h3 className="font-bold text-gray-800">Student Verification</h3>
-            </div>
-
-            {!isVerified ? (
-              <div className="space-y-3">
-                {step === "idle" && (
-                  <button
-                    type="button"
-                    onClick={() => setStep("email")}
-                    className="text-sm text-amber-600 font-semibold hover:underline"
-                  >
-                    + Verify your student status with a .edu email
-                  </button>
-                )}
-                {step === "email" && (
-                  <div className="flex gap-2">
-                    <Input
-                      value={eduEmail}
-                      onChange={(e) => setEduEmail(e.target.value)}
-                      placeholder="student@university.edu"
-                      className={inputStyles}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRequestCode}
-                      disabled={vLoading}
-                      className="bg-black text-white px-4 rounded-xl text-sm font-bold"
-                    >
-                      {vLoading ? "..." : "Send"}
-                    </button>
-                  </div>
-                )}
-                {step === "code" && (
-                  <div className="flex gap-2">
-                    <Input
-                      value={vCode}
-                      onChange={(e) => setVCode(e.target.value)}
-                      placeholder="6-digit code"
-                      className={inputStyles}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleVerifyCode}
-                      disabled={vLoading}
-                      className="bg-green-600 text-white px-4 rounded-xl text-sm font-bold"
-                    >
-                      {vLoading ? "..." : "Verify"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-600">
-                Verified via <b>{eduEmail}</b>
-              </p>
-            )}
+            <p className="text-[10px] text-gray-400 px-1 italic">
+              Can be changed once every 14 days.
+            </p>
           </div>
 
           <div className="space-y-2">

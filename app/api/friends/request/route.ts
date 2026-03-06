@@ -56,6 +56,11 @@ export async function POST(req: Request) {
     const requesterUUID = (session?.user as any)?.userId;
     const recipientId = body.recipientId;
 
+    console.log("--- DEBUG FRIEND REQUEST ---");
+    console.log("Session User ID (ObjectId):", session?.user?.id);
+    console.log("Session User UUID (requesterUUID):", requesterUUID);
+    console.log("Incoming recipientId (target UUID):", recipientId);
+
     if (!requesterUUID || !recipientId) {
       console.log("ERROR: Missing IDs in request");
       return NextResponse.json({ error: "Missing IDs" }, { status: 400 });
@@ -67,10 +72,10 @@ export async function POST(req: Request) {
         },
       );
 
-      /* console.log(
+      console.log(
         "Database Requester Found:",
         requester ? requester.username : "NULL",
-      ); debug print statement */
+      );
 
       if (!requester) {
         return NextResponse.json(
@@ -104,7 +109,7 @@ export async function POST(req: Request) {
           }).catch(() => null);
 
           if (incomingRequest) {
-            // console.log("Mutual request found! Auto-accepting...");
+            console.log("Mutual request found! Auto-accepting...");
 
             incomingRequest.status = "accepted";
             await incomingRequest.save();
@@ -145,10 +150,10 @@ export async function POST(req: Request) {
               status: "pending",
             });
 
-            /* console.log(
+            console.log(
               "SUCCESS: Created FriendRequest with ID:",
               newRequest.requestId,
-            ); debug print statement */
+            );
 
             return NextResponse.json(
               { message: "Friend request sent" },
