@@ -25,8 +25,8 @@ type CalendarEvent = {
   _id: string;
   title: string;
   description?: string;
-  startTime: string; // ISO string
-  endTime: string;   // ISO string
+  startTime: string;
+  endTime: string;
   location?: string;
   eventType?: string;
   createdBy?: string;
@@ -41,7 +41,6 @@ type Props = {
 };
 
 function toDatetimeLocalValue(date: Date) {
-  // format: YYYY-MM-DDTHH:mm
   const pad = (n: number) => String(n).padStart(2, "0");
   const yyyy = date.getFullYear();
   const mm = pad(date.getMonth() + 1);
@@ -56,7 +55,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Default range: now -> 7 days from now
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
     const d = new Date();
@@ -64,7 +62,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     return toDatetimeLocalValue(d);
   });
 
-  // Create form
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startTime, setStartTime] = useState(() => toDatetimeLocalValue(new Date()));
@@ -77,14 +74,12 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [eventType, setEventType] = useState("activity");
   const [creating, setCreating] = useState(false);
 
-  // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const rangeQuery = useMemo(() => {
     const qs = new URLSearchParams();
-    // API expects ISO strings; datetime-local is local time, but Date() will interpret it as local
     qs.set("from", new Date(from).toISOString());
     qs.set("to", new Date(to).toISOString());
     return `?${qs.toString()}`;
@@ -137,7 +132,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to create event");
 
-      // reset form (keep times reasonable)
       setTitle("");
       setDescription("");
       setLocation("");
@@ -200,10 +194,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   async function handleDelete(eventId: string) {
     try {
       setErr(null);
-      const res = await fetch(
-        `/api/groups/${groupId}/calendar/events/${eventId}`,
-        { method: "DELETE" }
-      );
+      const res = await fetch(`/api/groups/${groupId}/calendar/events/${eventId}`, {
+        method: "DELETE",
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete event");
       await fetchEvents();
@@ -219,16 +212,25 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         <Badge variant="secondary">{events.length} events</Badge>
       </div>
 
-      {/* Range */}
-      <Card className="p-4 mb-6">
+      <Card className="p-4 mb-6 bg-white border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label>From</Label>
-            <Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Label className="text-gray-800">From</Label>
+            <Input
+              type="datetime-local"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
           <div>
-            <Label>To</Label>
-            <Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Label className="text-gray-800">To</Label>
+            <Input
+              type="datetime-local"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
         </div>
         <div className="mt-3">
@@ -239,40 +241,64 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       </Card>
 
-      {/* Create */}
-      <Card className="p-4 mb-6">
+      <Card className="p-4 mb-6 bg-white border-gray-200">
         <h3 className="font-semibold text-gray-900 mb-3">Add event</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <Label>Title *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Dinner reservation, museum, flight..." />
+            <Label className="text-gray-800">Title *</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Dinner reservation, museum, flight..."
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div>
-            <Label>Start</Label>
-            <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            <Label className="text-gray-800">Start</Label>
+            <Input
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div>
-            <Label>End</Label>
-            <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            <Label className="text-gray-800">End</Label>
+            <Input
+              type="datetime-local"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div className="md:col-span-2">
-            <Label>Location</Label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Address or place name" />
+            <Label className="text-gray-800">Location</Label>
+            <Input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Address or place name"
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div className="md:col-span-2">
-            <Label>Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Notes/details..." />
+            <Label className="text-gray-800">Description</Label>
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Notes/details..."
+              className="text-gray-900 placeholder:text-gray-500"
+            />
           </div>
 
           <div>
-            <Label>Type</Label>
+            <Label className="text-gray-800">Type</Label>
             <Select value={eventType} onValueChange={setEventType}>
-              <SelectTrigger>
+              <SelectTrigger className="text-gray-900">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -299,7 +325,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       </Card>
 
-      {/* List */}
       {loading ? (
         <p className="text-gray-600">Loading events…</p>
       ) : events.length === 0 ? (
@@ -308,14 +333,21 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         <ul className="space-y-3">
           {events
             .slice()
-            .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+            .sort(
+              (a, b) =>
+                new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+            )
             .map((ev) => (
-              <li key={ev._id} className="border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
+              <li
+                key={ev._id}
+                className="border border-gray-200 rounded-xl p-4 flex flex-col gap-2"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-gray-900 truncate">{ev.title}</p>
                     <p className="text-sm text-gray-600">
-                      {new Date(ev.startTime).toLocaleString()} → {new Date(ev.endTime).toLocaleString()}
+                      {new Date(ev.startTime).toLocaleString()} →{" "}
+                      {new Date(ev.endTime).toLocaleString()}
                     </p>
                     {(ev.location || ev.eventType) && (
                       <p className="text-sm text-gray-600 truncate">
@@ -341,13 +373,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                   </div>
                 </div>
 
-                {ev.description && <p className="text-sm text-gray-700">{ev.description}</p>}
+                {ev.description && (
+                  <p className="text-sm text-gray-700">{ev.description}</p>
+                )}
               </li>
             ))}
         </ul>
       )}
 
-      {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -356,35 +389,57 @@ export default function CalendarEventsPanel({ groupId }: Props) {
 
           <div className="space-y-4">
             <div>
-              <Label>Title *</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Label className="text-gray-800">Title *</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-gray-900 placeholder:text-gray-500"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Start</Label>
-                <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Label className="text-gray-800">Start</Label>
+                <Input
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="text-gray-900 placeholder:text-gray-500"
+                />
               </div>
               <div>
-                <Label>End</Label>
-                <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <Label className="text-gray-800">End</Label>
+                <Input
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="text-gray-900 placeholder:text-gray-500"
+                />
               </div>
             </div>
 
             <div>
-              <Label>Location</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+              <Label className="text-gray-800">Location</Label>
+              <Input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="text-gray-900 placeholder:text-gray-500"
+              />
             </div>
 
             <div>
-              <Label>Description</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Label className="text-gray-800">Description</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="text-gray-900 placeholder:text-gray-500"
+              />
             </div>
 
             <div>
-              <Label>Type</Label>
+              <Label className="text-gray-800">Type</Label>
               <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger>
+                <SelectTrigger className="text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -401,7 +456,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingEdit}>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={savingEdit}
+            >
               Cancel
             </Button>
             <Button onClick={saveEdit} disabled={savingEdit || !title.trim()}>
