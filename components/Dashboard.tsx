@@ -116,27 +116,19 @@ export function Dashboard({ initialData }: DashboardProps) {
             </h1>
             <p className="text-gray-600">Manage and plan your adventures</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/activities/new">
+          <div className="flex gap-2">
+            <Link href="/groups">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
-                <Plus className="mr-2" size={18} />
-                Add Activity
-              </Button>
-            </Link>
-            <Link href="/activities">
-              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
-                Browse Activities
+                My Groups
               </Button>
             </Link>
             <Link href="/groups/new">
-              <Button
-                variant="outline"
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 rounded-xl"
-              >
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                <Plus className="mr-2" size={18} />
                 Create Group
               </Button>
             </Link>
-            <Link href="/trip">
+            <Link href="/trip/new">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Create Trip

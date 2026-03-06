@@ -1,18 +1,14 @@
 import mongoose from "mongoose";
-
-const mustHaveActivitySchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    address: { type: String, trim: true },
-  },
-  { _id: false }
-);
+import User from "../models/User";
+import { boolean, float64 } from "zod";
 
 const TripSchema = new mongoose.Schema({
+    
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
     },
+    
     fromCity: {
         type: String,
         required: true,
@@ -21,31 +17,32 @@ const TripSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+
     fromDate: {
         type: Date,
         required: true,
     },
+
     toDate: {
         type: Date,
         required: true,
     },
+
     mode: {
         type: String,
         enum: ['flight', 'train', 'bus', 'taxi'],
         required: true,
     },
+
     budget: {
         type: Number,
         required: true,
     },
+
     tripConfirmed: {
         type: Boolean,
         default: false,
-    },
-    mustHaves: {
-        type: [mustHaveActivitySchema],
-        default: [],
-    },
+    }
 },
 { timestamps: true });
 

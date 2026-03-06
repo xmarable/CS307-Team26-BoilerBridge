@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 
 type Trip = {
   _id: string;
@@ -189,15 +188,6 @@ export default function AllTripsPage() {
                     Created {fmtDate(t.createdAt)}
                   </div>
                 )}
-
-                <div className="mt-4 pt-4 border-t border-zinc-800">
-                  <Link
-                    href={`/trip/${t._id}/edit`}
-                    className="inline-flex items-center rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-                  >
-                    Edit preferences
-                  </Link>
-                </div>
               </div>
             ))}
           </div>

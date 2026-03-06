@@ -95,7 +95,7 @@ export function SignIn() {
                 <div>
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password" className="text-black">Password</Label>
-                    <a href="#" className="text-sm text-amber-600 hover:text-amber-700">
+                    <a href="/forgot-password" className="text-sm text-amber-600 hover:text-amber-700">
                       Forgot?
                     </a >
                   </div>
