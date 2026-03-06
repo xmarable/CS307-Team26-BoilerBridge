@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import MustHavesPanel from "@/components/group/MustHavesPanel";
+import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 
 type Member = { id: string; username: string; email: string };
 
@@ -367,9 +368,13 @@ export default function GroupPage() {
             );
           })()}
         </div>
-        {/* ----------- Must-Haves UI ---------------- */}
+        {/* ----------- Must-Haves & CalendarEvents UI ---------------- */}
+        {/* Calendar */}
+        <CalendarEventsPanel groupId={group._id} />
+
         {/* Must-haves */}
         <MustHavesPanel groupId={group._id} />
+        
         {/* ----------------------------------------- */}
       </div>
 
