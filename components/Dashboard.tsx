@@ -128,6 +128,17 @@ export function Dashboard({ initialData }: DashboardProps) {
                 Create Group
               </Button>
             </Link>
+            <Link href="/activities">
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                Browse Activities
+              </Button>
+            </Link>
+            <Link href="/activities/new">
+              <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
+                <Plus className="mr-2" size={18} />
+                Add Activity
+              </Button>
+            </Link>
             <Link href="/trip/new">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
