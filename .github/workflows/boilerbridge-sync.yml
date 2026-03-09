@@ -2,7 +2,7 @@ name: Sync BoilerBridge Docs to PDF
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Runs every 30 minutes
+    - cron: '0 */12 * * *' # Runs at Noon and Midnight
   workflow_dispatch:       # Allows manual trigger
 
 jobs:
@@ -123,3 +123,4 @@ jobs:
             git commit -m "Auto-sync: Smart update of BoilerBridge PDFs"
             git push origin main
           fi
+
