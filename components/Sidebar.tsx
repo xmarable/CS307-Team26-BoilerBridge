@@ -10,6 +10,7 @@ import {
   DollarSign,
   Settings,
   Users,
+  ShieldAlert,
 } from "lucide-react";
 
 const navItems = [
@@ -17,13 +18,26 @@ const navItems = [
   { name: "All Trips", href: "/alltrips", icon: List },
   { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/discover", icon: TrendingUp },
-  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare, badge: 11 },
+  {
+    name: "Messages",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    badge: 11,
+  },
   { name: "Expenses", href: "/expenses", icon: DollarSign },
   { name: "Settings", href: "/dashboard/profile", icon: Settings },
+  { name: "Safety & SOS", href: "#sos", icon: ShieldAlert },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  const handleSOSClick = (e: React.MouseEvent, name: string) => {
+    if (name === "Safety & SOS") {
+      // Dispatches a custom event that the SOSButton component is listening for
+      window.dispatchEvent(new Event("open-sos"));
+    }
+  };
 
   return (
     <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] sticky top-18.25">

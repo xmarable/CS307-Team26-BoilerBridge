@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { SOSButton } from "./SOSButton";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import Link from "next/link";
@@ -293,6 +294,7 @@ export function Dashboard({ initialData }: DashboardProps) {
           </div>
         </div>
       </div>
+      <SOSButton />
     </div>
   );
 }
