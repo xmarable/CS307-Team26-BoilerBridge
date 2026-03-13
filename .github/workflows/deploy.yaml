@@ -12,16 +12,14 @@ permissions:
   contents: read
   deployments: write
 
-# Prepare for Node.js update
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy-app:
     runs-on: ubuntu-latest
-    # Export the URL for the next job
     outputs:
-      live_url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
+      live_url: ${{ steps.extract_url.outputs.live_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,7 +29,6 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      # Corrected login method to avoid 401 Unauthorized errors
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login --expiry-seconds 1200
 
@@ -64,7 +61,26 @@ jobs:
           print_build_logs: true
           print_deploy_logs: true
 
-  # Separate job to set the environment URL after deployment succeeds
+      - name: Extract Live URL
+        id: extract_url
+        shell: bash
+        env:
+          DEPLOY_OUTPUT: ${{ steps.deploy.outputs.app }}
+        run: |
+          if [ -z "$DEPLOY_OUTPUT" ]; then
+            echo "Error: deploy output is empty"
+            exit 1
+          fi
+          
+          URL=$(echo "$DEPLOY_OUTPUT" | jq -r '.live_url')
+          
+          if [ "$URL" == "null" ] || [ -z "$URL" ]; then
+            echo "Error: could not parse live_url from output"
+            exit 1
+          fi
+          
+          echo "live_url=$URL" >> $GITHUB_OUTPUT
+
   set-production-url:
     needs: deploy-app
     runs-on: ubuntu-latest
@@ -72,4 +88,7 @@ jobs:
       name: Production
       url: ${{ needs.deploy-app.outputs.live_url }}
     steps:
-      - run: echo "Production URL updated in GitHub."
+      - name: Log Success
+        run: |
+          echo "Production environment URL updated."
+          echo "Deployment succeeded for: ${{ needs.deploy-app.outputs.live_url }}"
