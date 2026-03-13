@@ -36,7 +36,7 @@ export async function POST(
 
     // 3. Find the group and verify the user is a member
     // THIS IS WHERE YOU check if they are an 'Admin' or 'Leader' specifically
-    const group = await TravelGroup.findOne({ groupID: groupId }).lean();
+    const group = await TravelGroup.findOne({ groupID: groupId });
 
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
@@ -68,11 +68,13 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } },
+  context: { params: Promise<{ groupId: string }> },
 ) {
   try {
+    const { groupId } = await context.params;
     await dbConnect();
-    const group = await TravelGroup.findOne({ groupID: params.groupId })
+
+    const group = await TravelGroup.findOne({ groupID: groupId })
       .select("pinnedAnnouncements")
       .lean();
 
@@ -81,8 +83,9 @@ export async function GET(
     }
 
     // Sort by timestamp descending (newest first)
-    const sortedAnnouncements = group.pinnedAnnouncements.sort(
-      (a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime(),
+    const sortedAnnouncements = (group.pinnedAnnouncements || []).sort(
+      (a: any, b: any) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
     return NextResponse.json(sortedAnnouncements);
