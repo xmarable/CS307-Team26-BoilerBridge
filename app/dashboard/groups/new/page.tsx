@@ -95,7 +95,9 @@ export default function CreateGroupPage() {
     <div className="p-6 lg:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Create a travel group</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Create a travel group
+          </h1>
           <p className="text-gray-600 mt-1">
             Give your group a name. You’ll be the leader and first member.
           </p>
@@ -133,21 +135,21 @@ export default function CreateGroupPage() {
             />
           </div>
 
-            {error && (
-              <p className="text-sm text-red-600" role="alert">
-                {error}
-              </p>
-            )}
+          {error && (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all"
-              >
-                {isSubmitting ? "Creating…" : "Create group"}
-              </Button>
-              <Link href="/dashboard">
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all"
+            >
+              {isSubmitting ? "Creating…" : "Create group"}
+            </Button>
+            <Link href="/dashboard">
               <Button
                 type="button"
                 variant="outline"
@@ -155,9 +157,9 @@ export default function CreateGroupPage() {
               >
                 Cancel
               </Button>
-              </Link>
-            </div>
-          </form>
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

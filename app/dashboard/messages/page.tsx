@@ -6,19 +6,26 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 export default async function MessagesPage() {
-    const groups = await getUserGroups();
-    const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.userId as string;
+  const session = await getServerSession(authOptions);
 
-    if (groups == null) {
-        redirect("/signin");
-        return null;
-    }
+  if (!session || !session.user?.email) {
+    redirect("/signin");
+    return null;
+  }
 
-    if (!session) {
-        redirect("/signin");
-        return null;
-    }
+  const userId = (session?.user as any)?.userId as string;
+  const groups = await getUserGroups();
 
-    return <Messages groups={groups} userId={userId}/>;
+  if (groups == null) {
+    redirect("/dashboard");
+    return null;
+  }
+
+  const sanitizedGroups = JSON.parse(JSON.stringify(groups));
+
+  return (
+    <div className="h-[calc(100vh-64px)] overflow-hidden bg-white">
+      <Messages groups={sanitizedGroups} userId={userId} />
+    </div>
+  );
 }

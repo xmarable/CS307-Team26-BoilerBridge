@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, MapPin, Plus } from "lucide-react";
 
@@ -31,7 +30,9 @@ export default function ActivitiesPage() {
     if (status !== "authenticated") return;
 
     fetch("/api/activities", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load"))))
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error("Failed to load")),
+      )
       .then((data) => setActivities(data.activities ?? []))
       .catch(() => setError("Failed to load activities."))
       .finally(() => setLoading(false));
@@ -47,7 +48,6 @@ export default function ActivitiesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar session={session} />
       <main className="max-w-2xl mx-auto p-4 md:p-8">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/dashboard">
@@ -57,14 +57,19 @@ export default function ActivitiesPage() {
             </Button>
           </Link>
           <Link href="/activities/new">
-            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
+            <Button
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
               <Plus className="h-4 w-4 mr-1" />
               Add Activity
             </Button>
           </Link>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Browse Activities</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Browse Activities
+        </h1>
         <p className="text-gray-600 mb-6">
           Places and activities added by the community. Click to see reviews.
         </p>
@@ -72,7 +77,9 @@ export default function ActivitiesPage() {
         {loading && <p className="text-gray-500">Loading…</p>}
         {error && <p className="text-red-600">{error}</p>}
         {!loading && !error && activities.length === 0 && (
-          <p className="text-gray-500">No activities yet. Be the first to add one!</p>
+          <p className="text-gray-500">
+            No activities yet. Be the first to add one!
+          </p>
         )}
         {!loading && !error && activities.length > 0 && (
           <ul className="space-y-3">
@@ -91,7 +98,8 @@ export default function ActivitiesPage() {
                         )}
                         {a.reviewCount > 0 && (
                           <p className="text-xs text-amber-600 mt-1">
-                            {a.reviewCount} review{a.reviewCount !== 1 ? "s" : ""}
+                            {a.reviewCount} review
+                            {a.reviewCount !== 1 ? "s" : ""}
                           </p>
                         )}
                       </div>
