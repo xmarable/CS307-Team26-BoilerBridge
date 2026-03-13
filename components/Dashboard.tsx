@@ -16,14 +16,13 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { SOSButton } from "./SOSButton";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import Link from "next/link";
 
 const trips = [
   {
-    id: 1,
+    groupID: "1", // Changed from id: 1
     name: "Spring Break Miami",
     dates: "Mar 15-22, 2026",
     members: ["JD", "SK", "MR", "AL", "TC"],
@@ -34,7 +33,7 @@ const trips = [
     image: "https://images.unsplash.com/photo-1533993192821-2cce3a8267d1?w=400",
   },
   {
-    id: 2,
+    groupID: "2", // Changed from id: 2
     name: "Summer Road Trip",
     dates: "Jun 10-17, 2026",
     members: ["AM", "BR", "CD"],
@@ -45,7 +44,7 @@ const trips = [
     image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400",
   },
   {
-    id: 3,
+    groupID: "3", // Changed from id: 3
     name: "Weekend Camping",
     dates: "Apr 5-7, 2026",
     members: ["PQ", "RS", "TU", "VW", "XY", "ZA"],
@@ -56,7 +55,7 @@ const trips = [
     image: "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=400",
   },
   {
-    id: 4,
+    groupID: "4", // Changed from id: 4
     name: "NYC Museum Tour",
     dates: "May 20-23, 2026",
     members: ["BC", "DE"],
@@ -118,29 +117,29 @@ export function Dashboard({ initialData }: DashboardProps) {
             <p className="text-gray-600">Manage and plan your adventures</p>
           </div>
           <div className="flex gap-2">
-            <Link href="/groups">
+            <Link href="/dashboard/groups">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 My Groups
               </Button>
             </Link>
-            <Link href="/groups/new">
+            <Link href="/dashboard/groups/new">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Create Group
               </Button>
             </Link>
-            <Link href="/activities">
+            <Link href="/dashboard/activities">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 Browse Activities
               </Button>
             </Link>
-            <Link href="/activities/new">
+            <Link href="/dashboard/activities/new">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Add Activity
               </Button>
             </Link>
-            <Link href="/trip/new">
+            <Link href="/dashboard/trips/new">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Create Trip
@@ -151,7 +150,7 @@ export function Dashboard({ initialData }: DashboardProps) {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-10">
           {trips.map((trip) => (
-            <Link key={trip.id} href={`/trip/${trip.id}`}>
+            <Link key={trip.groupID} href={`/dashboard/trips/${trip.groupID}`}>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all group">
                 <div className="h-44 overflow-hidden relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -294,7 +293,6 @@ export function Dashboard({ initialData }: DashboardProps) {
           </div>
         </div>
       </div>
-      <SOSButton />
     </div>
   );
 }

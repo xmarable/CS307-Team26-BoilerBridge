@@ -57,7 +57,7 @@ export default function EditTripPage() {
             id: crypto.randomUUID(),
             name: m.name ?? "",
             address: m.address ?? "",
-          }))
+          })),
         );
       })
       .catch((e: Error) => setError(e.message))
@@ -75,9 +75,13 @@ export default function EditTripPage() {
     setMustHaves((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const updateMustHave = (id: string, field: "name" | "address", value: string) => {
+  const updateMustHave = (
+    id: string,
+    field: "name" | "address",
+    value: string,
+  ) => {
     setMustHaves((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
     );
   };
 
@@ -90,7 +94,10 @@ export default function EditTripPage() {
     try {
       const formData = new FormData(e.currentTarget);
       const mustHaveList = mustHaves
-        .map((r) => ({ name: r.name.trim(), address: r.address.trim() || undefined }))
+        .map((r) => ({
+          name: r.name.trim(),
+          address: r.address.trim() || undefined,
+        }))
         .filter((r) => r.name.length > 0);
 
       const payload = {
@@ -104,7 +111,12 @@ export default function EditTripPage() {
         mustHaves: mustHaveList,
       };
 
-      if (!payload.fromCity || !payload.toCity || !payload.fromDate || !payload.toDate) {
+      if (
+        !payload.fromCity ||
+        !payload.toCity ||
+        !payload.fromDate ||
+        !payload.toDate
+      ) {
         setError("Please fill all required fields.");
         setSaving(false);
         return;
@@ -125,7 +137,11 @@ export default function EditTripPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Failed to update trip.");
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to update trip.",
+        );
         setSaving(false);
         return;
       }
@@ -166,7 +182,9 @@ export default function EditTripPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Edit Trip</h1>
         <Link href="/alltrips">
-          <Button variant="ghost" size="sm">Cancel</Button>
+          <Button variant="ghost" size="sm">
+            Cancel
+          </Button>
         </Link>
       </div>
 
@@ -253,8 +271,16 @@ export default function EditTripPage() {
 
         <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
           <div className="flex items-center justify-between mb-3">
-            <Label className="text-base font-medium">Must-have activities</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addMustHave} className="gap-1">
+            <Label className="text-base font-medium">
+              Must-have activities
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addMustHave}
+              className="gap-1"
+            >
               <Plus className="h-4 w-4" />
               Add
             </Button>
@@ -263,21 +289,30 @@ export default function EditTripPage() {
             Add or edit places you don’t want to miss.
           </p>
           {mustHaves.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">No activities added yet.</p>
+            <p className="text-sm text-gray-400 py-2">
+              No activities added yet.
+            </p>
           ) : (
             <ul className="space-y-3">
               {mustHaves.map((row) => (
-                <li key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <li
+                  key={row.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                >
                   <div className="flex-1 grid gap-2 sm:grid-cols-2">
                     <Input
                       placeholder="Activity or place name"
                       value={row.name}
-                      onChange={(e) => updateMustHave(row.id, "name", e.target.value)}
+                      onChange={(e) =>
+                        updateMustHave(row.id, "name", e.target.value)
+                      }
                     />
                     <Input
                       placeholder="Address (optional)"
                       value={row.address}
-                      onChange={(e) => updateMustHave(row.id, "address", e.target.value)}
+                      onChange={(e) =>
+                        updateMustHave(row.id, "address", e.target.value)
+                      }
                     />
                   </div>
                   <Button
@@ -306,9 +341,17 @@ export default function EditTripPage() {
           <span className="text-sm font-medium">Trip confirmed?</span>
         </label>
 
-        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
 
-        <Button type="submit" disabled={saving} className="w-full bg-amber-600 hover:bg-amber-700">
+        <Button
+          type="submit"
+          disabled={saving}
+          className="w-full bg-amber-600 hover:bg-amber-700"
+        >
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </form>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { CheckCircle2, GraduationCap } from "lucide-react";
@@ -24,6 +25,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
 
   const [isVerified, setIsVerified] = useState(
     initialData?.isStudentVerified || false,
@@ -92,6 +94,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
             eduEmail: data.eduEmail,
           },
         });
+
+        router.refresh(); // force next.js to refresh server components (navbar)
       } else {
         alert(data.error || "Invalid code");
       }
@@ -152,6 +156,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
             image: data.image || formData.profileImage,
           },
         });
+        router.refresh(); // force next.js to refresh server components (navbar)
+
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }

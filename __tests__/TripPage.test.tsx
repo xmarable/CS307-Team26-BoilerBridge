@@ -4,7 +4,7 @@ import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-const TripPage = (await import("@/app/trip/page")).default;
+const TripPage = (await import("@/app/dashboard/trip/page")).default;
 
 describe("TripPage", () => {
   beforeEach(() => {

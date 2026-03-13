@@ -43,7 +43,7 @@ let PATCHLeader: (
 ) => Promise<Response>;
 let POSTLeave: (
   req: Request,
-  ctx: { params: Promise<{ groupId: string }> }
+  ctx: { params: Promise<{ groupId: string }> },
 ) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
@@ -766,9 +766,12 @@ describe("PATCH /api/groups/[groupId]/leader", () => {
 describe("POST /api/groups/[groupId]/leave", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
-    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: "507f1f77bcf86cd799439011" }),
-    });
+    const res = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: "507f1f77bcf86cd799439011" }),
+      },
+    );
     const data = await res.json();
     expect(res.status).toBe(401);
     expect(data.error).toMatch(/logged in/i);
@@ -797,17 +800,20 @@ describe("POST /api/groups/[groupId]/leave", () => {
       user: { id: member._id.toString() },
       expires: "",
     });
-    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: group._id.toString() }),
-    });
+    const res = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: group._id.toString() }),
+      },
+    );
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.group).toBeDefined();
     expect(data.group.membersList).not.toContain(member._id.toString());
     const updated = await TravelGroup.findById(group._id);
-    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).not.toContain(
-      member._id.toString()
-    );
+    expect(
+      updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString()),
+    ).not.toContain(member._id.toString());
     expect(updated!.membersList).toHaveLength(1);
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
@@ -836,20 +842,23 @@ describe("POST /api/groups/[groupId]/leave", () => {
       user: { id: leader._id.toString() },
       expires: "",
     });
-    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: group._id.toString() }),
-    });
+    const res = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: group._id.toString() }),
+      },
+    );
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.group).toBeDefined();
     expect(data.group.leaderID).toBe(member._id.toString());
     const updated = await TravelGroup.findById(group._id);
     expect((updated!.leaderID as mongoose.Types.ObjectId).toString()).toBe(
-      member._id.toString()
+      member._id.toString(),
     );
-    expect(updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString())).not.toContain(
-      leader._id.toString()
-    );
+    expect(
+      updated!.membersList.map((id: mongoose.Types.ObjectId) => id.toString()),
+    ).not.toContain(leader._id.toString());
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });
   });
@@ -871,9 +880,12 @@ describe("POST /api/groups/[groupId]/leave", () => {
       user: { id: leader._id.toString() },
       expires: "",
     });
-    const res = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: group._id.toString() }),
-    });
+    const res = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: group._id.toString() }),
+      },
+    );
     expect(res.status).toBe(200);
     const deleted = await TravelGroup.findById(group._id);
     expect(deleted).toBeNull();
@@ -903,17 +915,23 @@ describe("POST /api/groups/[groupId]/leave", () => {
       user: { id: member._id.toString() },
       expires: "",
     });
-    const leaveRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: group._id.toString() }),
-    });
+    const leaveRes = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: group._id.toString() }),
+      },
+    );
     expect(leaveRes.status).toBe(200);
     const getRes = await GETGroup(new Request("http://localhost"), {
       params: paramsManage({ groupId: group._id.toString() }),
     });
     expect(getRes.status).toBe(403);
-    const leaveAgainRes = await POSTLeave(new Request("http://localhost", { method: "POST" }), {
-      params: paramsManage({ groupId: group._id.toString() }),
-    });
+    const leaveAgainRes = await POSTLeave(
+      new Request("http://localhost", { method: "POST" }),
+      {
+        params: paramsManage({ groupId: group._id.toString() }),
+      },
+    );
     expect(leaveAgainRes.status).toBe(403);
     await TravelGroup.deleteOne({ _id: group._id });
     await User.deleteMany({ _id: { $in: [leader._id, member._id] } });

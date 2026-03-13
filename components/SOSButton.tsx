@@ -30,40 +30,18 @@ const EMERGENCY_NUMBERS: Record<
 
 export function SOSButton() {
   const [isOpen, setIsOpen] = useState(false);
-  const [locationCode, setLocationCode] = useState("US");
+  const [locationCode] = useState("US");
 
-  // Logic to open the modal
   const openModal = useCallback(() => {
     setIsOpen(true);
   }, []);
 
   useEffect(() => {
-    const checkHash = () => {
-      if (window.location.hash === "#sos") {
-        openModal();
-        // Clear hash so clicking the same link again triggers a change
-        window.history.replaceState(null, "", window.location.pathname);
-      }
-    };
-
-    // 1. Initial check
-    checkHash();
-
-    // 2. Event Listeners
-    window.addEventListener("hashchange", checkHash);
-    // This listener allows Sidebar.tsx to trigger the modal via:
-    // window.dispatchEvent(new Event("open-sos"))
+    // Listen ONLY for the custom event to prevent double-firing
     window.addEventListener("open-sos", openModal);
 
-    // 3. Hydration Fallback
-    const interval = setInterval(checkHash, 500);
-    const timeout = setTimeout(() => clearInterval(interval), 2000);
-
     return () => {
-      window.removeEventListener("hashchange", checkHash);
       window.removeEventListener("open-sos", openModal);
-      clearInterval(interval);
-      clearTimeout(timeout);
     };
   }, [openModal]);
 
@@ -72,20 +50,22 @@ export function SOSButton() {
 
   return (
     <>
-      {/* Floating Action Button */}
-      <button
-        onClick={openModal}
-        className="fixed bottom-8 right-8 w-16 h-16 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-[0_0_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition-all active:scale-90 z-40 border-4 border-white animate-pulse"
-      >
-        <ShieldAlert size={32} />
-      </button>
+      {/* Floating Action Button - Only renders when modal is closed */}
+      {!isOpen && (
+        <button
+          onClick={openModal}
+          className="fixed bottom-8 right-8 w-16 h-16 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-[0_0_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition-all active:scale-90 z-60 border-4 border-white animate-pulse"
+        >
+          <ShieldAlert size={32} />
+        </button>
+      )}
 
       {/* Emergency Overlay */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-9999 flex flex-col items-center justify-center p-6">
           <button
             onClick={() => setIsOpen(false)}
-            className="absolute top-8 right-8 text-white/40 hover:text-white p-2"
+            className="absolute top-8 right-8 text-white/40 hover:text-white p-2 transition-colors"
           >
             <X size={48} />
           </button>
