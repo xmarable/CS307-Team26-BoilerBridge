@@ -36,13 +36,13 @@ export async function GET(
     const { groupId } = await params;
     await dbConnect();
 
-    // Query by our standardized UUID field, not _id
+    // query by standardized UUID field, not _id
     const group = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    // Check membership in the new object-based membersList
+    // check membership in the new object-based membersList
     const memberEntry = group.membersList.find((m: any) => m.userId === userId);
     if (!memberEntry) {
       return NextResponse.json(
@@ -51,7 +51,7 @@ export async function GET(
       );
     }
 
-    // Fetch user details for the members list
+    // fetch user details for the members list
     const memberIds = group.membersList.map((m: any) => m.userId);
     const memberDocs = await User.find({
       userId: { $in: memberIds },
@@ -112,7 +112,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    // Only the leader can update group settings
+    // only the leader can update group settings
     if (group.leaderID !== userId) {
       return NextResponse.json(
         { error: "Only the group leader can update the group" },
