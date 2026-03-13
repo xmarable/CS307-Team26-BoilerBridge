@@ -12,12 +12,14 @@ permissions:
   contents: read
   deployments: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy-app:
     runs-on: ubuntu-latest
-    environment:
-      name: Production
-      url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
+    outputs:
+      live_url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,3 +64,13 @@ jobs:
           app_name: "cs307-team26-boilerbridge"
           print_build_logs: true
           print_deploy_logs: true
+
+  # New job to safely update the Production environment URL
+  set-production-url:
+    needs: deploy-app
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: ${{ needs.deploy-app.outputs.live_url }}
+    steps:
+      - run: echo "Production URL updated."
