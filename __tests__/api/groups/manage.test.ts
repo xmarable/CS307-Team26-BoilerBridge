@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { randomUUID } from "crypto";
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -21,30 +22,16 @@ const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
 >;
 
 let GETGroups: () => Promise<Response>;
-let GETGroup: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let PATCHGroup: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let POSTMember: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let DELETEMember: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string; memberId: string }> },
-) => Promise<Response>;
-let PATCHLeader: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let POSTLeave: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
+let GETGroup: (req: Request, ctx: any) => Promise<Response>;
+let PATCHGroup: (req: Request, ctx: any) => Promise<Response>;
+let POSTMember: (req: Request, ctx: any) => Promise<Response>;
+let DELETEMember: (req: Request, ctx: any) => Promise<Response>;
+let PATCHLeader: (req: Request, ctx: any) => Promise<Response>;
+let POSTLeave: (req: Request, ctx: any) => Promise<Response>;
+
+function paramsManage(p: { groupId: string; memberId?: string }) {
+  return Promise.resolve(p);
+}
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
@@ -52,18 +39,22 @@ beforeAll(async () => {
   await dbConnect();
   const groupsRoute = await import("@/app/api/groups/route");
   GETGroups = groupsRoute.GET;
+
   const groupIdRoute = await import("@/app/api/groups/[groupId]/route");
-  GETGroup = groupIdRoute.GET;
-  PATCHGroup = groupIdRoute.PATCH;
+  GETGroup = groupIdRoute.GET as any;
+  PATCHGroup = groupIdRoute.PATCH as any;
+
   const membersRoute = await import("@/app/api/groups/[groupId]/members/route");
-  POSTMember = membersRoute.POST;
+  POSTMember = membersRoute.POST as any;
+
   const memberIdRoute =
     await import("@/app/api/groups/[groupId]/members/[memberId]/route");
-  DELETEMember = memberIdRoute.DELETE;
+  DELETEMember = memberIdRoute.DELETE as any;
+
   const leaderRoute = await import("@/app/api/groups/[groupId]/leader/route");
-  PATCHLeader = leaderRoute.PATCH;
+  PATCHLeader = leaderRoute.PATCH as any;
   const leaveRoute = await import("@/app/api/groups/[groupId]/leave/route");
-  POSTLeave = leaveRoute.POST;
+  POSTLeave = leaveRoute.POST as any;
 });
 
 afterAll(async () => {
@@ -80,10 +71,6 @@ afterAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
 });
-
-function paramsManage(p: { groupId: string; memberId?: string }) {
-  return Promise.resolve(p as { groupId: string; memberId: string });
-}
 
 describe("GET /api/groups", () => {
   it("returns 401 when unauthenticated", async () => {
@@ -162,7 +149,7 @@ describe("GET /api/groups/[groupId]", () => {
       membersList: [user._id],
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: paramsManage({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group.groupID }),
     });
     const data = await res.json();
     expect(res.status).toBe(401);
@@ -194,7 +181,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: paramsManage({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group.groupID }),
     });
     const data = await res.json();
     expect(res.status).toBe(403);
@@ -227,7 +214,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const res = await GETGroup(new Request("http://localhost"), {
-      params: paramsManage({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group.groupID }),
     });
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -241,7 +228,7 @@ describe("GET /api/groups/[groupId]", () => {
       expires: "",
     });
     const resMember = await GETGroup(new Request("http://localhost"), {
-      params: paramsManage({ groupId: group._id.toString() }),
+      params: paramsManage({ groupId: group.groupID }),
     });
     const dataMember = await resMember.json();
     expect(resMember.status).toBe(200);
@@ -281,7 +268,7 @@ describe("PATCH /api/groups/[groupId]", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groupName: "Hacked" }),
       }),
-      { params: paramsManage({ groupId: group._id.toString() }) },
+      { params: paramsManage({ groupId: group.groupID }) },
     );
     const data = await res.json();
     expect(res.status).toBe(403);
@@ -315,7 +302,7 @@ describe("PATCH /api/groups/[groupId]", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ groupName: "After" }),
       }),
-      { params: paramsManage({ groupId: group._id.toString() }) },
+      { params: paramsManage({ groupId: group.groupID }) },
     );
     const data = await res.json();
     expect(res.status).toBe(200);
@@ -363,7 +350,7 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: newUser.email }),
       }),
-      { params: paramsManage({ groupId: group._id.toString() }) },
+      { params: paramsManage({ groupId: group.groupID }) },
     );
     const data = await res.json();
     expect(res.status).toBe(403);
@@ -409,7 +396,7 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: member.email }),
       }),
-      { params: paramsManage({ groupId: group._id.toString() }) },
+      { params: paramsManage({ groupId: group.groupID }) },
     );
     const data = await res.json();
     expect(res.status).toBe(400);
@@ -447,7 +434,7 @@ describe("POST /api/groups/[groupId]/members", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: newUser.email }),
       }),
-      { params: paramsManage({ groupId: group._id.toString() }) },
+      { params: paramsManage({ groupId: group.groupID }) },
     );
     const data = await res.json();
     expect(res.status).toBe(201);
@@ -487,8 +474,8 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
     });
     const res = await DELETEMember(new Request("http://localhost"), {
       params: paramsManage({
-        groupId: group._id.toString(),
-        memberId: leader._id.toString(),
+        groupId: group.groupID,
+        memberId: leader.userId,
       }),
     });
     const data = await res.json();
@@ -516,8 +503,8 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
     });
     const res = await DELETEMember(new Request("http://localhost"), {
       params: paramsManage({
-        groupId: group._id.toString(),
-        memberId: leader._id.toString(),
+        groupId: group.groupID,
+        memberId: leader.userId,
       }),
     });
     const data = await res.json();
@@ -572,13 +559,16 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
 describe("PATCH /api/groups/[groupId]/leader", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
+    const gId = randomUUID();
+    const nLId = randomUUID();
+
     const res = await PATCHLeader(
       new Request("http://localhost", {
         method: "PATCH",
-        body: JSON.stringify({ newLeaderId: "507f1f77bcf86cd799439011" }),
+        body: JSON.stringify({ newLeaderId: nLId }),
         headers: { "Content-Type": "application/json" },
       }),
-      { params: paramsManage({ groupId: "507f1f77bcf86cd799439011" }) },
+      { params: paramsManage({ groupId: gId }) },
     );
     const data = await res.json();
     expect(res.status).toBe(401);

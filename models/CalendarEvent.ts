@@ -7,8 +7,8 @@ export interface ICalendarEvent extends Document {
   endTime: Date;
   location?: string;
   eventType?: string;
-  createdBy: string; // User.userId (UUID)
-  groupId: string;   // TravelGroup.groupId (string used in URLs)
+  createdBy: mongoose.Schema.Types.UUID; // User.userId (UUID)
+  groupId: mongoose.Schema.Types.UUID; // TravelGroup.groupId (string used in URLs)
   source: "manual" | "itinerary";
   externalId?: string;
   timezone?: string;
@@ -51,7 +51,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
     externalId: { type: String },
     timezone: { type: String, default: "UTC" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const CalendarEvent: Model<ICalendarEvent> =

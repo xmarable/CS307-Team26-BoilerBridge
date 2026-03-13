@@ -7,16 +7,16 @@ import TravelGroup from "@/models/TravelGroup";
 
 export async function POST(
   _req: Request,
-  { params }: { params: Promise<{ groupId: string }> }
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? session.user.id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any)?.userId;
+
     if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to leave a group" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -27,33 +27,27 @@ export async function POST(
 
     await dbConnect();
 
-    const group = await TravelGroup.findById(groupId).lean();
+    const group = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const memberIds = (group.membersList as mongoose.Types.ObjectId[]).map(
-      (m) => m.toString()
-    );
+    const memberIds = (group.membersList as any[]).map((m) => m.userId);
     if (!memberIds.includes(userId)) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    const leaderIDStr = (group.leaderID as mongoose.Types.ObjectId).toString();
-    const isLeader = leaderIDStr === userId;
+    const isLeader = group.leaderID === userId;
     const memberCount = memberIds.length;
 
     if (isLeader) {
       // Sole member: delete the group entirely
       if (memberCount === 1) {
         await TravelGroup.findByIdAndDelete(groupId);
-        return NextResponse.json(
-          { message: "Group deleted" },
-          { status: 200 }
-        );
+        return NextResponse.json({ message: "Group deleted" }, { status: 200 });
       }
 
       // Leader with other members: auto-transfer leadership to the first other member
@@ -61,69 +55,59 @@ export async function POST(
       if (!newLeaderId) {
         return NextResponse.json(
           { error: "No eligible member to transfer leadership" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
-      const updated = await TravelGroup.findByIdAndUpdate(
-        groupId,
+      const updated = await TravelGroup.findOneAndUpdate(
+        { groupID: groupId },
         {
-          $set: { leaderID: new mongoose.Types.ObjectId(newLeaderId) },
-          $pull: { membersList: new mongoose.Types.ObjectId(userId) },
+          $set: { leaderID: newLeaderId },
+          $pull: { membersList: { userId: userId } },
         },
-        { new: true }
+        { new: true },
       ).lean();
 
       if (!updated) {
         return NextResponse.json({ error: "Group not found" }, { status: 404 });
       }
 
-      const updatedMemberIds = (updated.membersList as mongoose.Types.ObjectId[]).map(
-        (m) => m.toString()
-      );
-
       return NextResponse.json({
         group: {
-          _id: updated._id.toString(),
           groupID: updated.groupID,
           groupName: updated.groupName,
           description: updated.description,
-          leaderID: (updated.leaderID as mongoose.Types.ObjectId).toString(),
-          membersList: updatedMemberIds,
+          leaderID: updated.leaderID,
+          membersList: updated.membersList,
         },
       });
     }
 
     // Non-leader: simply remove from membersList
-    const updated = await TravelGroup.findByIdAndUpdate(
-      groupId,
-      { $pull: { membersList: new mongoose.Types.ObjectId(userId) } },
-      { new: true }
+    const updated = await TravelGroup.findOneAndUpdate(
+      { groupID: groupId },
+      { $pull: { membersList: { userId: userId } } },
+      { new: true },
     ).lean();
 
     if (!updated) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const updatedMemberIds = (updated.membersList as mongoose.Types.ObjectId[]).map(
-      (m) => m.toString()
-    );
-
     return NextResponse.json({
       group: {
-        _id: updated._id.toString(),
         groupID: updated.groupID,
         groupName: updated.groupName,
         description: updated.description,
-        leaderID: (updated.leaderID as mongoose.Types.ObjectId).toString(),
-        membersList: updatedMemberIds,
+        leaderID: updated.leaderID,
+        membersList: updated.membersList,
       },
     });
   } catch (error) {
     console.error("POST /api/groups/[groupId]/leave error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

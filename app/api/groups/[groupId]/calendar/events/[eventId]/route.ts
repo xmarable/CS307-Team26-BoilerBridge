@@ -9,17 +9,17 @@ import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 import CalendarEvent from "@/models/CalendarEvent";
 
-function isMemberOrLeader(group: any, userMongoId: string) {
-  const leader = group?.leaderID?.toString() === userMongoId;
+function isMemberOrLeader(group: any, userId: string) {
+  const leader = group?.leaderID === userId;
   const member =
     Array.isArray(group?.membersList) &&
-    group.membersList.some((id: any) => id?.toString() === userMongoId);
+    group.membersList.some((m: any) => m.userId === userId);
   return leader || member;
 }
 
-function isLeader(group: any, userMongoId: string) {
-  return group?.leaderID?.toString() === userMongoId;
-}
+function isLeader(group: any, userId: string) {
+  return group?.leaderID === userId;
+} 
 
 const UpdateEventSchema = z.object({
   title: z.string().min(1, "Title cannot be empty").optional(),
