@@ -43,7 +43,9 @@ export async function GET(
     }
 
     // check membership in the new object-based membersList
-    const memberEntry = group.membersList.find((m: any) => m.userId === userId);
+    const memberEntry = group.membersList.find(
+      (m: any) => m.userId.toString() === userId,
+    );
     if (!memberEntry) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
@@ -60,9 +62,11 @@ export async function GET(
       .lean();
 
     const members = group.membersList.map((m: any) => {
-      const details = memberDocs.find((u: any) => u.userId === m.userId);
+      const details = memberDocs.find(
+        (u: any) => u.userId.toString() === m.userId.toString(),
+      );
       return {
-        userId: m.userId,
+        userId: m.userId.toString(),
         role: m.role,
         username: details?.username || "Unknown",
         email: details?.email || "",
@@ -71,11 +75,11 @@ export async function GET(
 
     return NextResponse.json({
       group: {
-        groupID: group.groupID,
+        groupID: group.groupID.toString(),
         groupName: group.groupName,
         description: group.description,
-        leaderID: group.leaderID,
-        isLeader: group.leaderID === userId,
+        leaderID: group.leaderID.toString(),
+        isLeader: group.leaderID.toString() === userId,
         userRole: memberEntry.role,
         members,
       },
@@ -113,7 +117,7 @@ export async function PATCH(
     }
 
     // only the leader can update group settings
-    if (group.leaderID !== userId) {
+    if (group.leaderID.toString() !== userId) {
       return NextResponse.json(
         { error: "Only the group leader can update the group" },
         { status: 403 },
@@ -138,7 +142,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       group: {
-        groupID: group.groupID,
+        groupID: group.groupID.toString(),
         groupName: group.groupName,
         description: group.description,
       },

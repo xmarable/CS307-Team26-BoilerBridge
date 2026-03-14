@@ -26,18 +26,17 @@ export async function PATCH(
     }
 
     const { groupId } = await params;
-    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-      return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
-    }
 
     await dbConnect();
 
-    const group = await TravelGroup.findById(groupId).lean();
+    const group = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const memberIds = (group.membersList as any[]).map((m) => m.userId);
+    const memberIds = group.membersList.map((m: any) => m.userId.toString());
+    const currentLeaderID = group.leaderID.toString();
+
     if (!memberIds.includes(userId)) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
@@ -45,7 +44,7 @@ export async function PATCH(
       );
     }
 
-    if (group.leaderID !== userId) {
+    if (currentLeaderID !== userId) {
       return NextResponse.json(
         { error: "Only the group leader can transfer leadership" },
         { status: 403 },
@@ -78,26 +77,36 @@ export async function PATCH(
 
     const updated = await TravelGroup.findOneAndUpdate(
       { groupID: groupId },
-      { $set: { leaderID: newLeaderId } },
-      { new: true },
+      {
+        $set: {
+          leaderID: newLeaderId,
+          "membersList.$[newLeader].role": "Leader",
+          "membersList.$[oldLeader].role": "Admin",
+        },
+      },
+      {
+        arrayFilters: [
+          { "newLeader.userId": newLeaderId },
+          { "oldLeader.userId": userId },
+        ],
+        returnDocument: "after",
+      },
     ).lean();
 
     if (!updated) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const updatedMemberIds = (
-      updated.membersList as mongoose.Types.ObjectId[]
-    ).map((m) => m.toString());
-
     return NextResponse.json({
       group: {
-        _id: (updated as any)._id.toString(),
-        groupID: updated.groupID,
+        groupID: updated.groupID.toString(),
         groupName: updated.groupName,
         description: updated.description,
-        leaderID: updated.leaderID,
-        membersList: updated.membersList,
+        leaderID: updated.leaderID.toString(),
+        membersList: updated.membersList.map((m: any) => ({
+          userId: m.userId.toString(),
+          role: m.role,
+        })),
       },
     });
   } catch (error) {

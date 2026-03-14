@@ -21,9 +21,6 @@ export async function POST(
     }
 
     const { groupId } = await params;
-    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-      return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
-    }
 
     await dbConnect();
 
@@ -32,7 +29,7 @@ export async function POST(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const memberIds = (group.membersList as any[]).map((m) => m.userId);
+    const memberIds = group.membersList.map((m: any) => m.userId.toString());
     if (!memberIds.includes(userId)) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
@@ -40,18 +37,18 @@ export async function POST(
       );
     }
 
-    const isLeader = group.leaderID === userId;
+    const isLeader = group.leaderID.toString() === userId;
     const memberCount = memberIds.length;
 
     if (isLeader) {
       // Sole member: delete the group entirely
       if (memberCount === 1) {
-        await TravelGroup.findByIdAndDelete(groupId);
+        await TravelGroup.deleteOne({ groupID: groupId });
         return NextResponse.json({ message: "Group deleted" }, { status: 200 });
       }
 
       // Leader with other members: auto-transfer leadership to the first other member
-      const newLeaderId = memberIds.find((id) => id !== userId);
+      const newLeaderId = memberIds.find((id: string) => id !== userId);
       if (!newLeaderId) {
         return NextResponse.json(
           { error: "No eligible member to transfer leadership" },
@@ -65,20 +62,30 @@ export async function POST(
           $set: { leaderID: newLeaderId },
           $pull: { membersList: { userId: userId } },
         },
-        { new: true },
+        { returnDocument: "after" },
       ).lean();
 
-      if (!updated) {
-        return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      // Update the new leader's role to "Leader" in the membersList
+      if (updated) {
+        await TravelGroup.updateOne(
+          { groupID: groupId, "membersList.userId": newLeaderId },
+          { $set: { "membersList.$.role": "Leader" } },
+        );
       }
+
+      // Re-fetch to get final state with updated roles
+      const finalGroup = await TravelGroup.findOne({ groupID: groupId }).lean();
 
       return NextResponse.json({
         group: {
-          groupID: updated.groupID,
-          groupName: updated.groupName,
-          description: updated.description,
-          leaderID: updated.leaderID,
-          membersList: updated.membersList,
+          groupID: finalGroup!.groupID.toString(),
+          groupName: finalGroup!.groupName,
+          description: finalGroup!.description,
+          leaderID: finalGroup!.leaderID.toString(),
+          membersList: finalGroup!.membersList.map((m: any) => ({
+            userId: m.userId.toString(),
+            role: m.role,
+          })),
         },
       });
     }
@@ -87,7 +94,7 @@ export async function POST(
     const updated = await TravelGroup.findOneAndUpdate(
       { groupID: groupId },
       { $pull: { membersList: { userId: userId } } },
-      { new: true },
+      { returnDocument: "after" },
     ).lean();
 
     if (!updated) {
@@ -96,11 +103,14 @@ export async function POST(
 
     return NextResponse.json({
       group: {
-        groupID: updated.groupID,
+        groupID: updated.groupID.toString(),
         groupName: updated.groupName,
         description: updated.description,
-        leaderID: updated.leaderID,
-        membersList: updated.membersList,
+        leaderID: updated.leaderID.toString(),
+        membersList: updated.membersList.map((m: any) => ({
+          userId: m.userId.toString(),
+          role: m.role,
+        })),
       },
     });
   } catch (error) {

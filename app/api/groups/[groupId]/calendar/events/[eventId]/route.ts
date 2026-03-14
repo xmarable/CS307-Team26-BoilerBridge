@@ -19,7 +19,7 @@ function isMemberOrLeader(group: any, userId: string) {
 
 function isLeader(group: any, userId: string) {
   return group?.leaderID === userId;
-} 
+}
 
 const UpdateEventSchema = z.object({
   title: z.string().min(1, "Title cannot be empty").optional(),
@@ -37,25 +37,26 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userMongoId = (session?.user as any)?.id as string | undefined;
-    if (!userMongoId) {
+    const userId = (session?.user as any)?.userId as string | undefined;
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { groupId, eventId } = await params;
 
+    // event id is a objectid for calendarevent model
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
     }
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findById(groupId).lean();
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    if (!isMemberOrLeader(group, userMongoId)) {
+    if (!isMemberOrLeader(group, userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -65,8 +66,8 @@ export async function PUT(
     }
 
     // Creator OR leader can edit
-    const creator = event.createdBy === userMongoId;
-    const leader = isLeader(group, userMongoId);
+    const creator = event.createdBy === userId;
+    const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -88,7 +89,6 @@ export async function PUT(
     if (updates.location !== undefined) event.location = updates.location;
     if (updates.eventType !== undefined) event.eventType = updates.eventType;
     if (updates.timezone !== undefined) event.timezone = updates.timezone;
-
     if (updates.startTime !== undefined) event.startTime = updates.startTime;
     if (updates.endTime !== undefined) event.endTime = updates.endTime;
 
@@ -117,8 +117,8 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userMongoId = (session?.user as any)?.id as string | undefined;
-    if (!userMongoId) {
+    const userId = (session?.user as any)?.userId as string | undefined;
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -130,12 +130,13 @@ export async function DELETE(
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findById(groupId).lean();
+    // Use findOne with groupID UUID instead of findById
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    if (!isMemberOrLeader(group, userMongoId)) {
+    if (!isMemberOrLeader(group, userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -145,8 +146,8 @@ export async function DELETE(
     }
 
     // Creator OR leader can delete
-    const creator = event.createdBy === userMongoId;
-    const leader = isLeader(group, userMongoId);
+    const creator = event.createdBy === userId;
+    const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
