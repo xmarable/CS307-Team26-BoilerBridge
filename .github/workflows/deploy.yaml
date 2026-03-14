@@ -57,18 +57,12 @@ jobs:
 
       - name: Deploy to App Platform
         id: deploy
-        uses: nick-fields/retry@v3
+        uses: digitalocean/app_action/deploy@v2
+        env:
+          IMAGE_TAG_boilerbridge: "latest"
         with:
-          timeout_minutes: 15
-          max_attempts: 3
-          retry_on: error
-          # We use the exact working action logic from Preview, wrapped in retry
-          action: digitalocean/app_action/deploy@v2
-          env:
-            IMAGE_TAG_boilerbridge: "latest"
-          with:
-            token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-            app_spec_location: app.yaml
-            app_name: "cs307-team26-boilerbridge"
-            print_build_logs: true
-            print_deploy_logs: true
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_spec_location: app.yaml
+          app_name: "cs307-team26-boilerbridge"
+          print_build_logs: true
+          print_deploy_logs: true
