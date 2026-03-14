@@ -1,14 +1,16 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { randomUUID } from "crypto";
 
 export interface ICalendarEvent extends Document {
+  eventID: any;
   title: string;
   description?: string;
   startTime: Date;
   endTime: Date;
   location?: string;
   eventType?: string;
-  createdBy: string; // User.userId (UUID)
-  groupId: string;   // TravelGroup.groupId (string used in URLs)
+  createdBy: any; // User.userId (UUID)
+  groupId: any; // TravelGroup.groupId (string used in URLs)
   source: "manual" | "itinerary";
   externalId?: string;
   timezone?: string;
@@ -18,16 +20,20 @@ export interface ICalendarEvent extends Document {
 
 const CalendarEventSchema = new Schema<ICalendarEvent>(
   {
+    eventID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+      required: true,
+      unique: true,
+    },
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     startTime: { type: Date, required: true },
-
     endTime: {
       type: Date,
       required: true,
       validate: [
         {
-          // Mongoose "this" typing is messy; using any avoids TS errors
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           validator: function (this: any, value: Date) {
             return value > this.startTime;
@@ -36,12 +42,19 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
         },
       ],
     },
-
     location: { type: String, trim: true },
     eventType: { type: String, default: "general" },
-    createdBy: { type: String, required: true, index: true },
-    groupId: { type: String, required: true, index: true },
 
+    createdBy: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+      index: true,
+    },
+    groupId: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+      index: true,
+    },
     source: {
       type: String,
       enum: ["manual", "itinerary"],
@@ -51,8 +64,10 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
     externalId: { type: String },
     timezone: { type: String, default: "UTC" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
+
+CalendarEventSchema.index({ groupId: 1, startTime: 1 });
 
 const CalendarEvent: Model<ICalendarEvent> =
   mongoose.models.CalendarEvent ||

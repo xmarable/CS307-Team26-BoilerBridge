@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
-import mongoose from "mongoose";
 
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
@@ -10,16 +9,16 @@ import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 import MustHave from "@/models/MustHave";
 
-function isMemberOrLeader(group: any, userMongoId: string) {
-  const leader = group?.leaderID?.toString() === userMongoId;
+function isMemberOrLeader(group: any, userId: string) {
+  const leader = group?.leaderID?.toString() === userId;
   const member =
     Array.isArray(group?.membersList) &&
-    group.membersList.some((id: any) => id?.toString() === userMongoId);
+    group.membersList.some((m: any) => m.userId?.toString() === userId);
   return leader || member;
 }
 
-function isLeader(group: any, userMongoId: string) {
-  return group?.leaderID?.toString() === userMongoId;
+function isLeader(group: any, userId: string) {
+  return group?.leaderID?.toString() === userId;
 }
 
 const UpdateMustHaveSchema = z.object({
@@ -30,39 +29,45 @@ const UpdateMustHaveSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ groupId: string; id: string }> }
+  { params }: { params: Promise<{ groupId: string; id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? (session.user as any).id : undefined;
-    const userMongoId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any)?.userId;
 
-    if (!userMongoId) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { groupId, id } = await params;
 
-    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-      return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
-    }
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: "Invalid must-have ID" }, { status: 400 });
+    // We no longer use mongoose.Types.ObjectId.isValid because IDs are UUID strings
+    if (!groupId || !id) {
+      return NextResponse.json(
+        { error: "Invalid ID parameters" },
+        { status: 400 },
+      );
     }
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findById(groupId).lean();
-    if (!group) return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    if (!group)
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
-    if (!isMemberOrLeader(group, userMongoId)) {
+    if (!isMemberOrLeader(group, userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const item: any = await MustHave.findOne({ _id: id, groupId });
-    if (!item) return NextResponse.json({ error: "Must-have not found" }, { status: 404 });
+    const item: any = await MustHave.findOne({ id: id, groupID: groupId });
+    if (!item)
+      return NextResponse.json(
+        { error: "Must-have not found" },
+        { status: 404 },
+      );
 
-    const canEdit = item.addedBy === userMongoId || isLeader(group, userMongoId);
+    const canEdit =
+      item.addedBy?.toString() === userId || isLeader(group, userId);
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -72,7 +77,7 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid payload", details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,58 +94,66 @@ export async function PUT(
     console.error("PUT must-have error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ groupId: string; id: string }> }
+  { params }: { params: Promise<{ groupId: string; id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? (session.user as any).id : undefined;
-    const userMongoId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any)?.userId;
 
-    if (!userMongoId) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { groupId, id } = await params;
 
-    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-      return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
-    }
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: "Invalid must-have ID" }, { status: 400 });
+    if (!groupId || !id) {
+      return NextResponse.json(
+        { error: "Invalid ID parameters" },
+        { status: 400 },
+      );
     }
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findById(groupId).lean();
-    if (!group) return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    if (!group)
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
-    if (!isMemberOrLeader(group, userMongoId)) {
+    if (!isMemberOrLeader(group, userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const item: any = await MustHave.findOne({ _id: id, groupId }).lean();
-    if (!item) return NextResponse.json({ error: "Must-have not found" }, { status: 404 });
+    const item: any = await MustHave.findOne({
+      id: id,
+      groupID: groupId,
+    }).lean();
+    if (!item)
+      return NextResponse.json(
+        { error: "Must-have not found" },
+        { status: 404 },
+      );
 
-    const canDelete = item.addedBy === userMongoId || isLeader(group, userMongoId);
+    const canDelete =
+      item.addedBy?.toString() === userId || isLeader(group, userId);
     if (!canDelete) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await MustHave.deleteOne({ _id: id, groupId });
+    await MustHave.deleteOne({ id: id, groupID: groupId });
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
     console.error("DELETE must-have error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

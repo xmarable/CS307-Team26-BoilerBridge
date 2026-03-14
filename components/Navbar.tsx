@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Search, LogOut, Settings, CheckCircle2 } from "lucide-react";
 import { Input } from "./ui/input";
-import { Avatar, AvatarFallback } from "./ui/avatar";
 import { NotificationBell } from "./NotificationBell";
 import {
   DropdownMenu,
@@ -12,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-export async function Navbar({ session }: { session?: any }) {
+export function Navbar({ session }: { session?: any }) {
   const user = session?.user;
 
   const displayName = user?.name || user?.username || "User";

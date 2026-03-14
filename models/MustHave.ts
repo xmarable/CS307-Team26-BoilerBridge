@@ -3,17 +3,17 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export type MustHaveStatus = "proposed" | "approved" | "rejected";
 
 export interface IMustHave extends Document {
-  groupId: string;     // TravelGroup Mongo _id (string)
-  tripId?: string;     // optional (Trip Mongo _id as string)
-  placeId?: string;    // Google Places place_id
+  groupId: mongoose.Schema.Types.UUID; // TravelGroup Mongo _id (string)
+  tripId?: mongoose.Schema.Types.UUID; // optional (Trip Mongo _id as string)
+  placeId?: string; // Google Places place_id
   name: string;
   category?: string;
   address?: string;
   lat?: number;
   lng?: number;
   notes?: string;
-  priority?: number;   // 1..5 (scale to rate the priority)
-  addedBy: string;     // User Mongo _id (string)
+  priority?: number; // 1..5 (scale to rate the priority)
+  addedBy: mongoose.Schema.Types.UUID; // User Mongo _id
   status: MustHaveStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -21,8 +21,8 @@ export interface IMustHave extends Document {
 
 const MustHaveSchema = new Schema<IMustHave>(
   {
-    groupId: { type: String, required: true, index: true },
-    tripId: { type: String, index: true },
+    groupId: { type: mongoose.Schema.Types.UUID, required: true, index: true },
+    tripId: { type: mongoose.Schema.Types.UUID, index: true },
 
     placeId: { type: String, index: true },
 
@@ -35,7 +35,7 @@ const MustHaveSchema = new Schema<IMustHave>(
     notes: { type: String, trim: true },
     priority: { type: Number, default: 3 },
 
-    addedBy: { type: String, required: true, index: true },
+    addedBy: { type: mongoose.Schema.Types.UUID, required: true, index: true },
 
     status: {
       type: String,
@@ -44,7 +44,7 @@ const MustHaveSchema = new Schema<IMustHave>(
       index: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Optional helpful indexes for querying/filtering
@@ -53,6 +53,7 @@ MustHaveSchema.index({ groupId: 1, category: 1 });
 MustHaveSchema.index({ groupId: 1, priority: 1 });
 
 const MustHave: Model<IMustHave> =
-  mongoose.models.MustHave || mongoose.model<IMustHave>("MustHave", MustHaveSchema);
+  mongoose.models.MustHave ||
+  mongoose.model<IMustHave>("MustHave", MustHaveSchema);
 
-export default MustHave; 
+export default MustHave;

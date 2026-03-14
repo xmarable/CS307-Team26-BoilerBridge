@@ -1,6 +1,5 @@
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
-import type { Types } from "mongoose";
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -93,10 +92,10 @@ describe("POST /api/groups/create", () => {
       passwordHash,
       school: "Purdue",
     });
-    const userId = user._id.toString();
+    const userId = user.userId.toString();
 
     mockGetServerSession.mockResolvedValue({
-      user: { id: userId, email: "leader@test.com", name: "groupleader" },
+      user: { userId: userId, email: "leader@test.com", name: "groupleader" },
       expires: "9999-12-31T23:59:59.999Z",
     });
 
@@ -112,18 +111,20 @@ describe("POST /api/groups/create", () => {
     expect(res.status).toBe(201);
     expect(data.group).toBeDefined();
     expect(data.group.leaderID).toBe(userId);
-    expect(data.group.membersList).toContain(userId);
+
+    const memberIds = data.group.membersList.map((m: any) => m.userId);
+    expect(memberIds).toContain(userId);
     expect(data.group.groupName).toBe("Test Travel Group");
 
-    const saved = await TravelGroup.findById(data.group._id);
+    const saved = await TravelGroup.findOne({ groupID: data.group.groupID });
     expect(saved).not.toBeNull();
     expect(saved!.leaderID.toString()).toBe(userId);
-    expect(
-      saved!.membersList.map((id: Types.ObjectId) => id.toString()),
-    ).toContain(userId);
+    expect(saved!.membersList.map((m: any) => m.userId.toString())).toContain(
+      userId,
+    );
 
-    await User.deleteOne({ _id: user._id });
-    await TravelGroup.deleteOne({ _id: data.group._id });
+    await User.deleteOne({ userId: user.userId });
+    await TravelGroup.deleteOne({ groupID: data.group.groupID });
   });
 
   it("allows duplicate group names and assigns unique groupID", async () => {
@@ -134,10 +135,10 @@ describe("POST /api/groups/create", () => {
       passwordHash,
       school: "Purdue",
     });
-    const userId = user._id.toString();
+    const userId = user.userId.toString();
 
     mockGetServerSession.mockResolvedValue({
-      user: { id: userId, email: "dup@test.com", name: "duplicateuser" },
+      user: { userId: userId, email: "dup@test.com", name: "duplicateuser" },
       expires: "9999-12-31T23:59:59.999Z",
     });
 
@@ -164,7 +165,7 @@ describe("POST /api/groups/create", () => {
     expect(data2.group.groupID).toBeDefined();
     expect(data1.group.groupID).not.toBe(data2.group.groupID);
 
-    await User.deleteOne({ _id: user._id });
+    await User.deleteOne({ userId: user.userId });
     await TravelGroup.deleteMany({ groupName: "Same Name Group" });
   });
 });
