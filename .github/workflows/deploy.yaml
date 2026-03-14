@@ -45,12 +45,12 @@ jobs:
           retry_on: error
           command: |
             docker buildx build \
-              --context . \
               --push \
               --tag registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest \
               --cache-from type=gha \
               --cache-to type=gha,mode=max \
-              --build-arg MONGODB_URI=${{ secrets.MONGODB_URI }}
+              --build-arg MONGODB_URI=${{ secrets.MONGODB_URI }} \
+              .
 
       - name: Clean up old images
         run: doctl registry garbage-collection start --include-untagged-manifests --force
