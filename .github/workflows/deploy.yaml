@@ -12,14 +12,12 @@ permissions:
   contents: read
   deployments: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   deploy-app:
     runs-on: ubuntu-latest
-    outputs:
-      live_url: ${{ steps.extract_url.outputs.live_url }}
+    environment:
+      name: Production
+      url: ${{ fromJson(steps.deploy.outputs.app).live_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,65 +28,47 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry
-        run: doctl registry login --expiry-seconds 1200
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
-        uses: docker/build-push-action@v5
+        uses: nick-fields/retry@v3
         with:
-          context: .
-          push: true
-          tags: registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            MONGODB_URI=${{ secrets.MONGODB_URI }}
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_on: error
+          command: |
+            docker buildx build \
+              --context . \
+              --push \
+              --tag registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest \
+              --cache-from type=gha \
+              --cache-to type=gha,mode=max \
+              --build-arg MONGODB_URI=${{ secrets.MONGODB_URI }}
 
       - name: Clean up old images
         run: doctl registry garbage-collection start --include-untagged-manifests --force
 
       - name: Deploy to App Platform
         id: deploy
-        uses: digitalocean/app_action/deploy@v2
-        env:
-          IMAGE_TAG_boilerbridge: "latest"
+        uses: nick-fields/retry@v3
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          app_spec_location: app.yaml
-          app_name: "cs307-team26-boilerbridge"
-          print_build_logs: true
-          print_deploy_logs: true
-
-      - name: Extract Live URL
-        id: extract_url
-        shell: bash
-        env:
-          DEPLOY_OUTPUT: ${{ steps.deploy.outputs.app }}
-        run: |
-          if [ -z "$DEPLOY_OUTPUT" ]; then
-            echo "Error: deploy output is empty"
-            exit 1
-          fi
-          
-          URL=$(echo "$DEPLOY_OUTPUT" | jq -r '.live_url')
-          
-          if [ "$URL" == "null" ] || [ -z "$URL" ]; then
-            echo "Error: could not parse live_url from output"
-            exit 1
-          fi
-          
-          echo "live_url=$URL" >> $GITHUB_OUTPUT
-
-  set-production-url:
-    needs: deploy-app
-    runs-on: ubuntu-latest
-    environment:
-      name: Production
-      url: ${{ needs.deploy-app.outputs.live_url }}
-    steps:
-      - name: Log Success
-        run: |
-          echo "Production environment URL updated."
-          echo "Deployment succeeded for: ${{ needs.deploy-app.outputs.live_url }}"
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_on: error
+          # We use the exact working action logic from Preview, wrapped in retry
+          action: digitalocean/app_action/deploy@v2
+          env:
+            IMAGE_TAG_boilerbridge: "latest"
+          with:
+            token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+            app_spec_location: app.yaml
+            app_name: "cs307-team26-boilerbridge"
+            print_build_logs: true
+            print_deploy_logs: true
