@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Heart,
+  Plus,
+  MapPin,
+  Filter,
+  Trash2,
+  Edit3,
+  Loader2,
+} from "lucide-react";
 
 type MustHave = {
   _id: string;
@@ -78,9 +86,12 @@ export default function MustHavesPanel({ groupId }: Props) {
     try {
       setLoading(true);
       setErr(null);
-      const res = await fetch(`/api/groups/${groupId}/must-haves${queryString}`, {
-        method: "GET",
-      });
+      const res = await fetch(
+        `/api/groups/${groupId}/must-haves${queryString}`,
+        {
+          method: "GET",
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load must-haves");
       setItems(data.mustHaves ?? []);
@@ -93,7 +104,6 @@ export default function MustHavesPanel({ groupId }: Props) {
 
   useEffect(() => {
     fetchMustHaves();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, queryString]);
 
   async function handleCreate() {
@@ -114,16 +124,13 @@ export default function MustHavesPanel({ groupId }: Props) {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to create must-have");
-      }
+      if (!res.ok) throw new Error(data?.error || "Failed to create must-have");
 
       setName("");
       setCategory("");
       setAddress("");
       setNotes("");
       setPriority("3");
-
       await fetchMustHaves();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to create must-have");
@@ -146,15 +153,18 @@ export default function MustHavesPanel({ groupId }: Props) {
       setSavingEdit(true);
       setErr(null);
 
-      const res = await fetch(`/api/groups/${groupId}/must-haves/${editItem._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          notes: editNotes.trim(),
-          priority: Number(editPriority),
-          status: editStatus,
-        }),
-      });
+      const res = await fetch(
+        `/api/groups/${groupId}/must-haves/${editItem._id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            notes: editNotes.trim(),
+            priority: Number(editPriority),
+            status: editStatus,
+          }),
+        },
+      );
 
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to update must-have");
@@ -184,69 +194,132 @@ export default function MustHavesPanel({ groupId }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Must-haves</h2>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">{items.length} items</Badge>
+    <div className="space-y-8">
+      {/* Filters Section */}
+      <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={16} className="text-gray-400" />
+          <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">
+            Filters
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Status</Label>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="proposed">Proposed</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Priority</Label>
+            <Select value={filterPriority} onValueChange={setFilterPriority}>
+              <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="all">All Priorities</SelectItem>
+                {[1, 2, 3, 4, 5].map((p) => (
+                  <SelectItem key={p} value={String(p)}>
+                    Priority {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Category</Label>
+            <Input
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              placeholder="Filter category..."
+              className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Create */}
-      <Card className="p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-900">
-          <div>
-            <Label className="text-gray-800">Name *</Label>
+      {/* Create Section */}
+      <div className="bg-pink-50/50 rounded-[2.5rem] p-8 border border-pink-100/50">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-pink-500 rounded-2xl text-white shadow-lg shadow-pink-200">
+            <Plus size={24} />
+          </div>
+          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+            New Must-Have
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Name *</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Place / activity name"
-              className="text-gray-900 placeholder:text-gray-500"
+              placeholder="Place or activity name"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div>
-            <Label className="text-gray-800">Category</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Category</Label>
             <Input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Food, museum, hike..."
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div className="md:col-span-2">
-            <Label className="text-gray-800">Address</Label>
-            <Input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="123 Main St..."
-              className="text-gray-900 placeholder:text-gray-500"
-            />
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Address</Label>
+            <div className="relative">
+              <MapPin
+                className="absolute left-4 top-4 text-gray-400"
+                size={20}
+              />
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="123 Main St..."
+                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 pl-12 shadow-sm"
+              />
+            </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Label className="text-gray-800">Notes</Label>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Notes</Label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Why is this a must-have?"
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div>
-            <Label className="text-gray-800">Priority (1–5)</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">
+              Priority (1-5)
+            </Label>
             <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger className="text-gray-900">
+              <SelectTrigger className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="text-black bg-white">
-                <SelectItem value="1">1 (low)</SelectItem>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="1">1 (Low)</SelectItem>
                 <SelectItem value="2">2</SelectItem>
-                <SelectItem value="3">3</SelectItem>
+                <SelectItem value="3">3 (Normal)</SelectItem>
                 <SelectItem value="4">4</SelectItem>
-                <SelectItem value="5">5 (high)</SelectItem>
+                <SelectItem value="5">5 (High)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -255,133 +328,146 @@ export default function MustHavesPanel({ groupId }: Props) {
             <Button
               onClick={handleCreate}
               disabled={creating || !name.trim()}
-              className="w-full"
+              className="w-full h-14 bg-linear-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black rounded-2xl shadow-xl shadow-pink-200 transition-all active:scale-95"
             >
-              {creating ? "Adding…" : "Add must-have"}
+              {creating ? "Adding…" : "Add Must-Have"}
             </Button>
           </div>
         </div>
-
-        {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-      </Card>
-
-      <div className="flex flex-col md:flex-row gap-3 mb-4">
-        <div className="w-full md:w-56 text-gray-900">
-          <Label>Status</Label>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="text-gray-900">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="text-black bg-white">
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="proposed">Proposed</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="w-full md:w-56 text-gray-900">
-          <Label>Priority</Label>
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="text-gray-900">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="text-black bg-white">
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="1">1</SelectItem>
-              <SelectItem value="2">2</SelectItem>
-              <SelectItem value="3">3</SelectItem>
-              <SelectItem value="4">4</SelectItem>
-              <SelectItem value="5">5</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="w-full md:flex-1 text-gray-900">
-          <Label>Category</Label>
-          <Input
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            placeholder="Filter by category…"
-            className="text-gray-900 placeholder:text-gray-500"
-          />
-        </div>
+        {err && (
+          <p className="mt-4 text-sm text-red-600 font-bold text-center">
+            {err}
+          </p>
+        )}
       </div>
 
-      {loading ? (
-        <p className="text-gray-700">Loading must-haves…</p>
-      ) : items.length === 0 ? (
-        <p className="text-gray-700">No must-haves yet.</p>
-      ) : (
-        <ul className="space-y-3">
-          {items.map((it) => (
-            <li
-              key={it._id}
-              className="border border-gray-200 rounded-xl p-4 flex flex-col gap-2"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{it.name}</p>
-                  <p className="text-sm text-gray-600 truncate">
-                    {it.address || it.category || "—"}
-                  </p>
-                </div>
+      {/* Items List */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-lg font-black text-gray-900 tracking-tight">
+            Wishlist
+          </h3>
+          <Badge className="bg-pink-100 text-pink-700 border-none px-3 py-1 rounded-full font-bold">
+            {items.length} Items
+          </Badge>
+        </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="text-gray-700">P{it.priority}</Badge>
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="animate-spin text-pink-500" size={32} />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+            <Heart className="mx-auto text-gray-300 mb-2" size={40} />
+            <p className="text-gray-400 font-bold">No must-haves saved yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {items.map((it) => (
+              <div
+                key={it._id}
+                className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all relative overflow-hidden"
+              >
+                <div
+                  className={`absolute top-0 left-0 w-1.5 h-full ${
+                    it.status === "approved"
+                      ? "bg-green-500"
+                      : it.status === "rejected"
+                        ? "bg-red-500"
+                        : "bg-pink-500"
+                  }`}
+                />
+
+                <div className="flex justify-between items-start mb-3">
+                  <div className="min-w-0">
+                    <h4 className="font-black text-gray-900 text-lg truncate">
+                      {it.name}
+                    </h4>
+                    {it.category && (
+                      <span className="text-xs font-black text-pink-600 uppercase tracking-widest">
+                        {it.category}
+                      </span>
+                    )}
+                  </div>
                   <Badge
                     variant="secondary"
-                    className={
+                    className="bg-gray-100 text-gray-600 font-bold border-none"
+                  >
+                    P{it.priority}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  {it.address && (
+                    <p className="text-xs font-bold text-gray-500 flex items-center gap-1">
+                      <MapPin size={12} /> {it.address}
+                    </p>
+                  )}
+                  {it.notes && (
+                    <p className="text-sm text-gray-600 italic leading-relaxed">
+                      "{it.notes}"
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                  <Badge
+                    className={`font-bold capitalize ${
                       it.status === "approved"
-                        ? "bg-green-100 text-green-800"
+                        ? "bg-green-100 text-green-700"
                         : it.status === "rejected"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-yellow-100 text-yellow-800"
-                    }
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                    } border-none`}
                   >
                     {it.status}
                   </Badge>
+
+                  <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(it)}
+                      className="rounded-xl hover:bg-pink-50 text-gray-400 hover:text-pink-600"
+                    >
+                      <Edit3 size={16} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(it._id)}
+                      className="rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-              {it.notes && <p className="text-sm text-gray-700">{it.notes}</p>}
-
-              <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" onClick={() => openEdit(it)}>
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => handleDelete(it._id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
+      {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
-            <DialogTitle>Edit must-have</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight">
+              Modify Must-Have
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label className="text-gray-800">Status</Label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">Status</Label>
               <Select
                 value={editStatus}
                 onValueChange={(v) => setEditStatus(v as MustHave["status"])}
               >
-                <SelectTrigger className="text-gray-900">
+                <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   <SelectItem value="proposed">Proposed</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
@@ -389,44 +475,49 @@ export default function MustHavesPanel({ groupId }: Props) {
               </Select>
             </div>
 
-            <div>
-              <Label className="text-gray-800">Priority (1–5)</Label>
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">
+                Priority (1-5)
+              </Label>
               <Select value={editPriority} onValueChange={setEditPriority}>
-                <SelectTrigger className="text-gray-900">
+                <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5</SelectItem>
+                <SelectContent className="rounded-xl">
+                  {[1, 2, 3, 4, 5].map((p) => (
+                    <SelectItem key={p} value={String(p)}>
+                      Priority {p}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label className="text-gray-800">Notes</Label>
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">Notes</Label>
               <Input
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
-                className="text-gray-900 placeholder:text-gray-500"
+                className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
               />
             </div>
-
-            {err && <p className="text-sm text-red-600">{err}</p>}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setEditOpen(false)}
               disabled={savingEdit}
+              className="rounded-xl font-bold text-gray-500"
             >
               Cancel
             </Button>
-            <Button onClick={saveEdit} disabled={savingEdit}>
-              {savingEdit ? "Saving…" : "Save"}
+            <Button
+              onClick={saveEdit}
+              disabled={savingEdit}
+              className="rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-black px-6 shadow-lg shadow-pink-100"
+            >
+              {savingEdit ? "Saving…" : "Update Item"}
             </Button>
           </DialogFooter>
         </DialogContent>

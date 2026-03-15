@@ -28,9 +28,9 @@ const EMERGENCY_NUMBERS: Record<
   },
 };
 
-export function SOSButton() {
+export function SOSButton({ initialLocation = "US" }: { initialLocation?: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [locationCode] = useState("US");
+  const [locationCode] = useState(initialLocation);
 
   const openModal = useCallback(() => {
     setIsOpen(true);

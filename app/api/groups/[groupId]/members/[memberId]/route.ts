@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 
+/**
+ * handles removing a member from a group.
+ * restricted to the group leader only.
+ */
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ groupId: string; memberId: string }> },
@@ -13,9 +16,10 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.userId;
 
+    // verify authentication
     if (!userId) {
       return NextResponse.json(
-        { error: "You must be logged in to remove members" },
+        { error: "unauthorized" },
         { status: 401 },
       );
     }
@@ -24,55 +28,61 @@ export async function DELETE(
 
     await dbConnect();
 
+    // fetch group and verify existence
     const group = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      return NextResponse.json({ error: "group not found" }, { status: 404 });
     }
 
+    // gather member ids for validation
     const memberIds = group.membersList.map((m: any) => m.userId.toString());
 
-    if (!memberIds.includes(userId)) {
+    // verify requester is a member
+    if (!memberIds.includes(userId.toString())) {
       return NextResponse.json(
-        { error: "You do not have access to this group" },
+        { error: "forbidden: access denied" },
         { status: 403 },
       );
     }
 
+    // ac: verify current user is the group leader
     const leaderIDStr = group.leaderID.toString();
-    if (leaderIDStr !== userId) {
+    if (leaderIDStr !== userId.toString()) {
       return NextResponse.json(
-        { error: "Only the group leader can remove members" },
+        { error: "forbidden: only the leader can remove members" },
         { status: 403 },
       );
     }
 
+    // block attempt to remove self via this route
     if (leaderIDStr === memberId) {
       return NextResponse.json(
-        { error: "Cannot remove the group leader" },
+        { error: "cannot remove the group leader" },
         { status: 400 },
       );
     }
 
+    // verify target exists in group
     if (!memberIds.includes(memberId)) {
       return NextResponse.json(
-        { error: "Member not found in group" },
+        { error: "member not found in group" },
         { status: 404 },
       );
     }
 
-    // Pull from membersList using the userId UUID
+    // perform atomic update to pull member from list
     const updated = await TravelGroup.findOneAndUpdate(
       { groupID: groupId },
       { $pull: { membersList: { userId: memberId } } },
-      { returnDocument: "after" },
+      { new: true },
     ).lean();
 
     if (!updated) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+      return NextResponse.json({ error: "update failed" }, { status: 404 });
     }
 
     return NextResponse.json({
-      message: "Member removed",
+      message: "member removed",
       group: {
         groupID: updated.groupID.toString(),
         groupName: updated.groupName,
@@ -84,13 +94,13 @@ export async function DELETE(
         })),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(
       "DELETE /api/groups/[groupId]/members/[memberId] error:",
       error,
     );
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "server error" },
       { status: 500 },
     );
   }

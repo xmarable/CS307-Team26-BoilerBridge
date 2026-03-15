@@ -17,7 +17,7 @@ interface Announcement {
 interface GroupBoardProps {
   groupId: string;
   initialAnnouncements: Announcement[];
-  isLeader: boolean; // for user story 3
+  isLeader: boolean;
 }
 
 export function GroupBoard({
@@ -30,6 +30,10 @@ export function GroupBoard({
   const [newContent, setNewContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /**
+   * AC: Given a group leader pins a message...
+   * Then that message appears at the top of the board.
+   */
   const handlePostAnnouncement = async () => {
     if (!newContent.trim()) return;
     setIsSubmitting(true);
@@ -43,13 +47,37 @@ export function GroupBoard({
 
       if (res.ok) {
         const added = await res.json();
-        setAnnouncements([added, ...announcements]); // Add to top of list
+        // Prepend to state to reflect "top of board" immediately
+        setAnnouncements([added, ...announcements]);
         setNewContent("");
       }
     } catch (error) {
       console.error("Failed to pin announcement", error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * AC: Given an announcement is unpinned by a leader...
+   * Then the item is removed from the view for all members.
+   */
+  const handleDeleteAnnouncement = async (announcementID: string) => {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/announcements`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ announcementID }),
+      });
+
+      if (res.ok) {
+        // Filter out the deleted item from the local state
+        setAnnouncements((prev) =>
+          prev.filter((a) => a.announcementID !== announcementID),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to delete announcement", error);
     }
   };
 
@@ -107,6 +135,7 @@ export function GroupBoard({
                   <div className="flex items-center gap-4 text-xs font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <UserIcon size={14} className="text-amber-500" />
+                      {/* AC: I can see exactly which leader pinned each update */}
                       <span>{item.pinnedBy}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -118,7 +147,13 @@ export function GroupBoard({
                   </div>
 
                   {isLeader && (
-                    <button className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1">
+                    <button
+                      onClick={() =>
+                        handleDeleteAnnouncement(item.announcementID)
+                      }
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1 cursor-pointer"
+                      title="Unpin Announcement"
+                    >
                       <Trash2 size={16} />
                     </button>
                   )}

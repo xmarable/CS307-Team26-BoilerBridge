@@ -4,9 +4,15 @@ module.exports = {
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   testEnvironmentOptions: {
-    ...(typeof globalThis.Request !== "undefined" && { Request: globalThis.Request }),
-    ...(typeof globalThis.Headers !== "undefined" && { Headers: globalThis.Headers }),
-    ...(typeof globalThis.Response !== "undefined" && { Response: globalThis.Response }),
+    ...(typeof globalThis.Request !== "undefined" && {
+      Request: globalThis.Request,
+    }),
+    ...(typeof globalThis.Headers !== "undefined" && {
+      Headers: globalThis.Headers,
+    }),
+    ...(typeof globalThis.Response !== "undefined" && {
+      Response: globalThis.Response,
+    }),
   },
   rootDir: "./",
   setupFiles: ["<rootDir>/jest.setup.js"],
@@ -21,7 +27,10 @@ module.exports = {
       "babel-jest",
       {
         presets: [
-          ["@babel/preset-env", { targets: { node: "current" }, modules: false }],
+          [
+            "@babel/preset-env",
+            { targets: { node: "current" }, modules: false },
+          ],
           "@babel/preset-typescript",
           ["@babel/preset-react", { runtime: "automatic" }],
         ],
