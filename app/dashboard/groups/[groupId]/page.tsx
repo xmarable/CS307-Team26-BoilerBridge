@@ -28,26 +28,26 @@ import { Input } from "@/components/ui/input";
 import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import { Badge } from "@/components/ui/badge";
+
+type GroupSummary = {
+    groupID: string;
+    groupName: string;
+    leaderID: string;
+    members: string[];
+}
 
 type GroupState = {
   _id: string;
-  groupID?: string;
-  groupName?: string;
+  groupID: string;
+  groupName: string;
   description?: string;
   leaderID?: string;
-  membersList?: { userId: string; role: string }[];
+  membersList: { userId: string; role: string }[];
   pendingRequests?: { email: string; sentAt: string }[];
   isLeader?: boolean;
-  currentUserId?: string;
+  currentUserId: string;
   budget?: { used: number; total: number };
 };
 
@@ -248,6 +248,12 @@ export default function GroupDashboard() {
               label="Itinerary"
             />
             <SidebarButton
+              active={activeSection === "messages"}
+              onClick={() => setActiveSection("messages")}
+              icon={<MessageSquare size={22}/>}
+              label="Messages"
+            />
+            <SidebarButton
               active={activeSection === "members"}
               onClick={() => setActiveSection("members")}
               icon={<Users size={22} />}
@@ -368,7 +374,7 @@ export default function GroupDashboard() {
                       <h4 className="font-bold text-sm uppercase tracking-widest text-white/60">
                         Quick invite friends
                       </h4>
-                      {friends.length > 5 && (
+                      {friends.length > 1 && (
                         <div className="relative w-full md:w-64">
                           <Search
                             className="absolute left-3 top-2.5 text-white/40"
@@ -432,6 +438,18 @@ export default function GroupDashboard() {
                 {group.description ||
                   "Every great trip starts with a plan. Welcome to your group's command center!"}
               </p>
+            </div>
+          )}
+
+          {activeSection === "messages" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+            <GroupMessagesPanel 
+              activeGroup={{
+                groupID: group.groupID,
+                groupName: group.groupName
+              }}
+              userId={group.currentUserId}
+            />
             </div>
           )}
         </main>

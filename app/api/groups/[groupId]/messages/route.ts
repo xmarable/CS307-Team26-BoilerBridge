@@ -10,11 +10,11 @@ const MessageSchema = z.object({
     content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function verifyUser(params: Promise<any>) {
     // Verify user logged in
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.userId as string | undefined;
-    const id = (session?.user as any)?.id as string | undefined;
+    const userId = (session?.user)?.userId as string | undefined;
     if (!userId) {
         return null;
     }
@@ -37,14 +37,15 @@ async function verifyUser(params: Promise<any>) {
 
     // Verify user in member list
     const members = group?.membersList ?? [];
-    if (!members.includes(id)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!group.membersList.some((m: any) => m.userId.toString() === userId)) {
         return null;
     }
 
     return { group, userId: userId, username: user?.username };
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
     // Get group and userId info
     const info = await verifyUser(params);
 
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
         content: message.data.content
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     info.group.chatLogs.push(newMessage as any);
     await info.group.save();
 
@@ -89,6 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     const logs = info.group.chatLogs ?? [];
 
     // Make sure chat logs are sorted in ascending order
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logs?.sort((ma: any, mb: any) => {
         const ta = new Date(ma.timestamp).getTime();
         const tb = new Date(mb.timestamp).getTime();
@@ -100,6 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     if (before) {
         const beforeTime = new Date(before).getTime();
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         e_Index = logs.findIndex((message: any) => new Date(message.timestamp).getTime() >= beforeTime);
 
         if (e_Index === -1) {

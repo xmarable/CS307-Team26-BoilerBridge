@@ -8,8 +8,6 @@ import { Button } from "../ui/button";
 type GroupSummary = {
     groupID: string;
     groupName: string;
-    leaderID: string;
-    members: string[];
 }
 
 type MessageSummary = {
@@ -60,16 +58,20 @@ export default function MessagesPanel({ activeGroup, userId }: { activeGroup: Gr
 
     useEffect(() => {
         if (!activeGroup) {
-            setMessages([]);
             return;
         }
 
-        getMessages(activeGroup.groupID);
-        setMessage("");
+        const fetchMessages = () => getMessages(activeGroup.groupID);
+
+        fetchMessages();
+        const interval = setInterval(fetchMessages, 3000);
+
+        return () => clearInterval(interval);
+
     }, [activeGroup])
 
     return (
-        <div className="flex flex-col min-w-0 min-h-0">
+        <div className="flex flex-col min-w-0 min-h-0 h-full">
             {/* Chat header */}
             <div className="p-5 border-b border-gray-200 bg-white">
                 {activeGroup ? (

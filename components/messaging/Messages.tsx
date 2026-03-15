@@ -5,12 +5,11 @@ import { Button } from "../ui/button";
 import { MessageSquare, Send } from "lucide-react";
 import { Input } from "../ui/input";
 import GroupList from "./GroupList";
-import MessagesPanel from "./MessagesPanel";
+import GroupMessagesPanel from "./GroupMessagesPanel";
 
 type GroupSummary = {
     groupID: string;
     groupName: string;
-    leaderID: string;
     members: string[];
 }
 
@@ -41,7 +40,7 @@ export function Messages({ groups, userId }: { groups: GroupSummary[], userId: s
                             />
 
                             {/* Right side: messages */}
-                            <MessagesPanel
+                            <GroupMessagesPanel
                                 activeGroup={activeGroup}
                                 userId={userId}
                             />
