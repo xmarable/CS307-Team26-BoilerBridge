@@ -1,1 +1,1 @@
-NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest __tests__/SOSButton.test.tsx --config=jest.config.cjs --silent --verbose --colors
+NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' npx jest __tests__/roles.test.ts --config=jest.config.cjs --silent --verbose --colors

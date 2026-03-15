@@ -4,12 +4,16 @@ import { boolean, float64 } from "zod";
 
 const TripSchema = new mongoose.Schema(
   {
+    groupID: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+      ref: "TravelGroup",
+    },
     userId: {
       type: mongoose.Schema.Types.UUID,
       required: true,
       ref: "User",
     },
-
     fromCity: {
       type: String,
       required: true,

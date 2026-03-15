@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { randomUUID } from "crypto";
-import { unique } from "next/dist/build/utils";
 
 const expenseSchema = new mongoose.Schema(
   {
@@ -26,7 +25,7 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.UUID,
       default: () => randomUUID(),
       unique: true,
-      sparse: true, // added to allow multiple nulls in unique index
+      sparse: true,
     },
     senderID: {
       type: mongoose.Schema.Types.UUID,
@@ -77,6 +76,15 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// New schema for tracking invitations that haven't been accepted yet
+const pendingRequestSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, lowercase: true, trim: true },
+    sentAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const travelGroupSchema = new mongoose.Schema(
   {
     groupID: {
@@ -91,7 +99,11 @@ const travelGroupSchema = new mongoose.Schema(
       required: true,
       ref: "User",
     },
-    membersList: [groupMemberSchema], // use object structure to store role info
+    membersList: [groupMemberSchema],
+    pendingRequests: {
+      type: [pendingRequestSchema],
+      default: [],
+    },
     pinnedAnnouncements: {
       type: [announcementSchema],
       default: [],
