@@ -1,14 +1,27 @@
 /** @jest-environment jsdom */
 import { jest } from "@jest/globals";
+
+// 1. Mock the navigation and date-fns modules before any imports
+jest.unstable_mockModule("next/navigation", () => ({
+  __esModule: true,
+  useRouter: () => ({
+    push: jest.fn(),
+  }),
+  useParams: () => ({ groupId: "group-123" }),
+}));
+
+jest.unstable_mockModule("date-fns", () => ({
+  __esModule: true,
+  formatDistanceToNow: () => "just now",
+}));
+
+// 2. Dynamic imports to ensure mocks are applied correctly
+const { GroupBoard } = await import("../components/GroupBoard");
+
+// 3. Standard library imports
 import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { GroupBoard } from "../components/GroupBoard";
-
-// Mock the date-fns formatDistanceToNow to keep timestamps predictable
-await jest.mock("date-fns", () => ({
-  formatDistanceToNow: () => "just now",
-}));
 
 const mockAnnouncements = [
   {
@@ -27,8 +40,14 @@ const mockAnnouncements = [
 
 describe("Group Board Acceptance Criteria", () => {
   beforeEach(() => {
-    // cast to any to break the strict type chain for fetch mocking
-    global.fetch = jest.fn() as any;
+    // Cast to any to bypass strict fetch typing in tests
+    global.fetch = jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      } as Response),
+    ) as any;
   });
 
   afterEach(() => {
@@ -38,8 +57,8 @@ describe("Group Board Acceptance Criteria", () => {
 
   /**
    * Acceptance Criteria:
-   * Given a group leader pins a message, 
-   * When I navigate to the Group Board, 
+   * Given a group leader pins a message,
+   * When I navigate to the Group Board,
    * Then that message appears at the top of the board.
    */
   it("Given a group leader pins a message, When I navigate to the Group Board, Then that message appears at the top of the board", async () => {
@@ -53,18 +72,18 @@ describe("Group Board Acceptance Criteria", () => {
     const mockedFetch = global.fetch as jest.MockedFunction<typeof fetch>;
     (mockedFetch as any).mockResolvedValueOnce({
       ok: true,
+      status: 201,
       json: async () => newAnnouncement,
-    });
+    } as Response);
 
     render(
-      <GroupBoard 
-        groupId="group-123" 
-        initialAnnouncements={mockAnnouncements} 
-        isLeader={true} 
-      />
+      <GroupBoard
+        groupId="group-123"
+        initialAnnouncements={mockAnnouncements}
+        isLeader={true}
+      />,
     );
 
-    // [Action] Enter message and click pin
     const input = screen.getByPlaceholderText(/Pin an important update/i);
     const pinButton = screen.getByRole("button", { name: /^pin$/i });
 
@@ -74,25 +93,23 @@ describe("Group Board Acceptance Criteria", () => {
     // [Assertion] Verify the new message appears at the top (index 0)
     await waitFor(() => {
       const allCards = screen.getAllByText(/IMPORTANT|announcement/);
-      // The first element in the list must be the newly pinned message
       expect(allCards[0].textContent).toContain("IMPORTANT: Meeting at 5pm");
     });
   });
 
   /**
    * Acceptance Criteria:
-   * Given there are multiple announcements, 
-   * When I view the board, 
+   * Given there are multiple announcements,
+   * When I view the board,
    * Then I can see exactly which leader pinned each update.
    */
   it("Given there are multiple announcements, When I view the board, Then I can see exactly which leader pinned each update", () => {
-    // [Action] Render board with multiple announcements
     render(
-      <GroupBoard 
-        groupId="group-123" 
-        initialAnnouncements={mockAnnouncements} 
-        isLeader={false} 
-      />
+      <GroupBoard
+        groupId="group-123"
+        initialAnnouncements={mockAnnouncements}
+        isLeader={false}
+      />,
     );
 
     // [Assertion] Confirm metadata reveals specific leaders for each pin
@@ -102,23 +119,24 @@ describe("Group Board Acceptance Criteria", () => {
 
   /**
    * Acceptance Criteria:
-   * Given an announcement is unpinned by a leader, 
-   * When I refresh the board, 
+   * Given an announcement is unpinned by a leader,
+   * When I refresh the board,
    * Then the item is removed from the view for all members.
    */
   it("Given an announcement is unpinned by a leader, When I refresh the board, Then the item is removed from the view for all members", async () => {
     const mockedFetch = global.fetch as jest.MockedFunction<typeof fetch>;
     (mockedFetch as any).mockResolvedValueOnce({
       ok: true,
+      status: 200,
       json: async () => ({ success: true }),
-    });
+    } as Response);
 
     render(
-      <GroupBoard 
-        groupId="group-123" 
-        initialAnnouncements={mockAnnouncements} 
-        isLeader={true} 
-      />
+      <GroupBoard
+        groupId="group-123"
+        initialAnnouncements={mockAnnouncements}
+        isLeader={true}
+      />,
     );
 
     // [Action] Leader unpins the first message
@@ -127,10 +145,12 @@ describe("Group Board Acceptance Criteria", () => {
 
     // [Assertion] Item is removed from the view
     await waitFor(() => {
-      expect(screen.queryByText("Initial announcement")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Initial announcement"),
+      ).not.toBeInTheDocument();
     });
 
-    // Ensure state remains valid for other items
+    // Ensure other items remain
     expect(screen.getByText("Old update")).toBeInTheDocument();
   });
 });

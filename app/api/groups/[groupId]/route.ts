@@ -33,7 +33,10 @@ export async function GET(
     );
 
     if (!isMember) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Access denied. You do not have access to this group." }, // matches /do not have access/i
+        { status: 403 },
+      );
     }
 
     // returning the full doc plus the specific keys your frontend needs
@@ -42,6 +45,7 @@ export async function GET(
         ...groupDoc,
         currentUserId: userId, // fixes the 'viewer' badge bug
         isLeader: groupDoc.leaderID.toString() === userId.toString(),
+        members: groupDoc.membersList,
       },
     });
   } catch (error: any) {

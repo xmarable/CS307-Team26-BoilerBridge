@@ -462,10 +462,8 @@ describe("POST /api/groups/[groupId]/members", () => {
     );
     const data = await res.json();
     expect(res.status).toBe(201);
-    const memberIds = data.group.membersList.map((m: any) =>
-      m.userId.toString(),
-    );
-    expect(memberIds).toContain(newUser.userId.toString());
+    const pendingEmails = data.group.pendingRequests.map((r: any) => r.email);
+    expect(pendingEmails).toContain(newUser.email.toLowerCase());
     const updated = await TravelGroup.findOne({
       groupID: group.groupID.toString(),
     });

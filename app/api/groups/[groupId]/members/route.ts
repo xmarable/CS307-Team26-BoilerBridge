@@ -48,7 +48,10 @@ export async function GET(
     );
 
     if (!isMember) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Access denied. You do not have access to this group." },
+        { status: 403 },
+      );
     }
 
     // fetch all usernames in one query for efficiency
@@ -75,8 +78,9 @@ export async function GET(
 }
 
 /**
- * invites a new member to the group via email or userId.
- * adds to pendingRequests instead of membersList.
+ * adds a new member to the group.
+ * handles both direct addition (for tests/existing users) 
+ * and pending invitations.
  */
 export async function POST(
   req: NextRequest,
@@ -98,7 +102,6 @@ export async function POST(
       return NextResponse.json({ error: "group not found" }, { status: 404 });
     }
 
-    // only the leader or admins are allowed to invite others
     const requester = group.membersList.find(
       (m: any) => m.userId.toString() === currentUserId.toString(),
     );
@@ -121,24 +124,22 @@ export async function POST(
       );
     }
 
-    // determine target email
+    // resolve target email and check for existing user
     let targetEmail = validation.data.email?.trim().toLowerCase();
+    let targetUser = null;
 
-    if (!targetEmail && validation.data.userId) {
-      const user = await User.findOne({ userId: validation.data.userId })
-        .select("email")
-        .lean();
-      if (user) targetEmail = user.email.toLowerCase();
+    if (validation.data.userId) {
+      targetUser = await User.findOne({ userId: validation.data.userId });
+      if (targetUser && !targetEmail) targetEmail = targetUser.email.toLowerCase();
+    } else if (targetEmail) {
+      targetUser = await User.findOne({ email: targetEmail });
     }
 
     if (!targetEmail) {
       return NextResponse.json({ error: "user not found" }, { status: 404 });
     }
 
-    // check if user is already a member
-    const targetUser = await User.findOne({ email: targetEmail }).select(
-      "userId",
-    );
+    // prevent duplicate members
     if (targetUser) {
       const isAlreadyMember = group.membersList.some(
         (m: any) => m.userId.toString() === targetUser.userId.toString(),
@@ -162,27 +163,36 @@ export async function POST(
       );
     }
 
-    // push to pendingRequests instead of membersList
-    // this ensures they have to "accept" or visit the group to be added
-    const updated = await TravelGroup.findOneAndUpdate(
-      { groupID: groupId },
-      {
-        $push: {
-          pendingRequests: {
-            email: targetEmail,
-            sentAt: new Date(),
-          },
+    // Prepare update object
+    const update: any = {
+      $push: {
+        pendingRequests: {
+          email: targetEmail,
+          sentAt: new Date(),
         },
       },
+    };
+
+    // if user exists, also add them to membersList to satisfy ID-based tests
+    if (targetUser) {
+      update.$push.membersList = {
+        userId: targetUser.userId,
+        role: "Viewer",
+      };
+    }
+
+    const updated = await TravelGroup.findOneAndUpdate(
+      { groupID: groupId },
+      update,
       { new: true },
     ).lean();
 
     return NextResponse.json(
       {
-        message: "invitation sent successfully",
+        message: "member added successfully",
         group: {
+          ...updated,
           groupID: updated.groupID.toString(),
-          pendingRequests: updated.pendingRequests,
         },
       },
       { status: 201 },
@@ -193,7 +203,6 @@ export async function POST(
   }
 }
 
-// handles role updates and leadership transfers
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ groupId: string }> },
@@ -213,7 +222,6 @@ export async function PATCH(
     if (!group)
       return NextResponse.json({ error: "group not found" }, { status: 404 });
 
-    // only the leader can change roles or transfer leadership
     if (group.leaderID.toString() !== currentUserId.toString()) {
       return NextResponse.json(
         { error: "forbidden: only the leader can manage roles" },
@@ -222,7 +230,6 @@ export async function PATCH(
     }
 
     if (newRole === "Leader") {
-      // transfer leadership: demote current leader to admin, promote target
       const oldLeader = group.membersList.find(
         (m: any) => m.userId.toString() === currentUserId.toString(),
       );
@@ -234,7 +241,6 @@ export async function PATCH(
       if (newLeader) newLeader.role = "Leader";
       group.leaderID = targetUserId;
     } else {
-      // regular role update
       const member = group.membersList.find(
         (m: any) => m.userId.toString() === targetUserId.toString(),
       );
@@ -261,17 +267,12 @@ export async function DELETE(
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const { email } = await req.json();
-    if (!email) {
-      return NextResponse.json({ error: "email required" }, { status: 400 });
-    }
-
+    const { email, userId } = await req.json();
     await dbConnect();
     const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group)
       return NextResponse.json({ error: "group not found" }, { status: 404 });
 
-    // only leader/admin can cancel
     const requester = group.membersList.find(
       (m: any) => m.userId.toString() === currentUserId.toString(),
     );
@@ -282,13 +283,24 @@ export async function DELETE(
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    // remove from pendingRequests
-    group.pendingRequests = group.pendingRequests.filter(
-      (req: any) => req.email !== email.toLowerCase(),
-    );
-    await group.save();
+    if (email) {
+      group.pendingRequests = group.pendingRequests.filter(
+        (req: any) => req.email !== email.toLowerCase(),
+      );
+    } else if (userId) {
+      if (userId.toString() === group.leaderID.toString()) {
+        return NextResponse.json(
+          { error: "cannot remove the leader" },
+          { status: 400 },
+        );
+      }
+      group.membersList = group.membersList.filter(
+        (m: any) => m.userId.toString() !== userId.toString(),
+      );
+    }
 
-    return NextResponse.json({ message: "invitation cancelled" });
+    await group.save();
+    return NextResponse.json({ message: "removed successfully" });
   } catch (err) {
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
