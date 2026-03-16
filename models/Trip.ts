@@ -1,6 +1,4 @@
 import mongoose from "mongoose";
-import User from "../models/User";
-import { boolean, float64 } from "zod";
 
 const TripSchema = new mongoose.Schema(
   {
@@ -48,6 +46,19 @@ const TripSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    /** Activity/location names or IDs to exclude from itinerary recommendations (US14) */
+    avoidActivities: {
+      type: [String],
+      default: [],
+    },
+    avoidLocations: {
+      type: [String],
+      default: [],
+    },
+    /** Optional budget range for suggestions (US14); if set, recommendations respect this range */
+    budgetMin: { type: Number, default: undefined },
+    budgetMax: { type: Number, default: undefined },
   },
   { timestamps: true },
 );
