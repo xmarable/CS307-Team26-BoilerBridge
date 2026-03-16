@@ -5,6 +5,62 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 
+export async function GET(
+  _req: NextRequest,
+  context: { params: Promise<{ tripId: string }> }
+) {
+  try {
+    const { tripId } = await context.params;
+    await dbConnect();
+
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.userId;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const trip = await Trip.findById(tripId).lean();
+    if (!trip) {
+      return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    }
+
+    const permissionResult = await getMemberPermissions(
+      trip.groupID,
+      userId
+    ) as { error?: string; status?: number; canEdit?: boolean };
+
+    if (permissionResult.error) {
+      return NextResponse.json(
+        { error: permissionResult.error },
+        { status: permissionResult.status ?? 403 }
+      );
+    }
+
+    const t = trip as Record<string, unknown>;
+    return NextResponse.json({
+      _id: t._id?.toString(),
+      groupID: t.groupID?.toString(),
+      userId: t.userId?.toString(),
+      fromCity: t.fromCity,
+      toCity: t.toCity,
+      fromDate: t.fromDate,
+      toDate: t.toDate,
+      mode: t.mode,
+      budget: t.budget,
+      tripConfirmed: t.tripConfirmed,
+      avoidActivities: t.avoidActivities ?? [],
+      avoidLocations: t.avoidLocations ?? [],
+      budgetMin: t.budgetMin,
+      budgetMax: t.budgetMax,
+      mustHaves: t.mustHaves ?? [],
+    });
+  } catch (err: unknown) {
+    console.error("GET /api/trip/[tripId] error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ tripId: string }> }
