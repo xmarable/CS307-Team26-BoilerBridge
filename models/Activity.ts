@@ -14,6 +14,8 @@ export interface IActivity extends Document {
   rating?: number;
   reviewCount: number;
   reviews: IReview[];
+  /** Optional estimated cost for budget-based recommendations (US14) */
+  estimatedCost?: number;
   /** Cached summary fields */
   sentimentSummary?: string;
   highlights?: string[];
@@ -45,6 +47,7 @@ const ActivitySchema = new Schema<IActivity>(
       type: [ReviewSchema],
       default: [],
     },
+    estimatedCost: { type: Number },
     sentimentSummary: { type: String },
     highlights: [{ type: String }],
     pros: [{ type: String }],
