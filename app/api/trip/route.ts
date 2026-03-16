@@ -15,6 +15,10 @@ const tripSchema = z.object({
   mode: z.enum(["flight", "train", "bus", "taxi"]),
   budget: z.coerce.number().positive("Budget must be a positive number."),
   tripConfirmed: z.boolean().optional(),
+  avoidActivities: z.array(z.string()).optional(),
+  avoidLocations: z.array(z.string()).optional(),
+  budgetMin: z.coerce.number().optional(),
+  budgetMax: z.coerce.number().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -49,6 +53,10 @@ export async function POST(req: NextRequest) {
       mode,
       budget,
       tripConfirmed,
+      avoidActivities,
+      avoidLocations,
+      budgetMin,
+      budgetMax,
     } = result.data;
 
     // AC Check: Block request if the user is a 'Viewer'
@@ -81,20 +89,29 @@ export async function POST(req: NextRequest) {
       mode,
       budget: Number(budget),
       tripConfirmed: tripConfirmed ?? false,
+      ...(avoidActivities != null && { avoidActivities }),
+      ...(avoidLocations != null && { avoidLocations }),
+      ...(budgetMin != null && { budgetMin }),
+      ...(budgetMax != null && { budgetMax }),
     });
 
+    const t = trip as Record<string, unknown>;
     return NextResponse.json(
       {
-        tripID: trip.tripID.toString(),
-        userId: trip.userId.toString(),
-        groupID: trip.groupID.toString(),
-        fromCity: trip.fromCity,
-        toCity: trip.toCity,
-        fromDate: trip.fromDate,
-        toDate: trip.toDate,
-        mode: trip.mode,
-        budget: trip.budget,
-        tripConfirmed: trip.tripConfirmed,
+        tripID: t._id?.toString(),
+        userId: t.userId?.toString(),
+        groupID: t.groupID?.toString(),
+        fromCity: t.fromCity,
+        toCity: t.toCity,
+        fromDate: t.fromDate,
+        toDate: t.toDate,
+        mode: t.mode,
+        budget: t.budget,
+        tripConfirmed: t.tripConfirmed,
+        avoidActivities: t.avoidActivities ?? [],
+        avoidLocations: t.avoidLocations ?? [],
+        budgetMin: t.budgetMin,
+        budgetMax: t.budgetMax,
       },
       { status: 201 },
     );
@@ -121,9 +138,9 @@ export async function GET() {
     // Query using the userId string
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    const payload = trips.map((t: any) => ({
-      tripID: t.tripID.toString(),
-      userId: t.userId.toString(),
+    const payload = trips.map((t: Record<string, unknown>) => ({
+      tripID: t._id?.toString(),
+      userId: t.userId?.toString(),
       groupID: t.groupID?.toString(),
       fromCity: t.fromCity,
       toCity: t.toCity,
@@ -132,6 +149,10 @@ export async function GET() {
       mode: t.mode,
       budget: t.budget,
       tripConfirmed: t.tripConfirmed,
+      avoidActivities: t.avoidActivities ?? [],
+      avoidLocations: t.avoidLocations ?? [],
+      budgetMin: t.budgetMin,
+      budgetMax: t.budgetMax,
     }));
 
     return NextResponse.json(payload, { status: 200 });
