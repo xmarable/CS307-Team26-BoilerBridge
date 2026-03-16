@@ -36,7 +36,6 @@ async function verifyUser(params: Promise<any>) {
     }
 
     // Verify user in member list
-    const members = group?.membersList ?? [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!group.membersList.some((m: any) => m.userId.toString() === userId)) {
         return null;

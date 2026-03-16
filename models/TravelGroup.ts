@@ -76,6 +76,24 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const SMSSchema = new mongoose.Schema(
+  {
+    smsID: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    topic: {
+      type: String,
+      required: true
+    },
+    sentAt: {
+      type: Date,
+      required: true,
+      defualt: Date.now
+    }
+  }
+)
+
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
   {
@@ -109,6 +127,10 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
+    smsLogs: {
+      type: [SMSSchema],
+      default: []
+    },
     chatLogs: {
       type: [messageSchema],
       default: [],
