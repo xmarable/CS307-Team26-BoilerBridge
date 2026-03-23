@@ -15,7 +15,7 @@ type MessageSummary = {
     content: string;
 }
 
-export default function MessagesPanel({ activeGroup, userId }: { activeGroup: GroupSummary | null, userId: string }) {
+export default function GroupMessagesPanel({ activeGroup, userId }: { activeGroup: GroupSummary | null, userId: string }) {
     const [messages, setMessages] = useState<MessageSummary[]>([])
     const [message, setMessage] = useState("");
 

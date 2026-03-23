@@ -92,7 +92,29 @@ const SMSSchema = new mongoose.Schema(
       defualt: Date.now
     }
   }
-)
+);
+
+const photoSchema = new mongoose.Schema(
+  {
+    photoId: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    image: {
+      type: String,
+      default: ""
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    uploaderID: {
+      type: mongoose.Types.UUID,
+      ref: "User",
+      required: true
+    }
+  }
+);
 
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
@@ -135,6 +157,10 @@ const travelGroupSchema = new mongoose.Schema(
       type: [messageSchema],
       default: [],
     },
+    photos: {
+      type: [photoSchema],
+      default: []
+    }
   },
   { timestamps: true },
 );

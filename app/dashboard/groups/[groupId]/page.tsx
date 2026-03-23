@@ -21,6 +21,7 @@ import {
   UserPlus,
   Search,
   X,
+  Image
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
+import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 
 type GroupSummary = {
@@ -254,6 +256,12 @@ export default function GroupDashboard() {
               label="Messages"
             />
             <SidebarButton
+              active={activeSection === "photos"}
+              onClick={() => setActiveSection("photos")}
+              icon={<Image size={22} />}
+              label="Photos"
+            />
+            <SidebarButton
               active={activeSection === "members"}
               onClick={() => setActiveSection("members")}
               icon={<Users size={22} />}
@@ -449,6 +457,19 @@ export default function GroupDashboard() {
                 groupName: group.groupName
               }}
               userId={group.currentUserId}
+            />
+            </div>
+          )}
+
+          {activeSection === "photos" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+            <GroupPhotosPanel 
+              activeGroup={{
+                groupID: group.groupID,
+                groupName: group.groupName,
+              }}
+              userId={group.currentUserId}
+              isLeader={isLeader}
             />
             </div>
           )}
