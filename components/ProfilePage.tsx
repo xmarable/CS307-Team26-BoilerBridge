@@ -232,7 +232,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
                 setFormData({ ...formData, name: e.target.value })
               }
               className={inputStyles}
-              placeholder="e.g. Xavion Marable"
+              placeholder="e.g. John Doe"
             />
           </div>
 

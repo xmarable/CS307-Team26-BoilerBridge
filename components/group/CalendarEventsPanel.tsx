@@ -28,6 +28,7 @@ import {
   Trash2,
   Edit3,
   Loader2,
+  Zap,
 } from "lucide-react";
 
 type CalendarEvent = {
@@ -84,6 +85,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [location, setLocation] = useState("");
   const [eventType, setEventType] = useState("activity");
   const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
@@ -153,6 +155,24 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       setErr(e?.message ?? "Failed to create event");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleGenerate() {
+    try {
+      setGenerating(true);
+      setErr(null);
+      const res = await fetch(`/api/groups/${groupId}/itinerary/generate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data?.error || "Failed to generate itinerary");
+      await fetchEvents();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to generate itinerary");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -254,6 +274,32 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Baseline Itinerary Generator Trigger */}
+      <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1 text-center md:text-left">
+            <h3 className="text-2xl font-black lowercase tracking-tighter flex items-center justify-center md:justify-start gap-2">
+              <Zap className="text-amber-400 fill-amber-400" size={24} /> spark
+              itinerary
+            </h3>
+            <p className="text-gray-400 font-bold text-sm lowercase">
+              converts your must-haves into a scheduled timeline
+            </p>
+          </div>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest"
+          >
+            {generating ? (
+              <RefreshCw className="animate-spin mr-2" size={20} />
+            ) : (
+              "generate plan"
+            )}
+          </Button>
         </div>
       </div>
 
