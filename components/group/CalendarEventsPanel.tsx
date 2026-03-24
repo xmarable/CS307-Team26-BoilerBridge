@@ -29,6 +29,7 @@ import {
   Edit3,
   Loader2,
   Zap,
+  CheckCircle2,
 } from "lucide-react";
 
 type CalendarEvent = {
@@ -64,6 +65,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  // state for error and success popups
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [popupMsg, setPopupMsg] = useState("");
 
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
@@ -109,10 +115,10 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load events");
+      if (!res.ok) throw new Error(data?.error || "Failed to load events.");
       setEvents(data.events ?? data.calendarEvents ?? []);
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to load events");
+      setErr(e?.message ?? "Failed to load events.");
     } finally {
       setLoading(false);
     }
@@ -144,7 +150,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to create event");
+      if (!res.ok) throw new Error(data?.error || "Failed to create event.");
 
       setTitle("");
       setDescription("");
@@ -152,7 +158,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       setEventType("activity");
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to create event");
+      setErr(e?.message ?? "Failed to create event.");
     } finally {
       setCreating(false);
     }
@@ -166,11 +172,19 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         method: "POST",
       });
       const data = await res.json();
-      if (!res.ok)
-        throw new Error(data?.error || "Failed to generate itinerary");
-      await fetchEvents();
+      if (!res.ok) {
+        // show error if the generation fails
+        setPopupMsg(data?.error || "Failed to generate itinerary.");
+        setShowErrorPopup(true);
+      } else {
+        // show success if it worked
+        setPopupMsg(data?.message || "Itinerary sparked successfully.");
+        setShowSuccessPopup(true);
+        await fetchEvents();
+      }
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to generate itinerary");
+      setPopupMsg("An unexpected error occurred during generation.");
+      setShowErrorPopup(true);
     } finally {
       setGenerating(false);
     }
@@ -209,13 +223,13 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to update event");
+      if (!res.ok) throw new Error(data?.error || "Failed to update event.");
 
       setEditOpen(false);
       setEditEvent(null);
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to update event");
+      setErr(e?.message ?? "Failed to update event.");
     } finally {
       setSavingEdit(false);
     }
@@ -231,10 +245,10 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to delete event");
+      if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to delete event");
+      setErr(e?.message ?? "Failed to delete event.");
     }
   }
 
@@ -281,12 +295,12 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-1 text-center md:text-left">
-            <h3 className="text-2xl font-black lowercase tracking-tighter flex items-center justify-center md:justify-start gap-2">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center justify-center md:justify-start gap-2 uppercase">
               <Zap className="text-amber-400 fill-amber-400" size={24} /> spark
               itinerary
             </h3>
-            <p className="text-gray-400 font-bold text-sm lowercase">
-              converts your must-haves into a scheduled timeline
+            <p className="text-gray-400 font-bold text-sm">
+              Converts your must-haves into a scheduled timeline
             </p>
           </div>
           <Button
@@ -297,7 +311,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             {generating ? (
               <RefreshCw className="animate-spin mr-2" size={20} />
             ) : (
-              "generate plan"
+              "Generate Plan"
             )}
           </Button>
         </div>
@@ -507,6 +521,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         )}
       </div>
 
+      {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
@@ -588,6 +603,67 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               {savingEdit ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Popup Alert */}
+      <Dialog open={showErrorPopup} onOpenChange={setShowErrorPopup}>
+        <DialogContent className="rounded-[2.5rem] border-4 border-red-600 p-10 bg-white shadow-[10px_10px_0px_0px_rgba(220,38,38,1)] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
+              <Zap fill="currentColor" size={32} /> Trip Error
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-8 space-y-4">
+            <p className="text-xl font-black text-gray-900 leading-tight">
+              {popupMsg}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setShowErrorPopup(false)}
+              className="w-full h-16 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
+            >
+              got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Popup Alert */}
+      <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+        <DialogContent className="rounded-[2.5rem] border-4 border-amber-500 p-0 bg-white shadow-[10px_10px_0px_0px_rgba(245,158,11,1)] max-w-md mx-auto overflow-hidden">
+          {/* forced centering container */}
+          <div className="flex flex-col items-center justify-center p-10 w-full text-center">
+            {/* title section */}
+            <div className="flex flex-col items-center justify-center gap-3 mb-8">
+              <h2 className="text-4xl font-black text-amber-500 uppercase tracking-tighter">
+                Sparked
+              </h2>
+            </div>
+
+            {/* body section */}
+            <div className="mb-10">
+              <p className="text-xl font-black text-gray-900 leading-tight mb-2">
+                {popupMsg}
+              </p>
+              <p className="text-sm font-bold text-gray-400 leading-relaxed">
+                Your timeline has been refreshed with the new activities
+              </p>
+            </div>
+
+            {/* button section - forced full width */}
+            <div className="w-full">
+              <Button
+                onClick={() => setShowSuccessPopup(false)}
+                className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
+              >
+                Nice
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
