@@ -4,11 +4,11 @@ import dbConnect from "@/lib/dbConnect";
 
 export async function GET(
   req: Request,
-  { params }: { params: { groupId: string } },
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     await dbConnect();
-    const { groupId } = params;
+    const { groupId } = await params;
 
     const events = await CalendarEvent.find({ groupId })
       .sort({ startTime: 1 })

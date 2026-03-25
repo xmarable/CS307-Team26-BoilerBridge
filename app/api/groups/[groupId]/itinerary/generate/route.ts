@@ -6,7 +6,7 @@ import Trip from "@/models/Trip";
 
 export async function POST(
   req: Request,
-  { params }: { params: { groupId: string } },
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     await dbConnect();
