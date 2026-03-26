@@ -40,7 +40,32 @@ export async function POST(req: NextRequest) {
     }
 
     await user.save();
-    const url = `http://localhost:3000/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+    const url = `http://localhost:3000/signin/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
     console.log(`Password Reset Link: ${url}`);
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sgMail = require('@sendgrid/mail');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    //console.log(process.env.SENDGRID_API_KEY);
+
+    const msg = {
+        to: user.email,
+        from: 'boilerbridge307@gmail.com',
+        subject: 'BoilerBridge Password Reset',
+        text: url,
+        html: `
+            <p>Click the link below to reset your password:</p>
+            <p><a href="${url}">Reset Password</a></p>
+            <p>If you did not request this, you can ignore this email.</p>
+        `,
+    }
+
+    sgMail.send(msg).then(() => {
+        console.log("Email Sent")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }).catch((e: any) => {
+        console.log(e);
+    })
+
     return response;
 }
