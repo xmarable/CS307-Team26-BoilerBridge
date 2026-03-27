@@ -25,7 +25,7 @@ const navItems = [
   },
   { name: "All Trips", href: "/dashboard/alltrips", icon: List },
   { name: "Friends", href: "/dashboard/friends", icon: Users },
-  { name: "Discover", href: "/discover", icon: TrendingUp },
+  { name: "Discover", href: "/dashboard/discover", icon: TrendingUp },
   {
     name: "Messages",
     href: "/dashboard/messages",
