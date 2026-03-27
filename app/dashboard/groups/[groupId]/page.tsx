@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
+import ExpenseSummaryPanel from "@/components/group/ExpenseSummaryPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
@@ -250,6 +251,12 @@ export default function GroupDashboard() {
               label="Itinerary"
             />
             <SidebarButton
+              active={activeSection === "expenses"}
+              onClick={() => setActiveSection("expenses")}
+              icon={<DollarSign size={22} />}
+              label="Expense summary"
+            />
+            <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
               icon={<MessageSquare size={22}/>}
@@ -271,6 +278,20 @@ export default function GroupDashboard() {
         </aside>
 
         <main className="lg:col-span-10">
+          {activeSection === "expenses" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                  <DollarSign size={22} />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                  Expense summary
+                </h2>
+              </div>
+              <ExpenseSummaryPanel groupId={groupId!} />
+            </div>
+          )}
+
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section className="space-y-4 h-full flex flex-col">
