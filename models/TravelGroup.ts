@@ -76,6 +76,46 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const SMSSchema = new mongoose.Schema(
+  {
+    smsID: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    topic: {
+      type: String,
+      required: true
+    },
+    sentAt: {
+      type: Date,
+      required: true,
+      defualt: Date.now
+    }
+  }
+);
+
+const photoSchema = new mongoose.Schema(
+  {
+    photoId: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    image: {
+      type: String,
+      default: ""
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    uploaderID: {
+      type: mongoose.Types.UUID,
+      ref: "User",
+      required: true
+    }
+  }
+);
+
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
   {
@@ -109,10 +149,18 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
+    smsLogs: {
+      type: [SMSSchema],
+      default: []
+    },
     chatLogs: {
       type: [messageSchema],
       default: [],
     },
+    photos: {
+      type: [photoSchema],
+      default: []
+    }
   },
   { timestamps: true },
 );

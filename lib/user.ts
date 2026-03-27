@@ -5,7 +5,7 @@ import TravelGroup from "@/models/TravelGroup";
 
 export async function getUserGroups() {
   const session = await getServerSession(authOptions);
-  const userId = (session?.user as any)?.userId;
+  const userId = (session?.user)?.userId;
   if (!userId) {
     return null;
   }
@@ -20,7 +20,6 @@ export async function getUserGroups() {
   return groups.map((g) => ({
     groupID: g.groupID,
     groupName: g.groupName,
-    leaderID: g.leaderID,
     members: g.membersList,
   }));
 }
