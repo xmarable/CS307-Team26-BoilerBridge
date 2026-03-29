@@ -30,6 +30,7 @@ import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 import ExpenseSummaryPanel from "@/components/group/ExpenseSummaryPanel";
+import PaymentRequestsPanel from "@/components/group/PaymentRequestsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ export default function GroupDashboard() {
   const [loading, setLoading] = useState(!!groupId);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
+  const [paymentRequestsRefresh, setPaymentRequestsRefresh] = useState(0);
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -288,7 +290,20 @@ export default function GroupDashboard() {
                   Expense summary
                 </h2>
               </div>
-              <ExpenseSummaryPanel groupId={groupId!} />
+              <ExpenseSummaryPanel
+                groupId={groupId!}
+                currentUserId={group?.currentUserId}
+                onPaymentRequestCreated={() =>
+                  setPaymentRequestsRefresh((n) => n + 1)
+                }
+              />
+              {group?.currentUserId ? (
+                <PaymentRequestsPanel
+                  groupId={groupId!}
+                  currentUserId={group.currentUserId}
+                  refreshKey={paymentRequestsRefresh}
+                />
+              ) : null}
             </div>
           )}
 

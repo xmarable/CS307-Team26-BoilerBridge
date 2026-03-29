@@ -2,7 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import RequestPaymentModal from "@/components/group/RequestPaymentModal";
 import {
   Select,
   SelectContent,
@@ -56,9 +58,17 @@ function formatMoney(n: number) {
   return `${sign}$${Math.abs(n).toFixed(2)}`;
 }
 
-type Props = { groupId: string };
+type Props = {
+  groupId: string;
+  currentUserId?: string | null;
+  onPaymentRequestCreated?: () => void;
+};
 
-export default function ExpenseSummaryPanel({ groupId }: Props) {
+export default function ExpenseSummaryPanel({
+  groupId,
+  currentUserId,
+  onPaymentRequestCreated,
+}: Props) {
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -70,6 +80,11 @@ export default function ExpenseSummaryPanel({ groupId }: Props) {
     "amount-desc",
   );
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [prModal, setPrModal] = useState<{
+    debtorUserId: string;
+    debtorDisplayName: string;
+    amount: number;
+  } | null>(null);
 
   const qs = useMemo(() => {
     const p = new URLSearchParams();
@@ -146,6 +161,8 @@ export default function ExpenseSummaryPanel({ groupId }: Props) {
   if (!data) return null;
 
   const { meta, expenseCounts } = data;
+
+  const uid = currentUserId ?? "";
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -348,16 +365,35 @@ export default function ExpenseSummaryPanel({ groupId }: Props) {
             {sortedSettlements.map((s, i) => (
               <li
                 key={`${s.fromUserId}-${s.toUserId}-${i}`}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 flex flex-wrap items-center justify-between gap-2"
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 flex flex-wrap items-center justify-between gap-3"
               >
                 <span className="font-bold text-gray-900">
                   <span className="text-amber-700">{s.fromDisplayName}</span>
                   <span className="text-gray-400 font-medium mx-2">pays</span>
                   <span className="text-gray-900">{s.toDisplayName}</span>
                 </span>
-                <span className="font-black text-lg text-gray-900 tabular-nums">
-                  {formatMoney(s.amount)}
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="font-black text-lg text-gray-900 tabular-nums">
+                    {formatMoney(s.amount)}
+                  </span>
+                  {uid && s.toUserId === uid ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-amber-200 text-amber-800 hover:bg-amber-50"
+                      onClick={() =>
+                        setPrModal({
+                          debtorUserId: s.fromUserId,
+                          debtorDisplayName: s.fromDisplayName,
+                          amount: s.amount,
+                        })
+                      }
+                    >
+                      Request payment
+                    </Button>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -365,6 +401,23 @@ export default function ExpenseSummaryPanel({ groupId }: Props) {
       </section>
         </>
       )}
+
+      {prModal ? (
+        <RequestPaymentModal
+          groupId={groupId}
+          open={!!prModal}
+          onOpenChange={(open) => {
+            if (!open) setPrModal(null);
+          }}
+          debtorUserId={prModal.debtorUserId}
+          debtorDisplayName={prModal.debtorDisplayName}
+          suggestedAmount={prModal.amount}
+          onSuccess={() => {
+            setPrModal(null);
+            onPaymentRequestCreated?.();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
