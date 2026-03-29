@@ -62,12 +62,12 @@ const userSchema = new mongoose.Schema({
       notifications: {
         tripReminders: { type: Boolean, default: false },
         friendRequests: { type: Boolean, defualt: false },
-        groupInvite: { type: Boolean, default: false }
+        groupInvites: { type: Boolean, default: false },
+        groupNotifitaions: { type: Boolean, default: false }
       },
       deletion: {
         requested: { type: Boolean, default: false },
-        requestedAt: { type: Date, default: null },
-        scheduledFor: { type: Date, default: null },
+        requestedAt: { type: Date, default: new Date() },
         reason: { type: String, default: "" },
       },
       security: {
