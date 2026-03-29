@@ -58,22 +58,20 @@ const userSchema = new mongoose.Schema({
   },
   preferences: { type: Map, of: Boolean },
   settings: {
-    type: {
-      notifications: {
-        tripReminders: { type: Boolean, default: false },
-        friendRequests: { type: Boolean, defualt: false },
-        groupInvites: { type: Boolean, default: false },
-        groupNotifitaions: { type: Boolean, default: false }
-      },
-      deletion: {
-        requested: { type: Boolean, default: false },
-        requestedAt: { type: Date, default: new Date() },
-        reason: { type: String, default: "" },
-      },
-      security: {
-        isStudentVerified: { type: Boolean, default: false },
-        passwordLastChanged: { type: Date, default: null },
-      },
+    notifications: {
+      tripReminders: { type: Boolean, default: false },
+      friendRequests: { type: Boolean, defualt: false },
+      groupInvites: { type: Boolean, default: false },
+      groupNotificaions: { type: Boolean, default: false }
+    },
+    deletion: {
+      requested: { type: Boolean, default: false },
+      requestedAt: { type: Date, default: new Date() },
+      reason: { type: String, default: "" },
+    },
+    security: {
+      isStudentVerified: { type: Boolean, default: false },
+      passwordLastChanged: { type: Date, default: null },
     },
   },
 });

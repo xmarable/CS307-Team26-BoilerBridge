@@ -38,7 +38,10 @@ export default async function MePage() {
   };
 
   const settingsData = {
-    
+    tripReminders: dbUser.settings.notifications.tripReminders,
+    friendRequests: dbUser.settings.notifications.friendRequests,
+    groupInvites: dbUser.settings.notifications.groupInvites,
+    groupNotifitaions: dbUser.settings.notifications.groupNotifitaions,
   }
 
   return (
