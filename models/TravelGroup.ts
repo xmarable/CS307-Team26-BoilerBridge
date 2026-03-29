@@ -116,6 +116,39 @@ const photoSchema = new mongoose.Schema(
   }
 );
 
+const paymentRequestSchema = new mongoose.Schema(
+  {
+    requestID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+    },
+    requesterID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+      required: true,
+    },
+    targetMemberID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    expenseID: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "declined"],
+      default: "pending",
+    },
+    createdAt: { type: Date, default: Date.now },
+    message: { type: String },
+    declineReason: { type: String },
+  },
+  { _id: false },
+);
+
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
   {
@@ -160,7 +193,11 @@ const travelGroupSchema = new mongoose.Schema(
     photos: {
       type: [photoSchema],
       default: []
-    }
+    },
+    paymentRequests: {
+      type: [paymentRequestSchema],
+      default: [],
+    },
   },
   { timestamps: true },
 );
