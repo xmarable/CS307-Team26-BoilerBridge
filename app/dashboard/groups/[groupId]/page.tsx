@@ -21,7 +21,8 @@ import {
   UserPlus,
   Search,
   X,
-  Image
+  Image,
+  AlignEndHorizontal
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -248,6 +249,12 @@ export default function GroupDashboard() {
               onClick={() => setActiveSection("itinerary")}
               icon={<Calendar size={22} />}
               label="Itinerary"
+            />
+            <SidebarButton
+              active={activeSection === "polls"}
+              onClick={() => setActiveSection("polls")}
+              icon={<AlignEndHorizontal size={22} />}
+              label="Polls"
             />
             <SidebarButton
               active={activeSection === "messages"}

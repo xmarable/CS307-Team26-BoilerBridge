@@ -5,6 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import TravelGroup from "@/models/TravelGroup";
 import z from "zod";
+import { uploadImage } from "@/lib/cloudinary";
 
 const ImageSchema = z.object({
     images: z.array(z.string().trim()).min(1)
@@ -38,7 +39,7 @@ async function verifyUser(params: Promise<any>) {
     return { group, userId: userId };
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {
@@ -59,13 +60,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
         image: i
     }));
 
+    for (const image of newImages) {
+        try {
+            const url = await uploadImage(image.image);
+
+            image.image = url;
+        } catch(e) {
+            return NextResponse.json(
+                { error: "Image upload failed"},
+                { status: 500 }
+            );
+        }
+    }
+
     info.group.photos.unshift(...newImages);
     await info.group.save();
 
     return NextResponse.json({ images: newImages }, { status: 200 });
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {
@@ -78,7 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     return NextResponse.json({ images: images }, { status: 200 });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {
