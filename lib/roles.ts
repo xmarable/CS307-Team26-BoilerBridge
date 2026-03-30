@@ -7,7 +7,9 @@ export async function getMemberPermissions(groupId: string, userId: string) {
   const group = await TravelGroup.findOne({ groupID: groupId });
   if (!group) return { error: "Group not found", status: 404 };
 
-  const member = group.membersList.find((m: any) => m.userId === userId);
+  const member = group.membersList.find(
+    (m: any) => String(m.userId) === String(userId),
+  );
   if (!member) return { error: "Access denied: Not a member", status: 403 };
 
   return {
