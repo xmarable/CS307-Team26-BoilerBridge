@@ -92,6 +92,9 @@ export async function GET(
       expenseID: String(row.expenseID),
       status: String(row.status) as "pending" | "paid" | "declined",
       createdAt: row.createdAt,
+      ...(row.confirmedAt != null
+        ? { confirmedAt: row.confirmedAt }
+        : {}),
       message: row.message != null ? String(row.message) : undefined,
       declineReason:
         row.declineReason != null ? String(row.declineReason) : undefined,
