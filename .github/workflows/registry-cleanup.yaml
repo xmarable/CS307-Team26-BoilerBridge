@@ -15,30 +15,28 @@ jobs:
       - name: Wait for Registry Lock
         run: |
           while doctl registry garbage-collection get-active >/dev/null 2>&1; do
-            sleep 20
+            echo "locked... waiting 30s"
+            sleep 30
           done
 
-      - name: Force Purge Old Manifests
+      - name: Break All Abandoned Links
         run: |
-          ALL_MANIFESTS=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header)
+          # build the whitelist: keep latest and all active pr tags
+          doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -E "latest|pr-" | awk '{print $1}' > kept_digests.txt
 
-          echo "$ALL_MANIFESTS" | while read -r line; do
-            DIGEST=$(echo "$line" | awk '{print $1}')
-            TAGS=$(echo "$line" | awk '{for(i=2;i<=NF;i++) printf "%s ", $i}')
-            
+          ALL_DIGESTS=$(doctl registry repository list-manifests boilerbridge --format Digest --no-header)
+
+          for DIGEST in $ALL_DIGESTS; do
             if [ "$DIGEST" = "Digest" ]; then continue; fi
             
-            if [ -z "$TAGS" ] || [ "$TAGS" = "[]" ] || [ "$TAGS" = " " ]; then
+            if grep -q "$DIGEST" kept_digests.txt; then
+              echo "KEEPING: $DIGEST"
+            else
+              echo "SEVERING LINK: $DIGEST"
               doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
-              continue
             fi
-            
-            if echo "$TAGS" | grep -qE "latest|pr-"; then
-              continue
-            fi
-            
-            doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
           done
 
-      - name: Start Final Prune
-        run: doctl registry garbage-collection start --include-untagged-manifests --force || true
+      - name: Start Deep Blobs Prune
+        run: |
+          doctl registry garbage-collection start --include-untagged-manifests --force || true

@@ -27,26 +27,32 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Delete registry image and prune orphans
+      - name: Break Registry Links and Deep Prune
         run: |
+          # wait for any active gc to finish so we dont hit 412
           while doctl registry garbage-collection get-active >/dev/null 2>&1; do
-            sleep 20
+            echo "waiting for registry lock... sleeping 30s"
+            sleep 30
           done
 
-          DIGEST=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep "pr-${{ github.event.number }}" | awk '{print $1}')
+          # build the whitelist: keep 'latest' and any pr- tag EXCEPT the one we just closed
+          doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -E "latest|pr-" | grep -v "pr-${{ github.event.number }}" | awk '{print $1}' > kept_digests.txt
 
-          if [ ! -z "$DIGEST" ]; then
-            doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
-          fi
+          # get all digests to find the orphans
+          ALL_DIGESTS=$(doctl registry repository list-manifests boilerbridge --format Digest --no-header)
 
-          UNTAGGED=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | awk '$2 == "" || $2 == "[]" {print $1}')
+          for DIGEST in $ALL_DIGESTS; do
+            if [ "$DIGEST" = "Digest" ]; then continue; fi
+            
+            if grep -q "$DIGEST" kept_digests.txt; then
+              echo "SAFE: $DIGEST"
+            else
+              echo "CUTTING LINK: $DIGEST"
+              doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
+            fi
+          done
 
-          if [ ! -z "$UNTAGGED" ]; then
-            for d in $UNTAGGED; do
-              doctl registry repository delete-manifest boilerbridge $d --force || true
-            done
-          fi
-
+          # tell DO to actually wipe the unlinked blobs
           doctl registry garbage-collection start --include-untagged-manifests --force || true
 
       - name: Deactivate GitHub Environment
