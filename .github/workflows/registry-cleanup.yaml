@@ -1,0 +1,59 @@
+name: Registry Deep Cleanup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Force Purge Old Manifests
+        run: |
+          echo "Fetching all manifests for boilerbridge repository..."
+
+          ALL_MANIFESTS=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header)
+
+          # loop through every single manifest line by line
+          echo "$ALL_MANIFESTS" | while read -r DIGEST TAGS; do
+            
+            # rule 1: if it has no tags at all, kill it immediately
+            if [ -z "$TAGS" ] || [ "$TAGS" = "[]" ] || [ "$TAGS" = "<none>" ]; then
+              echo "Deleting untagged manifest: $DIGEST"
+              doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
+              continue
+            fi
+
+            # rule 2: if the tag contains 'latest', keep it (protects production)
+            if echo "$TAGS" | grep -q "latest"; then
+              echo "Keeping LATEST manifest: $DIGEST ($TAGS)"
+              continue
+            fi
+
+            # rule 3: if the tag contains 'pr-', keep it (protects active team previews)
+            if echo "$TAGS" | grep -q "pr-"; then
+              echo "Keeping PR manifest: $DIGEST ($TAGS)"
+              continue
+            fi
+
+            # rule 4: if we get down here, it is an old commit hash or abandoned tag
+            echo "Deleting old/abandoned manifest: $DIGEST ($TAGS)"
+            doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
+            
+          done
+
+      - name: Trigger Aggressive GC
+        run: |
+          echo "Checking for active garbage collection processes..."
+
+          while doctl registry garbage-collection get-active >/dev/null 2>&1; do
+            echo "System is currently locked. Sleeping for 20 seconds..."
+            sleep 20
+          done
+
+          echo "Starting deep garbage collection..."
+          doctl registry garbage-collection start --include-untagged-manifests --force || true
