@@ -10,35 +10,38 @@ export async function POST(
 ) {
   try {
     await dbConnect();
+
     const { groupId } = await params;
 
-    // 1. fetch trip details
+    if (!groupId) {
+      return NextResponse.json(
+        { error: "Group ID is required." },
+        { status: 400 },
+      );
+    }
+
+    // 1. Fetch trip details
+    // using 'as any' on the query object satisfies the UUID/string type mismatch
     const trip = await Trip.findOne({ groupId: groupId as any });
     if (!trip) {
       return NextResponse.json(
-        {
-          error:
-            "Trip settings not found. Please ensure the Group ID exists in the Trip document.",
-        },
+        { error: "Trip settings not found for the provided Group ID." },
         { status: 404 },
       );
     }
 
-    // 2. validate dates from the trip doc to prevent 'Invalid Date' errors
+    // 2. Validate trip dates
     const startDate = new Date(trip.fromDate);
     const endDate = new Date(trip.toDate);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return NextResponse.json(
-        {
-          error:
-            "Trip dates in the database are invalid. Please check the MongoDB document.",
-        },
+        { error: "Invalid date range found in the trip configuration." },
         { status: 400 },
       );
     }
 
-    // 3. fetch approved must-haves
+    // 3. Fetch approved must-haves
     const approvedMustHaves = await MustHave.find({
       groupId: groupId as any,
       status: "approved",
@@ -46,18 +49,18 @@ export async function POST(
 
     if (approvedMustHaves.length === 0) {
       return NextResponse.json(
-        { error: "No approved must-haves found. Please approve items first." },
+        { error: "No approved items available to generate an itinerary." },
         { status: 400 },
       );
     }
 
-    // 4. wipe existing generated events
+    // 4. Clear existing generated itinerary events
     await CalendarEvent.deleteMany({
       groupId: groupId as any,
       source: "itinerary",
     });
 
-    // 5. distribution logic
+    // 5. Distribution logic
     const totalDays =
       Math.ceil(
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
@@ -65,7 +68,6 @@ export async function POST(
     const generatedEvents: any[] = [];
 
     approvedMustHaves.forEach((mh, index) => {
-      // logic to spread across days and slots (10am, 2pm, 6pm)
       const dayOffset = Math.floor(index / 3) % totalDays;
       const slot = index % 3;
 
@@ -91,24 +93,18 @@ export async function POST(
       });
     });
 
-    // 6. batch insert into the timeline
+    // 6. Batch insert generated events
     const created = await CalendarEvent.insertMany(generatedEvents);
-    if (created) {
-      return NextResponse.json({
-        message: "Itinerary sparked successfully.",
-        count: created.length,
-      });
-    }
 
     return NextResponse.json({
       message: "Itinerary sparked successfully.",
-      count: generatedEvents.length,
+      count: created.length,
     });
   } catch (err: any) {
-    console.error("Generation error:", err);
+    console.error("Itinerary generation error:", err);
     return NextResponse.json(
       {
-        error: "Internal server error during generation.",
+        error: "Internal server error during itinerary generation.",
         details: err.message,
       },
       { status: 500 },

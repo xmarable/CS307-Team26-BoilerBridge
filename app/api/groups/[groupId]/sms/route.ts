@@ -19,7 +19,7 @@ export async function POST(
   { params }: { params: Promise<{ groupId: string }> },
 ) {
   const session = await getServerSession(authOptions);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const userId = (session?.user as any)?.userId as string | undefined;
 
   if (!userId) {
@@ -41,7 +41,7 @@ export async function POST(
 
   if (
     !group.membersList.some(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (m: any) => m.userId.toString() === userId && m.role === "Leader",
     )
   ) {
@@ -60,7 +60,7 @@ export async function POST(
   const newSMS = {
     topic: "yes",
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   group.smsLogs.push(newSMS as any);
   await group.save();
 

@@ -34,7 +34,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
       required: true,
       validate: [
         {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           validator: function (this: any, value: Date) {
             return value > this.startTime;
           },

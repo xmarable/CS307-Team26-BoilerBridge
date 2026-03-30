@@ -13,7 +13,7 @@ export default async function MessagesPage() {
     return null;
   }
 
-  // eslint-disable-next-line
+   
   const userId = (session?.user as any)?.userId as string;
   const groups = await getUserGroups();
 

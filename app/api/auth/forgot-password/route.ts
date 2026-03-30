@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     sgMail.send(msg).then(() => {
         console.log("Email Sent")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     }).catch((e: any) => {
         console.log(e);
     })

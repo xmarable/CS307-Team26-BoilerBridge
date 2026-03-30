@@ -1,3 +1,4 @@
+ 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -27,7 +28,6 @@ import {
   Trash2,
   Edit3,
   Loader2,
-  CheckCircle,
   Lock,
 } from "lucide-react";
 
@@ -263,7 +263,7 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
             <Input
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              placeholder="Filter category..."
+              placeholder="Filter by category..."
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -277,40 +277,34 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
             <div className="p-3 bg-pink-500 rounded-2xl text-white shadow-lg shadow-pink-200">
               <Plus size={24} />
             </div>
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight lowercase">
-              new must-have
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+              New Must-Have Item
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1.5">
-              <Label className="text-gray-700 font-bold ml-1 lowercase">
-                name *
-              </Label>
+              <Label className="text-gray-700 font-bold ml-1">Name *</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="place or activity name"
+                placeholder="Place or activity name"
                 className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-gray-700 font-bold ml-1 lowercase">
-                category
-              </Label>
+              <Label className="text-gray-700 font-bold ml-1">Category</Label>
               <Input
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="food, museum, hike..."
+                placeholder="Food, museum, hike..."
                 className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
               />
             </div>
 
             <div className="md:col-span-2 space-y-1.5">
-              <Label className="text-gray-700 font-bold ml-1 lowercase">
-                address
-              </Label>
+              <Label className="text-gray-700 font-bold ml-1">Address</Label>
               <div className="relative">
                 <MapPin
                   className="absolute left-4 top-4 text-gray-400"
@@ -319,38 +313,36 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
                 <Input
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 main st..."
+                  placeholder="123 Main St..."
                   className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 pl-12 shadow-sm"
                 />
               </div>
             </div>
 
             <div className="md:col-span-2 space-y-1.5">
-              <Label className="text-gray-700 font-bold ml-1 lowercase">
-                notes
-              </Label>
+              <Label className="text-gray-700 font-bold ml-1">Notes</Label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="why is this a must-have?"
+                placeholder="Describe why this is essential"
                 className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-gray-700 font-bold ml-1 lowercase">
-                priority (1-5)
+              <Label className="text-gray-700 font-bold ml-1">
+                Priority (1-5)
               </Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl">
-                  <SelectItem value="1">1 (low)</SelectItem>
+                  <SelectItem value="1">1 (Low)</SelectItem>
                   <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3 (normal)</SelectItem>
+                  <SelectItem value="3">3 (Normal)</SelectItem>
                   <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5 (high)</SelectItem>
+                  <SelectItem value="5">5 (High)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -361,20 +353,20 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
                 disabled={creating || !name.trim()}
                 className="w-full h-14 bg-pink-500 hover:bg-pink-600 text-white font-black rounded-2xl shadow-xl shadow-pink-200 transition-all active:scale-95 uppercase tracking-widest"
               >
-                {creating ? "adding…" : "add must-have"}
+                {creating ? "Adding..." : "Add Must-Have"}
               </Button>
             </div>
           </div>
           {err && (
-            <p className="mt-4 text-sm text-red-600 font-bold text-center lowercase">
+            <p className="mt-4 text-sm text-red-600 font-bold text-center">
               {err}
             </p>
           )}
         </div>
       ) : (
         <div className="bg-pink-50 p-6 rounded-[2.5rem] border border-dashed border-pink-200 text-center">
-          <p className="text-pink-400 font-bold flex items-center justify-center gap-2 lowercase">
-            <Lock size={16} /> read-only mode
+          <p className="text-pink-400 font-bold flex items-center justify-center gap-2">
+            <Lock size={16} /> Read-Only Mode
           </p>
         </div>
       )}
@@ -382,11 +374,11 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
       {/* Items List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
-          <h3 className="text-lg font-black text-gray-900 tracking-tight lowercase">
-            wishlist
+          <h3 className="text-lg font-black text-gray-900 tracking-tight">
+            Must-Have Wishlist
           </h3>
           <Badge className="bg-pink-100 text-pink-700 border-none px-3 py-1 rounded-full font-bold">
-            {items.length} items
+            {items.length} Items
           </Badge>
         </div>
 
@@ -397,8 +389,8 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
         ) : items.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
             <Heart className="mx-auto text-gray-300 mb-2" size={40} />
-            <p className="text-gray-400 font-bold lowercase">
-              no must-haves saved yet lol
+            <p className="text-gray-400 font-bold">
+              No items found in the wishlist.
             </p>
           </div>
         ) : (
@@ -420,7 +412,7 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
 
                 <div className="flex justify-between items-start mb-3">
                   <div className="min-w-0">
-                    <h4 className="font-black text-gray-900 text-lg truncate lowercase">
+                    <h4 className="font-black text-gray-900 text-lg truncate">
                       {it.name}
                     </h4>
                     {it.category && (
@@ -470,7 +462,7 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
                         onClick={() => handleQuickApprove(it._id)}
                         className="h-7 px-2 rounded-lg text-green-600 hover:bg-green-50 font-black text-[10px] uppercase tracking-tighter"
                       >
-                        approve
+                        Approve
                       </Button>
                     )}
                   </div>
@@ -506,16 +498,14 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight lowercase">
-              modify must-have
+            <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight">
+              Update Must-Have Details
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
-              <Label className="font-bold text-gray-700 ml-1 lowercase">
-                status
-              </Label>
+              <Label className="font-bold text-gray-700 ml-1">Status</Label>
               <Select
                 value={editStatus}
                 onValueChange={(v) => setEditStatus(v as MustHave["status"])}
@@ -524,16 +514,16 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="proposed">proposed</SelectItem>
-                  <SelectItem value="approved">approved</SelectItem>
-                  <SelectItem value="rejected">rejected</SelectItem>
+                  <SelectItem value="proposed">Proposed</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="font-bold text-gray-700 ml-1 lowercase">
-                priority (1-5)
+              <Label className="font-bold text-gray-700 ml-1">
+                Priority (1-5)
               </Label>
               <Select value={editPriority} onValueChange={setEditPriority}>
                 <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900">
@@ -542,7 +532,7 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
                 <SelectContent className="rounded-xl">
                   {[1, 2, 3, 4, 5].map((p) => (
                     <SelectItem key={p} value={String(p)}>
-                      priority {p}
+                      Priority {p}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -550,9 +540,7 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="font-bold text-gray-700 ml-1 lowercase">
-                notes
-              </Label>
+              <Label className="font-bold text-gray-700 ml-1">Notes</Label>
               <Input
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
@@ -566,16 +554,16 @@ export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
               variant="ghost"
               onClick={() => setEditOpen(false)}
               disabled={savingEdit}
-              className="rounded-xl font-bold text-gray-500 lowercase"
+              className="rounded-xl font-bold text-gray-500"
             >
-              cancel
+              Cancel
             </Button>
             <Button
               onClick={saveEdit}
               disabled={savingEdit}
               className="rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-black px-6 shadow-lg shadow-pink-100 uppercase"
             >
-              {savingEdit ? "saving…" : "update item"}
+              {savingEdit ? "Saving..." : "Update Item"}
             </Button>
           </DialogFooter>
         </DialogContent>

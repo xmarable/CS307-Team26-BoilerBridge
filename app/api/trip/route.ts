@@ -5,9 +5,42 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
+import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+
+const createInitialItinerary = (fromDate: Date, toDate: Date) => {
+  const MOCK_ACTIVITIES = [
+    { name: "Morning Park Walk", category: "Nature", isOutdoor: true },
+    { name: "Downtown Sightseeing", category: "Tourism", isOutdoor: true },
+    { name: "Visit Local Museum", category: "Culture", isOutdoor: false },
+    { name: "Beach Hangout", category: "Leisure", isOutdoor: true },
+  ];
+
+  const days =
+    Math.ceil(
+      (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24),
+    ) || 1;
+
+  const primary = Array.from({ length: days }).map((_, i) => {
+    const activity = MOCK_ACTIVITIES[i % MOCK_ACTIVITIES.length];
+    const date = new Date(fromDate);
+    date.setDate(date.getDate() + i);
+
+    return {
+      ...activity,
+      activityId: `mock-${i}`,
+      startTime: new Date(date.setHours(10, 0)),
+      endTime: new Date(date.setHours(12, 0)),
+    };
+  });
+
+  const rainyDay = generateRainyDayPlan(primary);
+  return { primary, rainyDay };
+};
 
 const tripSchema = z.object({
-  groupID: z.string().uuid(),
+  // changed to accept groupId from frontend while keeping UUID validation
+  groupId: z.string().uuid().optional(),
+  groupID: z.string().uuid().optional(),
   fromCity: z.string().min(1),
   toCity: z.string().min(1),
   fromDate: z.coerce.date(),
@@ -29,8 +62,6 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-
-    // Validate using zod
     const result = tripSchema.safeParse(body);
 
     if (!result.success) {
@@ -40,18 +71,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const {
-      groupID,
-      fromCity,
-      toCity,
-      fromDate,
-      toDate,
-      mode,
-      budget,
-      tripConfirmed,
-    } = result.data;
+    // logic: Normalize the ID from either groupId or groupID to match the model
+    const groupID = result.data.groupID || result.data.groupId;
 
-    // AC Check: Block request if the user is a 'Viewer'
+    if (!groupID) {
+      return NextResponse.json(
+        { error: "Group ID is required" },
+        { status: 400 },
+      );
+    }
+
+    const fromCity = result.data.fromCity;
+    const toCity = result.data.toCity;
+    const fromDate = result.data.fromDate;
+    const toDate = result.data.toDate;
+    const mode = result.data.mode;
+    const budget = result.data.budget;
+    const tripConfirmed = result.data.tripConfirmed;
+
     const permissionResult = (await getMemberPermissions(
       groupID,
       userId,
@@ -71,6 +108,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { primary, rainyDay } = createInitialItinerary(
+      new Date(fromDate),
+      new Date(toDate),
+    );
+
     const trip = await Trip.create({
       userId,
       groupID,
@@ -81,11 +123,13 @@ export async function POST(req: NextRequest) {
       mode,
       budget: Number(budget),
       tripConfirmed: tripConfirmed ?? false,
+      primaryItinerary: primary,
+      rainyDayItinerary: rainyDay,
     });
 
     return NextResponse.json(
       {
-        tripID: trip.tripID.toString(),
+        tripID: trip._id.toString(),
         userId: trip.userId.toString(),
         groupID: trip.groupID.toString(),
         fromCity: trip.fromCity,
@@ -95,6 +139,8 @@ export async function POST(req: NextRequest) {
         mode: trip.mode,
         budget: trip.budget,
         tripConfirmed: trip.tripConfirmed,
+        primaryItinerary: trip.primaryItinerary,
+        rainyDayItinerary: trip.rainyDayItinerary,
       },
       { status: 201 },
     );
@@ -118,11 +164,10 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Query using the userId string
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
     const payload = trips.map((t: any) => ({
-      tripID: t.tripID.toString(),
+      tripID: t._id.toString(),
       userId: t.userId.toString(),
       groupID: t.groupID?.toString(),
       fromCity: t.fromCity,
@@ -132,6 +177,8 @@ export async function GET() {
       mode: t.mode,
       budget: t.budget,
       tripConfirmed: t.tripConfirmed,
+      primaryItinerary: t.primaryItinerary,
+      rainyDayItinerary: t.rainyDayItinerary,
     }));
 
     return NextResponse.json(payload, { status: 200 });
