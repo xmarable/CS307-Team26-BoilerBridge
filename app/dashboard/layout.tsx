@@ -6,6 +6,7 @@ import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import { redirect } from "next/navigation";
 import { SOSButton } from "@/components/SOSButton";
+import { Toaster } from "sonner";
 
 export default async function DashboardLayout({
   children,
@@ -60,6 +61,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <SOSButton />
+      <Toaster richColors position="top-center" />
     </div>
   );
 }

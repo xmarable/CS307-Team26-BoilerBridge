@@ -143,6 +143,7 @@ const paymentRequestSchema = new mongoose.Schema(
       default: "pending",
     },
     createdAt: { type: Date, default: Date.now },
+    confirmedAt: { type: Date },
     message: { type: String },
     declineReason: { type: String },
   },
