@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import SharedCost from "@/models/SharedCost";
 import TravelGroup from "@/models/TravelGroup";
 import dbConnect from "@/lib/dbConnect";
-
+// Change this import if your auth config file uses a different path
 import { authOptions } from "@/lib/auth";
 
 function getSessionUserIds(session: any): string[] {
@@ -185,6 +185,63 @@ export async function PUT(
     console.error("PUT shared-cost error:", error);
     return NextResponse.json(
       { error: "Failed to update shared cost" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { groupId: string; id: string } }
+) {
+  try {
+    await dbConnect();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userIds = getSessionUserIds(session);
+    if (userIds.length === 0) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const group = await TravelGroup.findById(params.groupId);
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+
+    if (!isGroupMember(group, userIds) && !isGroupLeader(group, userIds)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const existingSharedCost = await SharedCost.findOne({
+      _id: params.id,
+      groupId: params.groupId,
+    });
+
+    if (!existingSharedCost) {
+      return NextResponse.json({ error: "Shared cost not found" }, { status: 404 });
+    }
+
+    if (!isCreator(existingSharedCost, userIds) && !isGroupLeader(group, userIds)) {
+      return NextResponse.json(
+        { error: "Only the creator or group admin can delete this shared cost" },
+        { status: 403 }
+      );
+    }
+
+    await SharedCost.findByIdAndDelete(params.id);
+
+    return NextResponse.json(
+      { message: "Shared cost deleted successfully" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("DELETE shared-cost error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete shared cost" },
       { status: 500 }
     );
   }
