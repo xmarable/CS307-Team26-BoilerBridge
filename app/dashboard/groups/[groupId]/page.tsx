@@ -33,6 +33,7 @@ import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 
 type GroupSummary = {
     groupID: string;
@@ -477,6 +478,18 @@ export default function GroupDashboard() {
               }}
               userId={group.currentUserId}
               isLeader={isLeader}
+            />
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+            <GroupPollsPanel 
+              activeGroup={{
+                groupID: group.groupID,
+                groupName: group.groupName,
+              }}
+              userId={group.currentUserId}
             />
             </div>
           )}
