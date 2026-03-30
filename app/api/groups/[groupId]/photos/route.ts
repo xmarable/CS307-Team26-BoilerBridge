@@ -5,6 +5,7 @@ import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import TravelGroup from "@/models/TravelGroup";
 import z from "zod";
+import { uploadImage } from "@/lib/cloudinary";
 
 const ImageSchema = z.object({
     images: z.array(z.string().trim()).min(1)
@@ -58,6 +59,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
         uploaderID: info.userId,
         image: i
     }));
+
+    for (const image of newImages) {
+        try {
+            const url = await uploadImage(image.image);
+
+            image.image = url;
+        } catch(e) {
+            return NextResponse.json(
+                { error: "Image upload failed"},
+                { status: 500 }
+            );
+        }
+    }
 
     info.group.photos.unshift(...newImages);
     await info.group.save();

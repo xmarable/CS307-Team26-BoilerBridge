@@ -175,7 +175,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
     <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="mb-8 flex justify-between items-start">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
           <p className="text-gray-500 text-sm">
             Update your public profile and verification status.
           </p>
@@ -352,7 +352,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
             disabled={loading}
             className="w-full bg-amber-500 text-white font-bold py-3.5 rounded-xl hover:bg-amber-600 shadow-md disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            {loading ? "Saving Changes..." : "Save Settings"}
+            {loading ? "Saving Changes..." : "Update Profile"}
           </button>
           {success && (
             <p className="text-center text-sm font-medium text-green-600 animate-pulse">

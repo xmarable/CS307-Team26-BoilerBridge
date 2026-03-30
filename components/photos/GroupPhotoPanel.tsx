@@ -11,6 +11,7 @@ type GroupSummary = {
 }
 
 type PhotoSummary = {
+    photoId: string;
     uploaderID: string;
     image: string;
 }
@@ -143,7 +144,7 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
                                     </div>
                                     { (userId === p.uploaderID || isLeader) &&
                                         <div className="px-3 py-2 text-xs text-gray-500">
-                                            <button onClick={() => console.log("Trash pressed")}>
+                                            <button onClick={() => console.log(`Trash pressed ${p.photoId}`)}>
                                                 <Trash2 size={10} />
                                             </button>
                                         </div>
