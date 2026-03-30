@@ -15,7 +15,7 @@ jobs:
   closed:
     runs-on: ubuntu-latest
     steps:
-      - name: delete preview app
+      - name: Delete preview app
         uses: digitalocean/app_action/delete@v2
         with:
           from_pr_preview: "true"
@@ -29,22 +29,33 @@ jobs:
 
       - name: Delete registry image and prune orphans
         run: |
+          # delete the specific pr manifest first
           DIGEST=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep "pr-${{ github.event.number }}" | awk '{print $1}')
 
           if [ ! -z "$DIGEST" ]; then
+            echo "deleting pr manifest $DIGEST"
             doctl registry repository delete-manifest boilerbridge "$DIGEST" --force
           fi
 
+          # forcefully nuke all untagged manifests so gc actually works
           UNTAGGED=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | awk '$2 == "" || $2 == "[]" {print $1}')
 
           if [ ! -z "$UNTAGGED" ]; then
             for digest in $UNTAGGED; do
-              doctl registry repository delete-manifest boilerbridge $digest --force
+              echo "deleting untagged manifest $digest"
+              doctl registry repository delete-manifest boilerbridge $digest --force || true
             done
           fi
 
-          sleep 5
-          doctl registry garbage-collection start --include-untagged-manifests --force
+          # retry loop for 409 errors
+          echo "checking for active garbage collection..."
+          while doctl registry garbage-collection get-active >/dev/null 2>&1; do
+            echo "gc is currently running. sleeping for 20s..."
+            sleep 20
+          done
+
+          echo "starting new garbage collection..."
+          doctl registry garbage-collection start --include-untagged-manifests --force || true
 
       - name: Deactivate GitHub Environment
         uses: actions/github-script@v7

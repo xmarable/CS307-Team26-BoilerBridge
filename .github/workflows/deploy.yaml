@@ -58,7 +58,3 @@ jobs:
           app_name: "cs307-team26-boilerbridge"
           print_build_logs: true
           print_deploy_logs: true
-
-      - name: Clean up old images
-        if: success()
-        run: doctl registry garbage-collection start --include-untagged-manifests --force

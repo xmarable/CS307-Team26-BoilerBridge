@@ -47,9 +47,6 @@ jobs:
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
 
-      - name: Clean up old images
-        run: doctl registry garbage-collection start --include-untagged-manifests --force
-
       - name: Deploy PR Preview
         id: deploy
         uses: digitalocean/app_action/deploy@v2
