@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2, ChevronLeft } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -21,9 +21,13 @@ interface MustHaveRow {
 export default function TripPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const params = useParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([]);
+
+  // Get the groupId from the URL parameters
+  const groupId = params?.groupId as string | undefined;
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -42,9 +46,13 @@ export default function TripPage() {
     setMustHaves((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const updateMustHave = (id: string, field: "name" | "address", value: string) => {
+  const updateMustHave = (
+    id: string,
+    field: "name" | "address",
+    value: string,
+  ) => {
     setMustHaves((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
     );
   };
 
@@ -57,10 +65,15 @@ export default function TripPage() {
       const formData = new FormData(e.currentTarget);
 
       const mustHaveList = mustHaves
-        .map((r) => ({ name: r.name.trim(), address: r.address.trim() || undefined }))
+        .map((r) => ({
+          name: r.name.trim(),
+          address: r.address.trim() || undefined,
+        }))
         .filter((r) => r.name.length > 0);
 
+      // logic: include the groupId in the payload to ensure trip settings link correctly
       const payload = {
+        groupId: groupId,
         fromCity: String(formData.get("fromCity") || "").trim(),
         toCity: String(formData.get("toCity") || "").trim(),
         fromDate: String(formData.get("fromDate") || ""),
@@ -71,11 +84,25 @@ export default function TripPage() {
         mustHaves: mustHaveList,
       };
 
-      if (!payload.fromCity || !payload.toCity || !payload.fromDate || !payload.toDate) {
+      if (
+        !payload.fromCity ||
+        !payload.toCity ||
+        !payload.fromDate ||
+        !payload.toDate
+      ) {
         setError("Please fill all required fields.");
         setLoading(false);
         return;
       }
+
+      if (!payload.groupId) {
+        setError(
+          "Missing group context. Please create the trip from within a group.",
+        );
+        setLoading(false);
+        return;
+      }
+
       if (Number.isNaN(payload.budget) || payload.budget <= 0) {
         setError("Budget must be a positive number.");
         setLoading(false);
@@ -91,7 +118,11 @@ export default function TripPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Failed to create trip.");
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to create trip.",
+        );
         setLoading(false);
         return;
       }
@@ -118,7 +149,11 @@ export default function TripPage() {
       <main className="max-w-xl mx-auto p-4 md:p-8">
         <div className="mb-6">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-gray-700 hover:text-gray-900 hover:bg-gray-200/60">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 -ml-2 text-gray-700 hover:text-gray-900 hover:bg-gray-200/60"
+            >
               <ChevronLeft className="h-4 w-4" />
               Back to dashboard
             </Button>
@@ -135,22 +170,46 @@ export default function TripPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="fromCity">From City</Label>
-                <Input id="fromCity" name="fromCity" placeholder="e.g. Chicago" required className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300" />
+                <Input
+                  id="fromCity"
+                  name="fromCity"
+                  placeholder="e.g. Chicago"
+                  required
+                  className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="toCity">To City</Label>
-                <Input id="toCity" name="toCity" placeholder="e.g. Miami" required className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300" />
+                <Input
+                  id="toCity"
+                  name="toCity"
+                  placeholder="e.g. Miami"
+                  required
+                  className="mt-1 text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
+                />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="fromDate">From Date</Label>
-                <Input id="fromDate" name="fromDate" type="date" required className="mt-1 text-gray-900 bg-white border-gray-300" />
+                <Input
+                  id="fromDate"
+                  name="fromDate"
+                  type="date"
+                  required
+                  className="mt-1 text-gray-900 bg-white border-gray-300"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="toDate">To Date</Label>
-                <Input id="toDate" name="toDate" type="date" required className="mt-1 text-gray-900 bg-white border-gray-300" />
+                <Input
+                  id="toDate"
+                  name="toDate"
+                  type="date"
+                  required
+                  className="mt-1 text-gray-900 bg-white border-gray-300"
+                />
               </div>
             </div>
 
@@ -186,7 +245,9 @@ export default function TripPage() {
 
             <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
               <div className="flex items-center justify-between mb-3">
-                <Label className="text-base font-medium text-gray-900">Must-have activities</Label>
+                <Label className="text-base font-medium text-gray-900">
+                  Must-have activities
+                </Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -202,22 +263,31 @@ export default function TripPage() {
                 Add places or activities you don’t want to miss on this trip.
               </p>
               {mustHaves.length === 0 ? (
-                <p className="text-sm text-gray-400 py-2">No activities added yet.</p>
+                <p className="text-sm text-gray-400 py-2">
+                  No activities added yet.
+                </p>
               ) : (
                 <ul className="space-y-3">
                   {mustHaves.map((row) => (
-                    <li key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <li
+                      key={row.id}
+                      className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                    >
                       <div className="flex-1 grid gap-2 sm:grid-cols-2">
                         <Input
                           placeholder="Activity or place name"
                           value={row.name}
-                          onChange={(e) => updateMustHave(row.id, "name", e.target.value)}
+                          onChange={(e) =>
+                            updateMustHave(row.id, "name", e.target.value)
+                          }
                           className="text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
                         />
                         <Input
                           placeholder="Address (optional)"
                           value={row.address}
-                          onChange={(e) => updateMustHave(row.id, "address", e.target.value)}
+                          onChange={(e) =>
+                            updateMustHave(row.id, "address", e.target.value)
+                          }
                           className="text-gray-900 placeholder:text-gray-400 bg-white border-gray-300"
                         />
                       </div>
@@ -238,12 +308,20 @@ export default function TripPage() {
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer">
-              <input name="tripConfirmed" type="checkbox" className="rounded border-gray-300 text-amber-600 focus:ring-amber-500" />
-              <span className="text-sm font-medium text-gray-700">Trip confirmed?</span>
+              <input
+                name="tripConfirmed"
+                type="checkbox"
+                className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Trip confirmed?
+              </span>
             </label>
 
             {error && (
-              <p className="text-sm text-red-600" role="alert">{error}</p>
+              <p className="text-sm text-red-600" role="alert">
+                {error}
+              </p>
             )}
 
             <Button

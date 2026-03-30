@@ -52,7 +52,7 @@ export function Navbar({ session }: { session?: any }) {
                 <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
                   {profileImage ? (
                     /* Standard img tag bypasses Shadcn/Avatar hydration lag */
-                    /* eslint-disable-next-line @next/next/no-img-element */
+                     
                     <img
                       src={profileImage}
                       alt={displayName}

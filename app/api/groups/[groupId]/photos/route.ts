@@ -10,7 +10,7 @@ const ImageSchema = z.object({
     images: z.array(z.string().trim()).min(1)
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 async function verifyUser(params: Promise<any>) {
     // Verify user logged in
     const session = await getServerSession(authOptions);
@@ -38,7 +38,7 @@ async function verifyUser(params: Promise<any>) {
     return { group, userId: userId };
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     return NextResponse.json({ images: newImages }, { status: 200 });
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     return NextResponse.json({ images: images }, { status: 200 });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ groupId: String }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ groupId: string }> }) {
     const info = await verifyUser(params);
 
     if (!info) {

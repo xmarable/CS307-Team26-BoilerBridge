@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "./ui/button";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 export default function MobileMenu({ isAuthed }: { isAuthed: boolean }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
