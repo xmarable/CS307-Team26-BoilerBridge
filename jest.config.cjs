@@ -1,4 +1,3 @@
-/* eslint-disable import/no-anonymous-default-export */
 // Jest config for Node + ESM support
 module.exports = {
   testEnvironment: "node",

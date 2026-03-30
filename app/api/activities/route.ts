@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    let activity = await Activity.findOne({ placeId: placeId.trim() }).lean();
+    const activity = await Activity.findOne({ placeId: placeId.trim() }).lean();
 
     if (!activity) {
       const created = await Activity.create({

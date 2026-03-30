@@ -1,10 +1,12 @@
+ 
 "use client";
 
 import { GroupBoard } from "./GroupBoard";
 import { Users, ShieldCheck, MapPin, Calendar } from "lucide-react";
+import { RainyDayToggle } from "./RainyDayToggle";
 
 export function GroupTripView({ initialData }: { initialData: any }) {
-  const { group, members, canManage, userRole } = initialData;
+  const { group, members, canManage, userRole, trip } = initialData;
 
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
@@ -38,13 +40,23 @@ export function GroupTripView({ initialData }: { initialData: any }) {
             isLeader={canManage}
           />
 
-          {/* Placeholder for future Sprint tasks (Itinerary/Expenses) */}
-          <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2.5rem] h-64 flex flex-col items-center justify-center text-gray-400">
-            <Calendar size={40} className="mb-2 opacity-20" />
-            <p className="font-bold uppercase tracking-widest text-xs">
-              Itinerary Coming Soon
-            </p>
-          </div>
+          {/* User Story #8: Rainy Day Plans toggle & comparison */}
+          {trip ? (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                <Calendar className="text-amber-500" />
+                Trip Itinerary
+              </h2>
+              <RainyDayToggle trip={trip} />
+            </div>
+          ) : (
+            <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2.5rem] h-64 flex flex-col items-center justify-center text-gray-400">
+              <Calendar size={40} className="mb-2 opacity-20" />
+              <p className="font-bold uppercase tracking-widest text-xs">
+                No Itinerary Generated Yet
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Sidebar Area */}

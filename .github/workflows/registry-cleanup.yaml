@@ -1,0 +1,42 @@
+name: Registry Deep Cleanup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Wait for Registry Lock
+        run: |
+          while doctl registry garbage-collection get-active >/dev/null 2>&1; do
+            echo "locked... waiting 30s"
+            sleep 30
+          done
+
+      - name: Break All Abandoned Links
+        run: |
+          # build the whitelist: keep latest and all active pr tags
+          doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -E "latest|pr-" | awk '{print $1}' > kept_digests.txt
+
+          ALL_DIGESTS=$(doctl registry repository list-manifests boilerbridge --format Digest --no-header)
+
+          for DIGEST in $ALL_DIGESTS; do
+            if [ "$DIGEST" = "Digest" ]; then continue; fi
+            
+            if grep -q "$DIGEST" kept_digests.txt; then
+              echo "KEEPING: $DIGEST"
+            else
+              echo "SEVERING LINK: $DIGEST"
+              doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
+            fi
+          done
+
+      - name: Start Deep Blobs Prune
+        run: |
+          doctl registry garbage-collection start --include-untagged-manifests --force || true

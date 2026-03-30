@@ -7,48 +7,66 @@ import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 
 const MessageSchema = z.object({
-    content: z.string().trim().min(1, "Message cannot be empty").max(500, "Message too long")
-})
+  content: z
+    .string()
+    .trim()
+    .min(1, "Message cannot be empty")
+    .max(500, "Message too long"),
+});
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ groupId: String }>}) {
-    const session = await getServerSession(authOptions);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userId = (session?.user as any)?.userId as string | undefined;
-    if (!userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ groupId: string }> },
+) {
+  const session = await getServerSession(authOptions);
 
-    await dbConnect();
-    const user = await User.findOne({ userId: userId });
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized"}, { status: 401});
-    }
+  const userId = (session?.user as { userId?: string })?.userId as
+    | string
+    | undefined;
 
-    const { groupId } = await params;
-    const group = await TravelGroup.findOne({ groupID: groupId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!group.membersList.some((m: any) => m.userId.toString() === userId && m.role === "Leader")) {
-        return NextResponse.json({ error: "Unauthorized"}, { status: 401});
-    }
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    const body = await req.json();
-    const message = MessageSchema.safeParse(body);
-    if (!message.success) {
-        return NextResponse.json(
-            { error: "Invalid Message", details: message.error.flatten()},
-            { status: 400 }
-        );
-    }
+  await dbConnect();
+  const user = await User.findOne({ userId: userId });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    const newSMS = {
-        topic: "yes"
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    group.smsLogs.push(newSMS as any);
-    await group.save();
+  const { groupId } = await params;
+  const group = await TravelGroup.findOne({ groupID: groupId });
 
-    // TODO send sms' with twilio
+  if (!group) {
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
+  }
 
+  if (
+    !group.membersList.some(
+      (m: { userId: { toString(): string }; role: string }) =>
+        m.userId.toString() === userId && m.role === "Leader",
+    )
+  ) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    return NextResponse.json({ message: "Success" }, { status: 201 });
+  const body = await req.json();
+  const message = MessageSchema.safeParse(body);
+  if (!message.success) {
+    return NextResponse.json(
+      { error: "Invalid Message", details: message.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const newSMS = {
+    topic: "yes",
+  };
+
+  group.smsLogs.push(newSMS as never);
+  await group.save();
+
+  // TODO send sms' with twilio
+
+  return NextResponse.json({ message: "Success" }, { status: 201 });
 }

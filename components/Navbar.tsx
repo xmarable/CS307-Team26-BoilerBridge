@@ -52,7 +52,7 @@ export function Navbar({ session }: { session?: any }) {
                 <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
                   {profileImage ? (
                     /* Standard img tag bypasses Shadcn/Avatar hydration lag */
-                    /* eslint-disable-next-line @next/next/no-img-element */
+                     
                     <img
                       src={profileImage}
                       alt={displayName}
@@ -101,7 +101,7 @@ export function Navbar({ session }: { session?: any }) {
 
               <DropdownMenuItem asChild>
                 <Link
-                  href="/account-settings"
+                  href="/dashboard/profile"
                   className="flex items-center w-full px-2 py-2 text-sm text-gray-700 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />

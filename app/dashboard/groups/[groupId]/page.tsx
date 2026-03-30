@@ -21,7 +21,8 @@ import {
   UserPlus,
   Search,
   X,
-  Image
+  Image,
+  AlignEndHorizontal
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -194,7 +195,7 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-(--突破-7xl) mx-auto space-y-10">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Link href="/dashboard">
@@ -259,6 +260,12 @@ export default function GroupDashboard() {
               label="Expense summary"
             />
             <SidebarButton
+              active={activeSection === "polls"}
+              onClick={() => setActiveSection("polls")}
+              icon={<AlignEndHorizontal size={22} />}
+              label="Polls"
+            />
+            <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
               icon={<MessageSquare size={22}/>}
@@ -304,6 +311,22 @@ export default function GroupDashboard() {
                   refreshKey={paymentRequestsRefresh}
                 />
               ) : null}
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-violet-50 rounded-xl text-violet-600">
+                  <AlignEndHorizontal size={22} />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                  Polls
+                </h2>
+              </div>
+              <p className="text-gray-500 font-medium">
+                Group polls will appear here.
+              </p>
             </div>
           )}
 

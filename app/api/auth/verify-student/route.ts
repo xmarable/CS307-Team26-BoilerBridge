@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
 import VerificationCode from "@/models/VerificationCode";
 import dbConnect from "@/lib/dbConnect";
+import sgMail from "@sendgrid/mail"
 
 export async function POST(req: NextRequest) {
   await dbConnect();
@@ -35,6 +36,26 @@ export async function POST(req: NextRequest) {
 
     // Replace with your actual mailer utility
     console.log(`Sending code ${verificationOtp} to ${email}`);
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
+
+    const msg = {
+      to: email,
+      from: "boilerbridge307@gmail.com",
+      subject: "BoilerBridge Student Verification",
+      test: `Verirification Code: ${code}`,
+      html: `
+            <p>User this code to verify your student status:</p>
+            <p>${code}</p>
+            <p>if u didn't request this u can just ignore it lol</p>
+        `
+    }
+
+    try {
+      await sgMail.send(msg);
+      console.log("Email Sent");
+    } catch (e) {
+      console.error("Sendgrid Error:", e);
+    }
 
     return NextResponse.json({ message: "Code sent" });
   }

@@ -11,7 +11,7 @@ import { Footer } from "./Footer";
 import { useState } from "react";
 
 export function ResetPassword() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -45,7 +45,7 @@ export function ResetPassword() {
         <div className="grid md:grid-cols-2">
           <div className="hidden md:block relative bg-linear-to-br from-amber-500 to-orange-600 p-12">
             <div className="absolute inset-0 opacity-20">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src="https://images.unsplash.com/photo-1542909359-544eb870c007?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmF2ZWwlMjBtYXAlMjBiYWNrcGFjayUyMGlsbHVzdHJhdGlvbnxlbnwxfHx8fDE3NzEwMDgzOTB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
                 alt="Travel"

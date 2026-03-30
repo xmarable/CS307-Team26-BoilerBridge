@@ -12,11 +12,14 @@ await jest.unstable_mockModule("next-auth/react", () => ({
   })),
 }));
 
-// 2. Mock next/navigation
+// 2. Mock next/navigation - Added useParams to prevent SyntaxError since the component now uses it
 await jest.unstable_mockModule("next/navigation", () => ({
   useRouter: jest.fn(() => ({
     push: jest.fn(),
     replace: jest.fn(),
+  })),
+  useParams: jest.fn(() => ({
+    groupId: "15105263-6166-40c8-977a-a3575375bc58", // mock the group context for the test
   })),
 }));
 
@@ -31,6 +34,7 @@ await import("next/navigation");
 await import("@/components/Navbar");
 
 // 5. Dynamic import of the component
+// logic: ensured this path matches your actual file structure to avoid import failures
 const TripPage = (await import("@/app/dashboard/trip/page")).default;
 
 describe("TripPage", () => {
@@ -133,6 +137,10 @@ describe("TripPage", () => {
     const [url, options]: any = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe("/api/trip");
     expect(options.method).toBe("POST");
+
+    // verification: ensure the groupId from useParams is passed in the payload
+    const body = JSON.parse(options.body);
+    expect(body.groupId).toBe("15105263-6166-40c8-977a-a3575375bc58");
 
     await waitFor(() => {
       expect(window.location.href).toBe("/alltrips");
