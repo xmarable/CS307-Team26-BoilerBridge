@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userId = (session?.user as any)?.userId as string | undefined;
     if (!userId) {
-        return null;
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await dbConnect();
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     const { groupId } = await params;
     const group = await TravelGroup.findOne({ groupID: groupId });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!group.membersList.some((m: any) => m.userId.toString === userId && m.role === "Leader")) {
+    if (!group.membersList.some((m: any) => m.userId.toString() === userId && m.role === "Leader")) {
         return NextResponse.json({ error: "Unauthorized"}, { status: 401});
     }
 

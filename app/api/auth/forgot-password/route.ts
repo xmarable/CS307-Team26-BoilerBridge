@@ -3,6 +3,7 @@ import User from "@/models/User";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import z from "zod";
+import sgMail from "@sendgrid/mail";
 
 
 const ForgotPassSchema = z.object({
@@ -43,9 +44,7 @@ export async function POST(req: NextRequest) {
     const url = `http://localhost:3000/signin/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
     console.log(`Password Reset Link: ${url}`);
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? "");
     //console.log(process.env.SENDGRID_API_KEY);
 
     const msg = {

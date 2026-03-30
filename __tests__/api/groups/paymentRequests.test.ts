@@ -368,4 +368,135 @@ describe("GET /api/groups/[groupId]/payment-requests", () => {
     expect(data.paymentRequests).toHaveLength(1);
     expect(data.paymentRequests[0].requesterID).toBe(String(a.userId));
   });
+
+  it("AC: target member sees pending request in incoming (filter=received)", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 7,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: b.userId },
+      expires: "",
+    });
+
+    const res = await GETPaymentRequests(
+      new Request(
+        "http://localhost/api/x/payment-requests?filter=received",
+      ),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.paymentRequests).toHaveLength(1);
+    expect(data.paymentRequests[0].targetMemberID).toBe(String(b.userId));
+    expect(data.paymentRequests[0].status).toBe("pending");
+  });
+
+  it("AC: requester sees declined status on outgoing after target declines", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const postRes = await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 6,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    const { paymentRequest } = await postRes.json();
+    const requestID = paymentRequest.requestID as string;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: b.userId },
+      expires: "",
+    });
+
+    await PATCHPaymentRequest(
+      new Request("http://localhost/api/x/payment-requests/y", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "declined", reason: "No thanks" }),
+      }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const getRes = await GETPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests?filter=sent"),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    expect(getRes.status).toBe(200);
+    const data = await getRes.json();
+    expect(data.paymentRequests).toHaveLength(1);
+    expect(data.paymentRequests[0].status).toBe("declined");
+    expect(data.paymentRequests[0].declineReason).toBe("No thanks");
+  });
+
+  it("returns 403 when viewer is not a group member", async () => {
+    const s = randomUUID().slice(0, 8);
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const member = await User.create({
+      username: `pr_get_${s}`,
+      email: `pr_get_${s}@test.com`,
+      passwordHash,
+      school: "Purdue",
+    });
+    const outsider = await User.create({
+      username: `pr_getout_${s}`,
+      email: `pr_getout_${s}@test.com`,
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: `PR GET ${s}`,
+      leaderID: member.userId,
+      membersList: [{ userId: member.userId, role: "Leader" }],
+      ledger: [],
+    });
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsider.userId },
+      expires: "",
+    });
+
+    const res = await GETPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests"),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    expect(res.status).toBe(403);
+  });
 });
