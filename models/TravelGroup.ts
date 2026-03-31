@@ -1,11 +1,16 @@
-import mongoose from "mongoose";
+import mongoose, { mongo } from "mongoose";
 import { randomUUID } from "crypto";
-import { unique } from "next/dist/build/utils";
 
 const expenseSchema = new mongoose.Schema(
   {
-    expenseID: { type: String },
-    payerID: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    expenseID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+    },
+    payerID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+    },
     amount: { type: Number },
     description: { type: String },
     debtors: { type: Map, of: Number },
@@ -20,36 +25,171 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.UUID,
       default: () => randomUUID(),
       unique: true,
-      sparse: true, // added to allow multiple nulls in unique index
+      sparse: true,
     },
-    senderID: { type: String },
+    senderID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+    },
+    senderName: {
+      type: String,
+      required: true,
+    },
     content: { type: String },
     timestamp: { type: Date, default: Date.now },
   },
   { _id: false },
 );
 
-const travelGroupSchema = new mongoose.Schema({
-  groupID: {
-    type: String,
-    default: () => randomUUID(),
-    unique: true,
-  },
-  groupName: { type: String, required: true, trim: true },
-  description: { type: String, trim: true },
-  leaderID: {
-    type: String,
-    required: true,
-  },
-  membersList: [
-    {
-      type: String,
+const announcementSchema = new mongoose.Schema(
+  {
+    announcementID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+    },
+    content: { type: String, required: true },
+    pinnedBy: { type: String, required: true },
+    pinnedByID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
       required: true,
     },
-  ],
-  ledger: [expenseSchema],
-  chatLogs: [messageSchema],
-});
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
+const groupMemberSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ["Leader", "Admin", "Viewer"],
+      default: "Viewer",
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
+const SMSSchema = new mongoose.Schema(
+  {
+    smsID: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    topic: {
+      type: String,
+      required: true
+    },
+    sentAt: {
+      type: Date,
+      required: true,
+      defualt: Date.now
+    }
+  }
+);
+
+const photoSchema = new mongoose.Schema(
+  {
+    photoId: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    image: {
+      type: String,
+      default: ""
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    uploaderID: {
+      type: mongoose.Types.UUID,
+      ref: "User",
+      required: true
+    }
+  }
+);
+
+// New schema for tracking invitations that haven't been accepted yet
+const pendingRequestSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true, lowercase: true, trim: true },
+    sentAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
+const pollSchema = new mongoose.Schema(
+  {
+    pollID: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    createdBy: {
+      type: mongoose.Types.UUID,
+      required: true
+    },
+    choices: {
+      type: [String],
+      default: [],
+      required: true
+    },
+    endsAt: {
+      type: Date,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }
+)
+
+const travelGroupSchema = new mongoose.Schema(
+  {
+    groupID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+      unique: true,
+    },
+    groupName: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    leaderID: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+      ref: "User",
+    },
+    membersList: [groupMemberSchema],
+    pendingRequests: {
+      type: [pendingRequestSchema],
+      default: [],
+    },
+    pinnedAnnouncements: {
+      type: [announcementSchema],
+      default: [],
+    },
+    ledger: [expenseSchema],
+    smsLogs: {
+      type: [SMSSchema],
+      default: []
+    },
+    chatLogs: {
+      type: [messageSchema],
+      default: [],
+    },
+    photos: {
+      type: [photoSchema],
+      default: []
+    }
+  },
+  { timestamps: true },
+);
 
 const TravelGroup =
   mongoose.models.TravelGroup ||

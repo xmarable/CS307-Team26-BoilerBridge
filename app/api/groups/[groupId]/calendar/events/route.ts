@@ -12,7 +12,9 @@ function isMemberOrLeader(group: any, userMongoId: string) {
   const leader = group?.leaderID?.toString() === userMongoId;
   const member =
     Array.isArray(group?.membersList) &&
-    group.membersList.some((id: any) => id?.toString() === userMongoId);
+    group.membersList.some(
+      (m: any) => (m.userId || m)?.toString() === userMongoId,
+    );
   return leader || member;
 }
 
@@ -34,7 +36,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userMongoId = (session?.user as any)?.id as string | undefined;
+    const userMongoId = (session?.user as any)?.userId as string | undefined;
     if (!userMongoId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -43,8 +45,8 @@ export async function POST(
 
     await dbConnect();
 
-    // In this repo, [groupId] should be TravelGroup Mongo _id
-    const group: any = await TravelGroup.findById(groupId).lean();
+    // use findOne with the groupID field because groupId is a UUID string, not a Mongo ObjectId
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -77,8 +79,8 @@ export async function POST(
       endTime: data.endTime,
       location: data.location,
       eventType: data.eventType ?? "general",
-      createdBy: userMongoId, // store as string mongo id
-      groupId: groupId, // store TravelGroup _id string for consistent queries
+      createdBy: userMongoId,
+      groupId: groupId,
       source: data.source ?? "manual",
       externalId: data.externalId,
       timezone: data.timezone ?? "UTC",
@@ -100,7 +102,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const userMongoId = (session?.user as any)?.id as string | undefined;
+    const userMongoId = (session?.user as any)?.userId as string | undefined;
     if (!userMongoId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -109,7 +111,8 @@ export async function GET(
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findById(groupId).lean();
+    // use findOne with the groupID field to avoid CastError on UUID strings
+    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -141,7 +144,6 @@ export async function GET(
       );
     }
 
-    // Overlap query: events that intersect [from, to)
     const events = await CalendarEvent.find({
       groupId,
       startTime: { $lt: to },

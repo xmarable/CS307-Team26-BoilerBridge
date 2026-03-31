@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { CheckCircle2, GraduationCap } from "lucide-react";
@@ -24,6 +25,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const router = useRouter();
 
   const [isVerified, setIsVerified] = useState(
     initialData?.isStudentVerified || false,
@@ -78,11 +80,24 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
         method: "POST",
         body: JSON.stringify({ action: "confirm", code: vCode }),
       });
+      const data = await res.json();
       if (res.ok) {
         setIsVerified(true);
+        setEduEmail(data.eduEmail);
         setStep("idle");
+
+        await update({
+          ...session,
+          user: {
+            ...session?.user,
+            isStudentVerified: true,
+            eduEmail: data.eduEmail,
+          },
+        });
+
+        router.refresh(); // force next.js to refresh server components (navbar)
       } else {
-        alert("Invalid code");
+        alert(data.error || "Invalid code");
       }
     } catch (error) {
       alert("Error verifying code");
@@ -141,6 +156,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
             image: data.image || formData.profileImage,
           },
         });
+        router.refresh(); // force next.js to refresh server components (navbar)
+
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }
@@ -158,13 +175,13 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
     <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
       <div className="mb-8 flex justify-between items-start">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
           <p className="text-gray-500 text-sm">
             Update your public profile and verification status.
           </p>
         </div>
         {isVerified && (
-          <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
+          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
             <CheckCircle2 size={16} />
             <span className="text-xs font-bold uppercase tracking-wider">
               Verified Student
@@ -174,8 +191,8 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex flex-col items-center sm:items-start gap-4 mb-8">
-          <label className="text-sm font-semibold text-gray-700">
+        <div className="flex flex-col items-center gap-4 mb-8">
+          <label className="align-center font-semibold text-gray-700">
             Profile Picture
           </label>
           <div className="relative group">
@@ -215,7 +232,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
                 setFormData({ ...formData, name: e.target.value })
               }
               className={inputStyles}
-              placeholder="e.g. Xavion Marable"
+              placeholder="e.g. John Doe"
             />
           </div>
 
@@ -335,7 +352,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
             disabled={loading}
             className="w-full bg-amber-500 text-white font-bold py-3.5 rounded-xl hover:bg-amber-600 shadow-md disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            {loading ? "Saving Changes..." : "Save Settings"}
+            {loading ? "Saving Changes..." : "Update Profile"}
           </button>
           {success && (
             <p className="text-center text-sm font-medium text-green-600 animate-pulse">

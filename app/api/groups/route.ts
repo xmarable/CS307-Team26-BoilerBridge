@@ -8,31 +8,29 @@ import TravelGroup from "@/models/TravelGroup";
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? session.user.id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any)?.userId;
     if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to view your groups" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     await dbConnect();
 
     const groups = await TravelGroup.find({
-      membersList: new mongoose.Types.ObjectId(userId),
+      "membersList.userId": userId,
     })
+      .sort({ createdAt: -1 })
       .lean();
 
-    const payload = groups.map((g) => ({
-      _id: (g._id as mongoose.Types.ObjectId).toString(),
+    const payload = groups.map((g: any) => ({
       groupID: g.groupID,
       groupName: g.groupName,
       description: g.description,
-      leaderID: (g.leaderID as mongoose.Types.ObjectId).toString(),
-      membersList: (g.membersList as mongoose.Types.ObjectId[]).map((m) =>
-        m.toString()
-      ),
+      leaderID: g.leaderID,
+      membersList: g.membersList,
+      createdAt: g.createdAt,
     }));
 
     return NextResponse.json({ groups: payload });
@@ -40,7 +38,60 @@ export async function GET() {
     console.error("GET /api/groups error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.userId;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { groupName, description } = await req.json();
+    if (!groupName) {
+      return NextResponse.json(
+        { error: "Group name is required" },
+        { status: 400 },
+      );
+    }
+
+    await dbConnect();
+
+    const newGroup = await TravelGroup.create({
+      groupName,
+      description: description || "",
+      leaderID: userId,
+      membersList: [
+        {
+          userId: userId,
+          role: "Leader",
+        },
+      ],
+    });
+
+    return NextResponse.json(
+      {
+        group: {
+          groupID: newGroup.groupID,
+          groupName: newGroup.groupName,
+          description: newGroup.description,
+          leaderID: newGroup.leaderID,
+          membersList: newGroup.membersList,
+          createdAt: newGroup.createdAt,
+        },
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("POST /api/groups error:", error);
+    return NextResponse.json(
+      { error: "Failed to create group" },
+      { status: 500 },
     );
   }
 }

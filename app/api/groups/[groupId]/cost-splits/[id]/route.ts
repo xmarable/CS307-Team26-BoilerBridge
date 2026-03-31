@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import CostSplit from "@/models/CostSplit";
@@ -15,7 +16,9 @@ function isGroupLeader(group: any, userIds: string[]) {
 
 function isGroupMember(group: any, userIds: string[]) {
   if (!Array.isArray(group?.membersList)) return false;
-  return group.membersList.some((memberId: string) => userIds.includes(memberId));
+  return group.membersList.some((memberId: string) =>
+    userIds.includes(memberId),
+  );
 }
 
 function isCreator(split: any, userIds: string[]) {
@@ -24,10 +27,12 @@ function isCreator(split: any, userIds: string[]) {
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { groupId: string; id: string } }
+  context: { params: Promise<{ groupId: string; id: string }> },
 ) {
   try {
     await dbConnect();
+
+    const { groupId, id } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -39,7 +44,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -49,34 +54,31 @@ export async function PUT(
     }
 
     const existingSplit = await CostSplit.findOne({
-      _id: params.id,
-      groupId: params.groupId,
+      _id: id,
+      groupId: groupId,
     });
 
     if (!existingSplit) {
-      return NextResponse.json({ error: "Cost split not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Cost split not found" },
+        { status: 404 },
+      );
     }
 
     if (!isCreator(existingSplit, userIds) && !isGroupLeader(group, userIds)) {
       return NextResponse.json(
         { error: "Only the creator or group admin can edit this cost split" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const body = await req.json();
-    const {
-      tripId,
-      expenseId,
-      participants,
-      splitType,
-      totalAmount,
-    } = body;
+    const { tripId, expenseId, participants, splitType, totalAmount } = body;
 
     if (expenseId !== undefined && !expenseId) {
       return NextResponse.json(
         { error: "expenseId cannot be empty" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -84,7 +86,7 @@ export async function PUT(
       if (!Array.isArray(participants) || participants.length === 0) {
         return NextResponse.json(
           { error: "participants must be a non-empty array" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -94,7 +96,7 @@ export async function PUT(
       if (!validTypes.includes(splitType)) {
         return NextResponse.json(
           { error: "Invalid splitType" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -103,13 +105,13 @@ export async function PUT(
       if (typeof totalAmount !== "number" || totalAmount <= 0) {
         return NextResponse.json(
           { error: "totalAmount must be greater than 0" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
 
     const updatedSplit = await CostSplit.findByIdAndUpdate(
-      params.id,
+      id,
       {
         ...(tripId !== undefined ? { tripId } : {}),
         ...(expenseId !== undefined ? { expenseId } : {}),
@@ -117,7 +119,7 @@ export async function PUT(
         ...(splitType !== undefined ? { splitType } : {}),
         ...(totalAmount !== undefined ? { totalAmount } : {}),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     return NextResponse.json({ costSplit: updatedSplit }, { status: 200 });
@@ -125,17 +127,19 @@ export async function PUT(
     console.error("PUT cost-split error:", error);
     return NextResponse.json(
       { error: "Failed to update cost split" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { groupId: string; id: string } }
+  context: { params: Promise<{ groupId: string; id: string }> },
 ) {
   try {
     await dbConnect();
+
+    const { groupId, id } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -147,7 +151,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -157,32 +161,35 @@ export async function DELETE(
     }
 
     const existingSplit = await CostSplit.findOne({
-      _id: params.id,
-      groupId: params.groupId,
+      _id: id,
+      groupId: groupId,
     });
 
     if (!existingSplit) {
-      return NextResponse.json({ error: "Cost split not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Cost split not found" },
+        { status: 404 },
+      );
     }
 
     if (!isCreator(existingSplit, userIds) && !isGroupLeader(group, userIds)) {
       return NextResponse.json(
         { error: "Only the creator or group admin can delete this cost split" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    await CostSplit.findByIdAndDelete(params.id);
+    await CostSplit.findByIdAndDelete(id);
 
     return NextResponse.json(
       { message: "Cost split deleted successfully" },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("DELETE cost-split error:", error);
     return NextResponse.json(
       { error: "Failed to delete cost split" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

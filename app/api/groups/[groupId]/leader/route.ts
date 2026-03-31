@@ -7,51 +7,47 @@ import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 
 const patchLeaderSchema = z.object({
-  newLeaderId: z.string().min(1, "newLeaderId is required"),
+  newLeaderId: z.string().uuid("newLeaderId must be a valid UUID"),
 });
 
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ groupId: string }> }
+  { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? session.user.id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any)?.userId;
+
     if (!userId) {
       return NextResponse.json(
         { error: "You must be logged in to transfer leadership" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const { groupId } = await params;
-    if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-      return NextResponse.json({ error: "Invalid group ID" }, { status: 400 });
-    }
 
     await dbConnect();
 
-    const group = await TravelGroup.findById(groupId).lean();
+    const group = await TravelGroup.findOne({ groupID: groupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const memberIds = (group.membersList as mongoose.Types.ObjectId[]).map(
-      (m) => m.toString()
-    );
+    const memberIds = group.membersList.map((m: any) => m.userId.toString());
+    const currentLeaderID = group.leaderID.toString();
+
     if (!memberIds.includes(userId)) {
       return NextResponse.json(
         { error: "You do not have access to this group" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    const leaderIDStr = (group.leaderID as mongoose.Types.ObjectId).toString();
-    if (leaderIDStr !== userId) {
+    if (currentLeaderID !== userId) {
       return NextResponse.json(
         { error: "Only the group leader can transfer leadership" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -64,56 +60,60 @@ export async function PATCH(
     }
 
     const { newLeaderId } = validation.data;
-    if (!mongoose.Types.ObjectId.isValid(newLeaderId)) {
-      return NextResponse.json(
-        { error: "Invalid newLeaderId" },
-        { status: 400 }
-      );
-    }
 
     if (newLeaderId === userId) {
       return NextResponse.json(
         { error: "Cannot transfer leadership to yourself" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!memberIds.includes(newLeaderId)) {
       return NextResponse.json(
         { error: "User is not a member of this group" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const updated = await TravelGroup.findByIdAndUpdate(
-      groupId,
-      { $set: { leaderID: new mongoose.Types.ObjectId(newLeaderId) } },
-      { new: true }
+    const updated = await TravelGroup.findOneAndUpdate(
+      { groupID: groupId },
+      {
+        $set: {
+          leaderID: newLeaderId,
+          "membersList.$[newLeader].role": "Leader",
+          "membersList.$[oldLeader].role": "Admin",
+        },
+      },
+      {
+        arrayFilters: [
+          { "newLeader.userId": newLeaderId },
+          { "oldLeader.userId": userId },
+        ],
+        returnDocument: "after",
+      },
     ).lean();
 
     if (!updated) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const updatedMemberIds = (updated.membersList as mongoose.Types.ObjectId[]).map(
-      (m) => m.toString()
-    );
-
     return NextResponse.json({
       group: {
-        _id: updated._id.toString(),
-        groupID: updated.groupID,
+        groupID: updated.groupID.toString(),
         groupName: updated.groupName,
         description: updated.description,
-        leaderID: (updated.leaderID as mongoose.Types.ObjectId).toString(),
-        membersList: updatedMemberIds,
+        leaderID: updated.leaderID.toString(),
+        membersList: updated.membersList.map((m: any) => ({
+          userId: m.userId.toString(),
+          role: m.role,
+        })),
       },
     });
   } catch (error) {
     console.error("PATCH /api/groups/[groupId]/leader error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

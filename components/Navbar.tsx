@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Search, LogOut, Settings } from "lucide-react";
+import { Search, LogOut, Settings, CheckCircle2 } from "lucide-react";
 import { Input } from "./ui/input";
-import { Avatar, AvatarFallback } from "./ui/avatar";
 import { NotificationBell } from "./NotificationBell";
 import {
   DropdownMenu,
@@ -12,12 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-export async function Navbar({ session }: { session?: any }) {
+export function Navbar({ session }: { session?: any }) {
   const user = session?.user;
 
   const displayName = user?.name || user?.username || "User";
   const displayInitial = displayName.charAt(0).toUpperCase();
   const profileImage = user?.image;
+  const isVerified = user?.isStudentVerified;
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40 w-full h-18.25 flex items-center">
@@ -48,19 +48,30 @@ export async function Navbar({ session }: { session?: any }) {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all rounded-full border border-gray-100 w-10 h-10 overflow-hidden bg-gray-100 flex items-center justify-center">
-                {profileImage ? (
-                  /* Standard img tag bypasses Shadcn/Avatar hydration lag */
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={profileImage}
-                    alt={displayName}
-                    className="w-full h-full object-cover"
-                    loading="eager"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 text-white font-bold flex items-center justify-center">
-                    {displayInitial}
+              <div className="relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all rounded-full border border-gray-100 w-10 h-10 bg-gray-100 flex items-center justify-center">
+                <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+                  {profileImage ? (
+                    /* Standard img tag bypasses Shadcn/Avatar hydration lag */
+                     
+                    <img
+                      src={profileImage}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                      loading="eager"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 text-white font-bold flex items-center justify-center">
+                      {displayInitial}
+                    </div>
+                  )}
+                </div>
+                {/* Verified Badge Overlay */}
+                {isVerified && (
+                  <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm z-50">
+                    <CheckCircle2
+                      size={14}
+                      className="text-green-600 fill-green-50"
+                    />
                   </div>
                 )}
               </div>
@@ -72,9 +83,14 @@ export async function Navbar({ session }: { session?: any }) {
             >
               <DropdownMenuLabel className="font-normal px-2 py-2">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-bold leading-none text-gray-900">
-                    {user?.name || `@${user?.username}` || "User"}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-bold leading-none text-gray-900">
+                      {user?.name || `@${user?.username}` || "User"}
+                    </p>
+                    {isVerified && (
+                      <CheckCircle2 size={12} className="text-green-600" />
+                    )}
+                  </div>
                   <p className="text-xs leading-none text-gray-500 truncate">
                     {user?.email}
                   </p>
@@ -85,7 +101,7 @@ export async function Navbar({ session }: { session?: any }) {
 
               <DropdownMenuItem asChild>
                 <Link
-                  href="/settings"
+                  href="/dashboard/profile"
                   className="flex items-center w-full px-2 py-2 text-sm text-gray-700 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
                 >
                   <Settings className="mr-2 h-4 w-4" />

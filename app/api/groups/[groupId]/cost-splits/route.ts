@@ -12,18 +12,20 @@ Supports optional filters:
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> },
 ) {
   try {
     await dbConnect();
 
+    const { groupId } = await context.params;
     const { searchParams } = new URL(req.url);
 
     const tripId = searchParams.get("tripId");
     const expenseId = searchParams.get("expenseId");
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {
-      groupId: params.groupId,
+      groupId: groupId,
     };
 
     if (tripId) query.tripId = tripId;
@@ -37,7 +39,7 @@ export async function GET(
 
     return NextResponse.json(
       { error: "Failed to fetch cost splits" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -49,11 +51,12 @@ Create a cost split for an expense
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> },
 ) {
   try {
     await dbConnect();
 
+    const { groupId } = await context.params;
     const body = await req.json();
 
     const {
@@ -68,33 +71,33 @@ export async function POST(
     if (!expenseId) {
       return NextResponse.json(
         { error: "expenseId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!participants || participants.length === 0) {
       return NextResponse.json(
         { error: "participants are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!splitType) {
       return NextResponse.json(
         { error: "splitType is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!totalAmount || totalAmount <= 0) {
       return NextResponse.json(
         { error: "totalAmount must be greater than 0" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const newSplit = await CostSplit.create({
-      groupId: params.groupId,
+      groupId: groupId,
       tripId,
       expenseId,
       participants,
@@ -103,16 +106,13 @@ export async function POST(
       createdBy,
     });
 
-    return NextResponse.json(
-      { costSplit: newSplit },
-      { status: 201 }
-    );
+    return NextResponse.json({ costSplit: newSplit }, { status: 201 });
   } catch (error) {
     console.error("POST cost-split error:", error);
 
     return NextResponse.json(
       { error: "Failed to create cost split" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

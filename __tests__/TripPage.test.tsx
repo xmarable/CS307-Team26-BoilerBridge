@@ -4,12 +4,45 @@ import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-const TripPage = (await import("@/app/trip/page")).default;
+// 1. Mock next-auth/react - Data MUST be inside the factory to avoid undefined errors in ESM
+await jest.unstable_mockModule("next-auth/react", () => ({
+  useSession: jest.fn(() => ({
+    data: { user: { userId: "test-user-id", name: "Xavy" } },
+    status: "authenticated",
+  })),
+}));
+
+// 2. Mock next/navigation - Added useParams to prevent SyntaxError since the component now uses it
+await jest.unstable_mockModule("next/navigation", () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+  })),
+  useParams: jest.fn(() => ({
+    groupId: "15105263-6166-40c8-977a-a3575375bc58", // mock the group context for the test
+  })),
+}));
+
+// 3. Mock Navbar as a named export
+await jest.unstable_mockModule("@/components/Navbar", () => ({
+  Navbar: () => <nav data-testid="mock-navbar" />,
+}));
+
+// 4. Force registration of mocks before importing the component
+await import("next-auth/react");
+await import("next/navigation");
+await import("@/components/Navbar");
+
+// 5. Dynamic import of the component
+// logic: ensured this path matches your actual file structure to avoid import failures
+const TripPage = (await import("@/app/dashboard/trip/page")).default;
 
 describe("TripPage", () => {
+  // Now, inside your tests, you can even re-mock the return value if needed:
+  // (useSession as jest.Mock).mockReturnValue({ data: null, status: "loading" });
+
   beforeEach(() => {
     global.fetch = jest.fn<any>();
-
     Object.defineProperty(window, "location", {
       value: { href: "" },
       writable: true,
@@ -17,19 +50,20 @@ describe("TripPage", () => {
   });
 
   afterEach(() => {
-    jest.resetAllMocks();
-    window.location.href = ""; // reset location after each test to prevent cross-test contamination
+    jest.clearAllMocks();
   });
 
   it("renders the create trip form", () => {
+    // This will now use the mock version of useSession that is 100% defined
     render(<TripPage />);
 
-    // "Create Trip" exists in both h1 and button, so target the heading
     expect(
       screen.getByRole("heading", { name: "Create Trip" }),
     ).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("From City")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("To City")).toBeInTheDocument();
+
+    expect(screen.getByPlaceholderText("e.g. Chicago")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("e.g. Miami")).toBeInTheDocument();
+
     expect(
       screen.getByRole("button", { name: /create trip/i }),
     ).toBeInTheDocument();
@@ -39,10 +73,10 @@ describe("TripPage", () => {
     const { container } = render(<TripPage />);
 
     // Fill required fields
-    fireEvent.change(screen.getByPlaceholderText("From City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Chicago"), {
       target: { value: "Chicago" },
     });
-    fireEvent.change(screen.getByPlaceholderText("To City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Miami"), {
       target: { value: "NYC" },
     });
     fireEvent.change(screen.getByLabelText(/from date/i), {
@@ -53,11 +87,11 @@ describe("TripPage", () => {
     });
 
     // Invalid budget
-    fireEvent.change(screen.getByPlaceholderText("Budget"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. 500"), {
       target: { value: "0" },
     });
 
-    // Submit the form directly (more reliable than clicking submit with native constraint validation)
+    // Submit the form directly
     const formEl = container.querySelector("form");
     expect(formEl).toBeTruthy();
     fireEvent.submit(formEl!);
@@ -72,15 +106,15 @@ describe("TripPage", () => {
   it("calls POST /api/trip and redirects on success", async () => {
     (global.fetch as jest.Mock<any>).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ _id: "abc123" }),
+      json: async () => ({ tripID: "abc12345-abcd-abcd-abcd-abc123456789" }),
     } as Response);
 
     render(<TripPage />);
 
-    fireEvent.change(screen.getByPlaceholderText("From City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Chicago"), {
       target: { value: "Chicago" },
     });
-    fireEvent.change(screen.getByPlaceholderText("To City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Miami"), {
       target: { value: "NYC" },
     });
     fireEvent.change(screen.getByLabelText(/from date/i), {
@@ -92,7 +126,7 @@ describe("TripPage", () => {
     fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "flight" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Budget"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. 500"), {
       target: { value: "1200" },
     });
 
@@ -103,6 +137,10 @@ describe("TripPage", () => {
     const [url, options]: any = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe("/api/trip");
     expect(options.method).toBe("POST");
+
+    // verification: ensure the groupId from useParams is passed in the payload
+    const body = JSON.parse(options.body);
+    expect(body.groupId).toBe("15105263-6166-40c8-977a-a3575375bc58");
 
     await waitFor(() => {
       expect(window.location.href).toBe("/alltrips");
@@ -117,10 +155,10 @@ describe("TripPage", () => {
 
     render(<TripPage />);
 
-    fireEvent.change(screen.getByPlaceholderText("From City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Chicago"), {
       target: { value: "Chicago" },
     });
-    fireEvent.change(screen.getByPlaceholderText("To City"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Miami"), {
       target: { value: "NYC" },
     });
     fireEvent.change(screen.getByLabelText(/from date/i), {
@@ -129,7 +167,7 @@ describe("TripPage", () => {
     fireEvent.change(screen.getByLabelText(/to date/i), {
       target: { value: "2026-03-10" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Budget"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. 500"), {
       target: { value: "1200" },
     });
 

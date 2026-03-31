@@ -15,7 +15,7 @@ jobs:
   closed:
     runs-on: ubuntu-latest
     steps:
-      - name: delete preview app
+      - name: Delete preview app
         uses: digitalocean/app_action/delete@v2
         with:
           from_pr_preview: "true"
@@ -27,24 +27,33 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Delete registry image and prune orphans
+      - name: Break Registry Links and Deep Prune
         run: |
-          DIGEST=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep "pr-${{ github.event.number }}" | awk '{print $1}')
+          # wait for any active gc to finish so we dont hit 412
+          while doctl registry garbage-collection get-active >/dev/null 2>&1; do
+            echo "waiting for registry lock... sleeping 30s"
+            sleep 30
+          done
 
-          if [ ! -z "$DIGEST" ]; then
-            doctl registry repository delete-manifest boilerbridge "$DIGEST" --force
-          fi
+          # build the whitelist: keep 'latest' and any pr- tag EXCEPT the one we just closed
+          doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -E "latest|pr-" | grep -v "pr-${{ github.event.number }}" | awk '{print $1}' > kept_digests.txt
 
-          UNTAGGED=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | awk '$2 == "" || $2 == "[]" {print $1}')
+          # get all digests to find the orphans
+          ALL_DIGESTS=$(doctl registry repository list-manifests boilerbridge --format Digest --no-header)
 
-          if [ ! -z "$UNTAGGED" ]; then
-            for digest in $UNTAGGED; do
-              doctl registry repository delete-manifest boilerbridge $digest --force
-            done
-          fi
+          for DIGEST in $ALL_DIGESTS; do
+            if [ "$DIGEST" = "Digest" ]; then continue; fi
+            
+            if grep -q "$DIGEST" kept_digests.txt; then
+              echo "SAFE: $DIGEST"
+            else
+              echo "CUTTING LINK: $DIGEST"
+              doctl registry repository delete-manifest boilerbridge "$DIGEST" --force || true
+            fi
+          done
 
-          sleep 5
-          doctl registry garbage-collection start --include-untagged-manifests --force
+          # tell DO to actually wipe the unlinked blobs
+          doctl registry garbage-collection start --include-untagged-manifests --force || true
 
       - name: Deactivate GitHub Environment
         uses: actions/github-script@v7

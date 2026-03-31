@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +19,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Calendar,
+  Plus,
+  Clock,
+  MapPin,
+  RefreshCw,
+  Trash2,
+  Edit3,
+  Loader2,
+  Zap,
+  CheckCircle2,
+} from "lucide-react";
 
 type CalendarEvent = {
   _id: string;
@@ -55,6 +66,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // state for error and success popups
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [popupMsg, setPopupMsg] = useState("");
+
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
     const d = new Date();
@@ -64,7 +80,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [startTime, setStartTime] = useState(() => toDatetimeLocalValue(new Date()));
+  const [startTime, setStartTime] = useState(() =>
+    toDatetimeLocalValue(new Date()),
+  );
   const [endTime, setEndTime] = useState(() => {
     const d = new Date();
     d.setHours(d.getHours() + 1);
@@ -73,6 +91,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [location, setLocation] = useState("");
   const [eventType, setEventType] = useState("activity");
   const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
@@ -89,14 +108,17 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     try {
       setLoading(true);
       setErr(null);
-      const res = await fetch(`/api/groups/${groupId}/calendar/events${rangeQuery}`, {
-        method: "GET",
-      });
+      const res = await fetch(
+        `/api/groups/${groupId}/calendar/events${rangeQuery}`,
+        {
+          method: "GET",
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load events");
+      if (!res.ok) throw new Error(data?.error || "Failed to load events.");
       setEvents(data.events ?? data.calendarEvents ?? []);
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to load events");
+      setErr(e?.message ?? "Failed to load events.");
     } finally {
       setLoading(false);
     }
@@ -104,14 +126,12 @@ export default function CalendarEventsPanel({ groupId }: Props) {
 
   useEffect(() => {
     fetchEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, rangeQuery]);
 
   async function handleCreate() {
     try {
       setCreating(true);
       setErr(null);
-
       const startISO = new Date(startTime).toISOString();
       const endISO = new Date(endTime).toISOString();
 
@@ -130,18 +150,43 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to create event");
+      if (!res.ok) throw new Error(data?.error || "Failed to create event.");
 
       setTitle("");
       setDescription("");
       setLocation("");
       setEventType("activity");
-
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to create event");
+      setErr(e?.message ?? "Failed to create event.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleGenerate() {
+    try {
+      setGenerating(true);
+      setErr(null);
+      const res = await fetch(`/api/groups/${groupId}/itinerary/generate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // show error if the generation fails
+        setPopupMsg(data?.error || "Failed to generate itinerary.");
+        setShowErrorPopup(true);
+      } else {
+        // show success if it worked
+        setPopupMsg(data?.message || "Itinerary sparked successfully.");
+        setShowSuccessPopup(true);
+        await fetchEvents();
+      }
+    } catch (e: any) {
+      setPopupMsg("An unexpected error occurred during generation.");
+      setShowErrorPopup(true);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -161,7 +206,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     try {
       setSavingEdit(true);
       setErr(null);
-
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events/${editEvent._id}`,
         {
@@ -175,17 +219,17 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             location: location.trim() || undefined,
             eventType,
           }),
-        }
+        },
       );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to update event");
+      if (!res.ok) throw new Error(data?.error || "Failed to update event.");
 
       setEditOpen(false);
       setEditEvent(null);
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to update event");
+      setErr(e?.message ?? "Failed to update event.");
     } finally {
       setSavingEdit(false);
     }
@@ -194,114 +238,152 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   async function handleDelete(eventId: string) {
     try {
       setErr(null);
-      const res = await fetch(`/api/groups/${groupId}/calendar/events/${eventId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/groups/${groupId}/calendar/events/${eventId}`,
+        {
+          method: "DELETE",
+        },
+      );
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to delete event");
+      if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
       await fetchEvents();
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to delete event");
+      setErr(e?.message ?? "Failed to delete event.");
     }
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Calendar</h2>
-        <Badge variant="secondary">{events.length} events</Badge>
-      </div>
-
-      <Card className="p-4 mb-6 bg-white border-gray-200">
+    <div className="space-y-8">
+      {/* Search/Range Controls */}
+      <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <Clock size={16} /> View Window
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchEvents}
+            className="rounded-xl text-amber-600 hover:bg-amber-50"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-gray-800">From</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">From</Label>
             <Input
               type="datetime-local"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
-          <div>
-            <Label className="text-gray-800">To</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">To</Label>
             <Input
               type="datetime-local"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
         </div>
-        <div className="mt-3">
-          <Button variant="outline" onClick={fetchEvents}>
-            Refresh
+      </div>
+
+      {/* Baseline Itinerary Generator Trigger */}
+      <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1 text-center md:text-left">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center justify-center md:justify-start gap-2 uppercase">
+              <Zap className="text-amber-400 fill-amber-400" size={24} /> spark
+              itinerary
+            </h3>
+            <p className="text-gray-400 font-bold text-sm">
+              Converts your must-haves into a scheduled timeline
+            </p>
+          </div>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest"
+          >
+            {generating ? (
+              <RefreshCw className="animate-spin mr-2" size={20} />
+            ) : (
+              "Generate Plan"
+            )}
           </Button>
         </div>
-        {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-      </Card>
+      </div>
 
-      <Card className="p-4 mb-6 bg-white border-gray-200">
-        <h3 className="font-semibold text-gray-900 mb-3">Add event</h3>
+      {/* Add Event Form */}
+      <div className="bg-amber-50/50 rounded-[2.5rem] p-8 border border-amber-100/50">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-200">
+            <Plus size={24} />
+          </div>
+          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+            Add to Timeline
+          </h3>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <Label className="text-gray-800">Title *</Label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">
+              Event Title *
+            </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Dinner reservation, museum, flight..."
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div>
-            <Label className="text-gray-800">Start</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Start Time</Label>
             <Input
               type="datetime-local"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div>
-            <Label className="text-gray-800">End</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">End Time</Label>
             <Input
               type="datetime-local"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="text-gray-900 placeholder:text-gray-500"
+              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
             />
           </div>
 
-          <div className="md:col-span-2">
-            <Label className="text-gray-800">Location</Label>
-            <Input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Address or place name"
-              className="text-gray-900 placeholder:text-gray-500"
-            />
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Location</Label>
+            <div className="relative">
+              <MapPin
+                className="absolute left-4 top-4 text-gray-400"
+                size={20}
+              />
+              <Input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Where is it happening?"
+                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 pl-12 shadow-sm"
+              />
+            </div>
           </div>
 
-          <div className="md:col-span-2">
-            <Label className="text-gray-800">Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Notes/details..."
-              className="text-gray-900 placeholder:text-gray-500"
-            />
-          </div>
-
-          <div>
-            <Label className="text-gray-800">Type</Label>
+          <div className="space-y-1.5">
+            <Label className="text-gray-700 font-bold ml-1">Type</Label>
             <Select value={eventType} onValueChange={setEventType}>
-              <SelectTrigger className="text-gray-900">
+              <SelectTrigger className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-2xl">
                 <SelectItem value="activity">Activity</SelectItem>
                 <SelectItem value="travel">Travel</SelectItem>
                 <SelectItem value="food">Food</SelectItem>
@@ -315,134 +397,186 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             <Button
               onClick={handleCreate}
               disabled={creating || !title.trim()}
-              className="w-full"
+              className="w-full h-14 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black rounded-2xl shadow-xl shadow-amber-200 transition-all active:scale-95"
             >
-              {creating ? "Adding…" : "Add event"}
+              {creating ? "Adding…" : "Add Event"}
             </Button>
           </div>
         </div>
+        {err && (
+          <p className="mt-4 text-sm text-red-600 font-bold text-center">
+            {err}
+          </p>
+        )}
+      </div>
 
-        {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
-      </Card>
+      {/* Events Feed */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-lg font-black text-gray-900">
+            Upcoming Activities
+          </h3>
+          <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
+            {events.length} Events Found
+          </Badge>
+        </div>
 
-      {loading ? (
-        <p className="text-gray-600">Loading events…</p>
-      ) : events.length === 0 ? (
-        <p className="text-gray-600">No events in this range.</p>
-      ) : (
-        <ul className="space-y-3">
-          {events
-            .slice()
-            .sort(
-              (a, b) =>
-                new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-            )
-            .map((ev) => (
-              <li
-                key={ev._id}
-                className="border border-gray-200 rounded-xl p-4 flex flex-col gap-2"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{ev.title}</p>
-                    <p className="text-sm text-gray-600">
-                      {new Date(ev.startTime).toLocaleString()} →{" "}
-                      {new Date(ev.endTime).toLocaleString()}
-                    </p>
-                    {(ev.location || ev.eventType) && (
-                      <p className="text-sm text-gray-600 truncate">
-                        {ev.location ? ev.location : ""}
-                        {ev.location && ev.eventType ? " • " : ""}
-                        {ev.eventType ? ev.eventType : ""}
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="animate-spin text-amber-500" size={32} />
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+            <Calendar className="mx-auto text-gray-300 mb-2" size={40} />
+            <p className="text-gray-400 font-bold">
+              No events scheduled for this window.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {events
+              .slice()
+              .sort(
+                (a, b) =>
+                  new Date(a.startTime).getTime() -
+                  new Date(b.startTime).getTime(),
+              )
+              .map((ev) => (
+                <div
+                  key={ev._id}
+                  className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-center gap-4"
+                >
+                  <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center shrink-0">
+                    <span className="text-xs font-black text-amber-600 uppercase">
+                      {new Date(ev.startTime).toLocaleString("default", {
+                        month: "short",
+                      })}
+                    </span>
+                    <span className="text-xl font-black text-amber-700 leading-none">
+                      {new Date(ev.startTime).getDate()}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-black text-gray-900 text-lg truncate">
+                        {ev.title}
+                      </h4>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold"
+                      >
+                        {ev.eventType}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Clock size={14} className="text-amber-500" />
+                        {new Date(ev.startTime).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        →{" "}
+                        {new Date(ev.endTime).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {ev.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={14} className="text-amber-500" />
+                          {ev.location}
+                        </span>
+                      )}
+                    </div>
+                    {ev.description && (
+                      <p className="mt-2 text-sm text-gray-600 line-clamp-1">
+                        {ev.description}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => openEdit(ev)}>
-                      Edit
+                  <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(ev)}
+                      className="rounded-xl hover:bg-amber-50 hover:text-amber-600"
+                    >
+                      <Edit3 size={18} />
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDelete(ev._id)}
+                      className="rounded-xl hover:bg-red-50 hover:text-red-600"
                     >
-                      Delete
+                      <Trash2 size={18} />
                     </Button>
                   </div>
                 </div>
+              ))}
+          </div>
+        )}
+      </div>
 
-                {ev.description && (
-                  <p className="text-sm text-gray-700">{ev.description}</p>
-                )}
-              </li>
-            ))}
-        </ul>
-      )}
-
+      {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
-            <DialogTitle>Edit event</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-gray-900">
+              Edit Event
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label className="text-gray-800">Title *</Label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">Title *</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="text-gray-900 placeholder:text-gray-500"
+                className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-gray-800">Start</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-bold text-gray-700 ml-1">Start</Label>
                 <Input
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="text-gray-900 placeholder:text-gray-500"
+                  className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
                 />
               </div>
-              <div>
-                <Label className="text-gray-800">End</Label>
+              <div className="space-y-1.5">
+                <Label className="font-bold text-gray-700 ml-1">End</Label>
                 <Input
                   type="datetime-local"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="text-gray-900 placeholder:text-gray-500"
+                  className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
                 />
               </div>
             </div>
 
-            <div>
-              <Label className="text-gray-800">Location</Label>
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">Location</Label>
               <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="text-gray-900 placeholder:text-gray-500"
+                className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
               />
             </div>
 
-            <div>
-              <Label className="text-gray-800">Description</Label>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="text-gray-900 placeholder:text-gray-500"
-              />
-            </div>
-
-            <div>
-              <Label className="text-gray-800">Type</Label>
+            <div className="space-y-1.5">
+              <Label className="font-bold text-gray-700 ml-1">Type</Label>
               <Select value={eventType} onValueChange={setEventType}>
-                <SelectTrigger className="text-gray-900">
+                <SelectTrigger className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   <SelectItem value="activity">Activity</SelectItem>
                   <SelectItem value="travel">Travel</SelectItem>
                   <SelectItem value="food">Food</SelectItem>
@@ -451,22 +585,85 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            {err && <p className="text-sm text-red-600">{err}</p>}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setEditOpen(false)}
+              className="rounded-xl font-bold text-gray-500"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={saveEdit}
+              disabled={savingEdit || !title.trim()}
+              className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-6"
+            >
+              {savingEdit ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Popup Alert */}
+      <Dialog open={showErrorPopup} onOpenChange={setShowErrorPopup}>
+        <DialogContent className="rounded-[2.5rem] border-4 border-red-600 p-10 bg-white shadow-[10px_10px_0px_0px_rgba(220,38,38,1)] max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
+              <Zap fill="currentColor" size={32} /> Trip Error
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-8 space-y-4">
+            <p className="text-xl font-black text-gray-900 leading-tight">
+              {popupMsg}
+            </p>
           </div>
 
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setEditOpen(false)}
-              disabled={savingEdit}
+              onClick={() => setShowErrorPopup(false)}
+              className="w-full h-16 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
             >
-              Cancel
-            </Button>
-            <Button onClick={saveEdit} disabled={savingEdit || !title.trim()}>
-              {savingEdit ? "Saving…" : "Save"}
+              got it
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Popup Alert */}
+      <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
+        <DialogContent className="rounded-[2.5rem] border-4 border-amber-500 p-0 bg-white shadow-[10px_10px_0px_0px_rgba(245,158,11,1)] max-w-md mx-auto overflow-hidden">
+          {/* forced centering container */}
+          <div className="flex flex-col items-center justify-center p-10 w-full text-center">
+            {/* title section */}
+            <div className="flex flex-col items-center justify-center gap-3 mb-8">
+              <h2 className="text-4xl font-black text-amber-500 uppercase tracking-tighter">
+                Sparked
+              </h2>
+            </div>
+
+            {/* body section */}
+            <div className="mb-10">
+              <p className="text-xl font-black text-gray-900 leading-tight mb-2">
+                {popupMsg}
+              </p>
+              <p className="text-sm font-bold text-gray-400 leading-relaxed">
+                Your timeline has been refreshed with the new activities
+              </p>
+            </div>
+
+            {/* button section - forced full width */}
+            <div className="w-full">
+              <Button
+                onClick={() => setShowSuccessPopup(false)}
+                className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
+              >
+                Nice
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
