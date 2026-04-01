@@ -10,12 +10,12 @@ function getSessionUserIds(session: any): string[] {
 }
 
 function isGroupLeader(group: any, userIds: string[]) {
-  return userIds.includes(group?.leaderID);
+  return userIds.includes(group?.leaderID?.toString());
 }
 
 function isGroupMember(group: any, userIds: string[]) {
   if (!Array.isArray(group?.membersList)) return false;
-  return group.membersList.some((memberId: string) => userIds.includes(memberId));
+  return group.membersList.some((m: any) => userIds.includes(m.userId?.toString()));
 }
 
 function allParticipantsValid(
@@ -24,7 +24,7 @@ function allParticipantsValid(
   userIds: string[]
 ) {
   const validIds = new Set<string>([
-    ...(Array.isArray(group?.membersList) ? group.membersList : []),
+    ...(Array.isArray(group?.membersList) ? group.membersList.map((m: any) => m.userId?.toString()) : []),
     group?.leaderID,
     ...userIds,
   ].filter(Boolean));

@@ -10,15 +10,15 @@ import TravelGroup from "@/models/TravelGroup";
 import CalendarEvent from "@/models/CalendarEvent";
 
 function isMemberOrLeader(group: any, userId: string) {
-  const leader = group?.leaderID === userId;
+  const leader = group?.leaderID?.toString() === userId;
   const member =
     Array.isArray(group?.membersList) &&
-    group.membersList.some((m: any) => m.userId === userId);
+    group.membersList.some((m: any) => (m.userId || m)?.toString() === userId,);
   return leader || member;
 }
 
 function isLeader(group: any, userId: string) {
-  return group?.leaderID === userId;
+  return group?.leaderID.toString() === userId;
 }
 
 const UpdateEventSchema = z.object({
@@ -66,7 +66,7 @@ export async function PUT(
     }
 
     // Creator OR leader can edit
-    const creator = event.createdBy === userId;
+    const creator = !!(await CalendarEvent.exists({ _id: eventId, createdBy: userId }));
     const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -146,7 +146,7 @@ export async function DELETE(
     }
 
     // Creator OR leader can delete
-    const creator = event.createdBy === userId;
+    const creator = !!(await CalendarEvent.exists({ _id: eventId, createdBy: userId }));
     const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
