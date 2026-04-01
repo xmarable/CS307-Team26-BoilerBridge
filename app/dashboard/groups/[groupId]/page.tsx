@@ -33,6 +33,9 @@ import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import SplitCostsPanel from "@/components/group/SplitCostsPanel";
+
+
 
 type GroupSummary = {
     groupID: string;
@@ -274,6 +277,12 @@ export default function GroupDashboard() {
               icon={<Users size={22} />}
               label="Members"
             />
+            <SidebarButton
+              active={activeSection === "expenses"}
+              onClick={() => setActiveSection("expenses")}
+              icon={<DollarSign size={22} />}
+              label="Expenses"
+            />
           </div>
         </aside>
 
@@ -478,6 +487,15 @@ export default function GroupDashboard() {
               userId={group.currentUserId}
               isLeader={isLeader}
             />
+            </div>
+          )}
+          {activeSection === "expenses" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <SplitCostsPanel
+                groupId={groupId!}
+                currentUserId={group.currentUserId}
+                userRole={userRole}
+              />
             </div>
           )}
         </main>
