@@ -22,7 +22,7 @@ export async function POST(
 
     // 1. Fetch trip details
     // using 'as any' on the query object satisfies the UUID/string type mismatch
-    const trip = await Trip.findOne({ groupId: groupId as any });
+    const trip = await Trip.findOne({ groupID: groupId as any });
     if (!trip) {
       return NextResponse.json(
         { error: "Trip settings not found for the provided Group ID." },
