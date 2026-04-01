@@ -34,10 +34,11 @@ function allParticipantsValid(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> }
 ) {
   try {
     await dbConnect();
+    const { groupId } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -49,7 +50,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -66,7 +67,7 @@ export async function GET(
     const date = searchParams.get("date");
 
     const query: any = {
-      groupId: params.groupId,
+      groupId: groupId,
     };
 
     if (tripId) query.tripId = tripId;
@@ -98,10 +99,11 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> }
 ) {
   try {
     await dbConnect();
+    const { groupId } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -113,7 +115,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -202,7 +204,7 @@ export async function POST(
     }
 
     const sharedCost = await SharedCost.create({
-      groupId: params.groupId,
+      groupId: groupId,
       tripId: tripId || undefined,
       title: title.trim(),
       description: description?.trim() || undefined,
