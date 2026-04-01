@@ -34,6 +34,8 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
+import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+
 
 
 
@@ -73,6 +75,9 @@ export default function GroupDashboard() {
   const [loading, setLoading] = useState(!!groupId);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
+
+  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits">("ledger");
+
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -490,14 +495,40 @@ export default function GroupDashboard() {
             </div>
           )}
           {activeSection === "expenses" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <SplitCostsPanel
-                groupId={groupId!}
-                currentUserId={group.currentUserId}
-                userRole={userRole}
-              />
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex gap-3 px-1">
+                {(["ledger", "splits"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setExpensesTab(tab)}
+                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+                      expensesTab === tab
+                        ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                        : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tab === "ledger" ? "Ledger" : "Splits"}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+                {expensesTab === "ledger" ? (
+                  <SharedCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                ) : (
+                  <SplitCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                )}
+              </div>
             </div>
           )}
+
         </main>
       </div>
     </div>
