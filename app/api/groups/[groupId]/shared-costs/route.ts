@@ -218,7 +218,28 @@ export async function POST(
       notes: notes?.trim() || undefined,
       createdBy: session.user.userId ?? session.user.id,
     });
-
+    
+    try {
+      await TravelGroup.findByIdAndUpdate(groupId, {
+        $push: {
+          ledger: {
+            payerID: paidBy.trim(),
+            amount,
+            description: title.trim(),
+            debtors: Object.fromEntries(
+              participants.map((p: any) => [
+                p.userId,
+                amount / participants.length,
+              ]),
+            ),
+            isSettled: false,
+          },
+        },
+      });
+    } catch (err) {
+      console.warn("Ledger sync failed:", err);
+    }
+    
     return NextResponse.json({ sharedCost }, { status: 201 });
   } catch (error) {
     console.error("POST shared-costs error:", error);
