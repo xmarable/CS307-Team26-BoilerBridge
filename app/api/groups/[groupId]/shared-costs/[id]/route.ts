@@ -39,10 +39,11 @@ function allParticipantsValid(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { groupId: string; id: string } }
+  context: { params: Promise<{ groupId: string; id: string }> }
 ) {
   try {
     await dbConnect();
+    const { groupId, id } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -54,7 +55,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -64,8 +65,8 @@ export async function PUT(
     }
 
     const existingSharedCost = await SharedCost.findOne({
-      _id: params.id,
-      groupId: params.groupId,
+      _id: id,
+      groupId: groupId,
     });
 
     if (!existingSharedCost) {
@@ -161,7 +162,7 @@ export async function PUT(
     }
 
     const updatedSharedCost = await SharedCost.findByIdAndUpdate(
-      params.id,
+      id,
       {
         ...(tripId !== undefined ? { tripId } : {}),
         ...(title !== undefined ? { title: title.trim() } : {}),
@@ -192,10 +193,11 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { groupId: string; id: string } }
+  context: { params: Promise<{ groupId: string; id: string }> }
 ) {
   try {
     await dbConnect();
+    const { groupId, id } = await context.params;
 
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -207,7 +209,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(params.groupId);
+    const group = await TravelGroup.findById(groupId);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -217,8 +219,8 @@ export async function DELETE(
     }
 
     const existingSharedCost = await SharedCost.findOne({
-      _id: params.id,
-      groupId: params.groupId,
+      _id: id,
+      groupId: groupId,
     });
 
     if (!existingSharedCost) {
@@ -232,7 +234,7 @@ export async function DELETE(
       );
     }
 
-    await SharedCost.findByIdAndDelete(params.id);
+    await SharedCost.findByIdAndDelete(id);
 
     return NextResponse.json(
       { message: "Shared cost deleted successfully" },
