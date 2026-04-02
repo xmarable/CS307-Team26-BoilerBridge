@@ -84,6 +84,8 @@ export async function PATCH(
       status?: string;
       targetMemberID?: { toString(): string };
       requesterID?: { toString(): string };
+      expenseID?: unknown;
+      amount?: unknown;
     };
 
     if (String(pr.targetMemberID) !== uid) {
