@@ -1,11 +1,11 @@
 name: cs307-team26-boilerbridge
 region: nyc3
 services:
-  - name: boilerbridge
+  - name: boilerbridge-web
     image:
       registry_type: DOCR
       repository: boilerbridge-registry/boilerbridge
-      tag: latest
+      tag: ${IMAGE_TAG_BOILERBRIDGE_WEB}
     run_command: node server.js
     http_port: 3000
     instance_count: 1
