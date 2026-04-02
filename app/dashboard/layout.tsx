@@ -10,6 +10,7 @@ import FriendRequest from "@/models/FriendRequest";
 import { redirect } from "next/navigation";
 import { SOSButton } from "@/components/SOSButton";
 import { DashboardWarmer } from "@/components/DashboardWarmer";
+import { Toaster } from "sonner";
 
 export default async function DashboardLayout({
   children,
@@ -82,6 +83,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <SOSButton />
+      <Toaster richColors position="top-center" />
     </div>
   );
 }

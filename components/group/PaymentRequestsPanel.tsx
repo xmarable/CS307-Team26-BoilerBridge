@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +35,7 @@ type PaymentRequestRow = {
   createdAt?: string;
   message?: string;
   declineReason?: string;
+  confirmedAt?: string;
   requesterDisplayName?: string;
   targetDisplayName?: string;
 };
@@ -75,6 +86,9 @@ export default function PaymentRequestsPanel({
   );
   const [declineReason, setDeclineReason] = useState("");
   const [declineSubmitting, setDeclineSubmitting] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<PaymentRequestRow | null>(
+    null,
+  );
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -106,9 +120,41 @@ export default function PaymentRequestsPanel({
   const incoming = rows.filter((r) => r.targetMemberID === currentUserId);
   const outgoing = rows.filter((r) => r.requesterID === currentUserId);
 
-  const patchStatus = async (
+  const confirmPayment = async () => {
+    if (!confirmTarget) return;
+    setActionId(confirmTarget.requestID);
+    setErr(null);
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/payment-requests/${confirmTarget.requestID}/confirm`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(
+          typeof j.error === "string" ? j.error : `Update failed (${res.status})`,
+        );
+        toast.error(
+          typeof j.error === "string" ? j.error : "Could not confirm payment.",
+        );
+        return;
+      }
+      setConfirmTarget(null);
+      toast.success("Payment confirmed.");
+      await fetchRequests();
+    } catch {
+      setErr("Network error.");
+      toast.error("Network error.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const declineRequest = async (
     r: PaymentRequestRow,
-    status: "paid" | "declined",
     reason?: string,
   ) => {
     setActionId(r.requestID);
@@ -120,10 +166,8 @@ export default function PaymentRequestsPanel({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            status,
-            ...(status === "declined" && reason?.trim()
-              ? { reason: reason.trim() }
-              : {}),
+            status: "declined",
+            ...(reason?.trim() ? { reason: reason.trim() } : {}),
           }),
         },
       );
@@ -133,11 +177,9 @@ export default function PaymentRequestsPanel({
         return;
       }
       await fetchRequests();
-      if (status === "declined") {
-        setDeclineOpen(false);
-        setDeclineTarget(null);
-        setDeclineReason("");
-      }
+      setDeclineOpen(false);
+      setDeclineTarget(null);
+      setDeclineReason("");
     } catch {
       setErr("Network error.");
     } finally {
@@ -155,9 +197,8 @@ export default function PaymentRequestsPanel({
     if (!declineTarget) return;
     setDeclineSubmitting(true);
     try {
-      await patchStatus(
+      await declineRequest(
         declineTarget,
-        "declined",
         declineReason.trim() || undefined,
       );
     } finally {
@@ -231,13 +272,9 @@ export default function PaymentRequestsPanel({
                         size="sm"
                         className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
                         disabled={actionId === r.requestID}
-                        onClick={() => patchStatus(r, "paid")}
+                        onClick={() => setConfirmTarget(r)}
                       >
-                        {actionId === r.requestID ? (
-                          <Loader2 className="animate-spin" size={16} />
-                        ) : (
-                          "Pay"
-                        )}
+                        Confirm payment
                       </Button>
                       <Button
                         type="button"
@@ -298,6 +335,43 @@ export default function PaymentRequestsPanel({
           </ul>
         )}
       </section>
+
+      <AlertDialog
+        open={!!confirmTarget}
+        onOpenChange={(open) => {
+          if (!open) setConfirmTarget(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirm you have paid {formatMoney(confirmTarget?.amount ?? 0)} to{" "}
+              <span className="font-semibold text-foreground">
+                {confirmTarget?.requesterDisplayName ?? "the requester"}
+              </span>
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl" type="button">
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700"
+              disabled={!!confirmTarget && actionId === confirmTarget.requestID}
+              onClick={() => void confirmPayment()}
+            >
+              {confirmTarget && actionId === confirmTarget.requestID ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
         <DialogContent className="rounded-2xl sm:max-w-md">

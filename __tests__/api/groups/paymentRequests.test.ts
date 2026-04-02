@@ -15,6 +15,7 @@ const nextAuth = await import("next-auth");
 const { default: dbConnect } = await import("@/lib/dbConnect");
 const { default: User } = await import("@/models/User");
 const { default: TravelGroup } = await import("@/models/TravelGroup");
+const { default: Notification } = await import("@/models/Notification");
 
 const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
   typeof nextAuth.getServerSession
@@ -32,6 +33,15 @@ let PATCHPaymentRequest: (
   req: Request,
   ctx: { params: Promise<{ groupId: string; requestId: string }> },
 ) => Promise<Response>;
+let POSTConfirmPayment: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string; requestId: string }> },
+) => Promise<Response>;
+let PATCHNotificationRead: (
+  req: Request,
+  ctx: { params: Promise<{ notificationId: string }> },
+) => Promise<Response>;
+let GETNotifications: (req: Request) => Promise<Response>;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
@@ -46,10 +56,21 @@ beforeAll(async () => {
     "@/app/api/groups/[groupId]/payment-requests/[requestId]/route"
   );
   PATCHPaymentRequest = patch.PATCH;
+  const confirm = await import(
+    "@/app/api/groups/[groupId]/payment-requests/[requestId]/confirm/route"
+  );
+  POSTConfirmPayment = confirm.POST;
+  const notifRead = await import(
+    "@/app/api/notifications/[notificationId]/read/route"
+  );
+  PATCHNotificationRead = notifRead.PATCH;
+  const notifGet = await import("@/app/api/notifications/route");
+  GETNotifications = notifGet.GET;
 });
 
 afterAll(async () => {
   if (mongoose.connection.readyState === 1) {
+    await Notification.deleteMany({});
     await TravelGroup.deleteMany({});
     await User.deleteMany({});
     await mongoose.connection.close();
@@ -498,5 +519,231 @@ describe("GET /api/groups/[groupId]/payment-requests", () => {
       { params: Promise.resolve({ groupId: String(group.groupID) }) },
     );
     expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/groups/.../payment-requests/.../confirm", () => {
+  it("sets paid, confirmedAt, notifies requester, and updates ledger when target confirms", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const postRes = await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 30,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    expect([200, 201]).toContain(postRes.status);
+    const { paymentRequest } = await postRes.json();
+    const requestID = paymentRequest.requestID as string;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: b.userId },
+      expires: "",
+    });
+
+    const confirmRes = await POSTConfirmPayment(
+      new Request("http://localhost/api/x/confirm", { method: "POST" }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+    expect(confirmRes.status).toBe(200);
+    const body = await confirmRes.json();
+    expect(body.paymentRequest.status).toBe("paid");
+    expect(body.paymentRequest.confirmedAt).toBeTruthy();
+
+    const notif = await Notification.findOne({
+      recipientID: a.userId,
+      type: "payment_confirmed",
+    }).lean();
+    expect(notif).toBeTruthy();
+    expect(String(notif!.paymentRequestID)).toBe(requestID);
+    expect(String(notif!.message)).toContain("has confirmed payment");
+
+    const updated = await TravelGroup.findOne({ groupID: group.groupID }).lean();
+    const ledger = (updated as { ledger?: { isSettled?: boolean }[] }).ledger ?? [];
+    expect(ledger[0]?.isSettled).toBe(true);
+  });
+
+  it("returns 403 when requester tries to confirm", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const postRes = await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 5,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    const { paymentRequest } = await postRes.json();
+    const requestID = paymentRequest.requestID as string;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const confirmRes = await POSTConfirmPayment(
+      new Request("http://localhost/api/x/confirm", { method: "POST" }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+    expect(confirmRes.status).toBe(403);
+    const errBody = await confirmRes.json();
+    expect(errBody.error).toBeTruthy();
+  });
+
+  it("returns 400 Payment already confirmed on duplicate confirm", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const postRes = await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 5,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    const { paymentRequest } = await postRes.json();
+    const requestID = paymentRequest.requestID as string;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: b.userId },
+      expires: "",
+    });
+
+    const first = await POSTConfirmPayment(
+      new Request("http://localhost/api/x/confirm", { method: "POST" }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+    expect(first.status).toBe(200);
+
+    const second = await POSTConfirmPayment(
+      new Request("http://localhost/api/x/confirm", { method: "POST" }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+    expect(second.status).toBe(400);
+    const errBody = await second.json();
+    expect(errBody.error).toBe("Payment already confirmed");
+  });
+});
+
+describe("GET /api/notifications and PATCH .../read", () => {
+  it("lists notifications with unreadCount and marks as read", async () => {
+    const { a, b, group, expenseID } = await createUsersAndGroupWithExpense();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const postRes = await POSTPaymentRequests(
+      new Request("http://localhost/api/x/payment-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseID,
+          targetMemberID: String(b.userId),
+          amount: 4,
+        }),
+      }),
+      { params: Promise.resolve({ groupId: String(group.groupID) }) },
+    );
+    const { paymentRequest } = await postRes.json();
+    const requestID = paymentRequest.requestID as string;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: b.userId },
+      expires: "",
+    });
+
+    await POSTConfirmPayment(
+      new Request("http://localhost/api/x/confirm", { method: "POST" }),
+      {
+        params: Promise.resolve({
+          groupId: String(group.groupID),
+          requestId: requestID,
+        }),
+      },
+    );
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: a.userId },
+      expires: "",
+    });
+
+    const listRes = await GETNotifications(
+      new Request("http://localhost/api/notifications?page=1&limit=10"),
+    );
+    expect(listRes.status).toBe(200);
+    const listData = await listRes.json();
+    expect(listData.unreadCount).toBeGreaterThanOrEqual(1);
+    const n = listData.notifications.find(
+      (x: { paymentRequestID: string }) => x.paymentRequestID === requestID,
+    );
+    expect(n).toBeTruthy();
+    expect(n.read).toBe(false);
+
+    const patchRes = await PATCHNotificationRead(
+      new Request("http://localhost/api/x/read", { method: "PATCH" }),
+      { params: Promise.resolve({ notificationId: n.notificationID }) },
+    );
+    expect(patchRes.status).toBe(200);
+
+    const after = await GETNotifications(
+      new Request("http://localhost/api/notifications?page=1&limit=10"),
+    );
+    const afterData = await after.json();
+    const n2 = afterData.notifications.find(
+      (x: { paymentRequestID: string }) => x.paymentRequestID === requestID,
+    );
+    expect(n2.read).toBe(true);
   });
 });
