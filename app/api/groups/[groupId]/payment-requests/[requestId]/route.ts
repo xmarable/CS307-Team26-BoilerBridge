@@ -4,6 +4,7 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
+import { applyPaymentRequestToLedger } from "@/lib/paymentRequestLedger";
 
 const patchBodySchema = z.object({
   status: z.enum(["declined", "paid"]),
@@ -107,6 +108,11 @@ export async function PATCH(
       }
     } else {
       (requests[idx] as { status: string }).status = "paid";
+      applyPaymentRequestToLedger(group, {
+        expenseID: pr.expenseID,
+        amount: pr.amount,
+        targetMemberID: pr.targetMemberID,
+      });
     }
 
     group.markModified("paymentRequests");

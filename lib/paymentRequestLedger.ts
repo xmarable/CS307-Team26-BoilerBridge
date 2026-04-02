@@ -80,3 +80,119 @@ export function buildCreditorLinesForMember(
 
   return out;
 }
+
+const roundMoney = (n: number) => Math.round(n * 100) / 100;
+
+function getDebtorAmount(
+  debtors: Map<string, number> | Record<string, number>,
+  memberId: string,
+): number {
+  const id = String(memberId);
+  if (debtors instanceof Map) {
+    if (debtors.has(id)) return Number(debtors.get(id));
+    for (const [k, v] of debtors.entries()) {
+      if (String(k) === id) return Number(v);
+    }
+    return 0;
+  }
+  const o = debtors as Record<string, number>;
+  if (Object.prototype.hasOwnProperty.call(o, id)) return Number(o[id]);
+  for (const k of Object.keys(o)) {
+    if (String(k) === id) return Number(o[k]);
+  }
+  return 0;
+}
+
+function setDebtorAmount(
+  debtors: Map<string, number> | Record<string, number>,
+  memberId: string,
+  amount: number,
+): void {
+  const id = String(memberId);
+  const v = roundMoney(amount);
+  if (debtors instanceof Map) {
+    let key = id;
+    if (!debtors.has(id)) {
+      for (const k of debtors.keys()) {
+        if (String(k) === id) {
+          key = k;
+          break;
+        }
+      }
+    }
+    if (v <= 0.001) debtors.delete(key);
+    else debtors.set(key, v);
+    return;
+  }
+  const o = debtors as Record<string, number>;
+  let key = id;
+  if (!(id in o)) {
+    for (const k of Object.keys(o)) {
+      if (String(k) === id) {
+        key = k;
+        break;
+      }
+    }
+  }
+  if (v <= 0.001) delete o[key];
+  else o[key] = v;
+}
+
+function totalDebtorsOwed(
+  debtors: Map<string, number> | Record<string, number>,
+): number {
+  let sum = 0;
+  if (debtors instanceof Map) {
+    for (const v of debtors.values()) sum += Number(v);
+  } else {
+    for (const v of Object.values(debtors as Record<string, number>)) {
+      sum += Number(v);
+    }
+  }
+  return roundMoney(sum);
+}
+
+/**
+ * When a payment request is marked paid, reduce the debtor's balance on the
+ * matching ledger expense and mark the expense settled if nothing is left owed.
+ * Mutates the Mongoose group document; caller should save after markModified.
+ */
+export function applyPaymentRequestToLedger(
+  group: { ledger?: unknown[]; markModified?: (path: string) => void },
+  pr: {
+    expenseID: unknown;
+    amount: unknown;
+    targetMemberID: unknown;
+  },
+): void {
+  const eid = String(pr.expenseID);
+  const target = String(pr.targetMemberID);
+  const paid = Number(pr.amount);
+  if (!Number.isFinite(paid) || paid < 0) return;
+
+  const ledger = group.ledger;
+  if (!Array.isArray(ledger)) return;
+
+  const exp = ledger.find(
+    (x) =>
+      x != null &&
+      String((x as { expenseID?: unknown }).expenseID) === eid,
+  ) as
+    | {
+        debtors?: Map<string, number> | Record<string, number>;
+        isSettled?: boolean;
+      }
+    | undefined;
+
+  if (!exp?.debtors) return;
+
+  const cur = getDebtorAmount(exp.debtors, target);
+  const next = Math.max(0, roundMoney(cur - paid));
+  setDebtorAmount(exp.debtors, target, next);
+
+  if (totalDebtorsOwed(exp.debtors) < 0.01) {
+    exp.isSettled = true;
+  }
+
+  group.markModified?.("ledger");
+}
