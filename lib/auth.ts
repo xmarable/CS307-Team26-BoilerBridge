@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import clientPromise from "./mongodb";
@@ -28,7 +28,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user) return null;
-        if (user.settings.deletion.requested) {
+        if (user.settings?.deletion?.requested) {
           return null;
         }
 
@@ -72,8 +72,7 @@ export const authOptions: NextAuthOptions = {
         token.eduEmail = session.user?.eduEmail ?? token.eduEmail;
       }
 
-      // only sync with DB if we have an email and it's not a static request
-      // this prevents the loop from hijacking the redirect flow
+      // sync with DB to check if user still exists
       if (token?.email) {
         try {
           const client = await clientPromise;
@@ -83,25 +82,21 @@ export const authOptions: NextAuthOptions = {
             .findOne({ email: token.email });
 
           if (!dbUser) {
-            // if user is deleted, we invalidate the token fields
-            // but keep the shape valid for TS
+            // user was deleted from the cluster
             return {
               ...token,
-              email: null,
-              userId: undefined,
-              id: undefined,
-            } as unknown as JWT;
+              isDeleted: true, // flag this for the session callback lol
+            } as any;
           }
 
-          if (dbUser) {
-            token.name = dbUser.username || dbUser.name || token.name;
-            token.picture = dbUser.image || token.picture;
-            token.isStudentVerified =
-              dbUser.settings?.security?.isStudentVerified ?? false;
-            token.eduEmail = dbUser.eduEmail || null;
-          }
+          // user exists, sync fresh data
+          token.name = dbUser.username || dbUser.name || token.name;
+          token.picture = dbUser.image || token.picture;
+          token.isStudentVerified =
+            dbUser.settings?.security?.isStudentVerified ?? false;
+          token.eduEmail = dbUser.eduEmail || null;
+          token.isDeleted = false;
         } catch (error) {
-          // log it but don't kill the session, otherwise u loop forever
           console.error("Auth Callback DB Error:", error);
         }
       }
@@ -109,6 +104,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // check the deletion flag we set in the jwt callback
+      if ((token as any).isDeleted) {
+        return null as any; // this kills the session and breaks the loop
+      }
+
       if (session.user && token) {
         (session.user as any).id = token.id as string;
         (session.user as any).userId = token.userId as string;
@@ -123,6 +123,6 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/signin",
-    error: "/signin", // redirect errors back to signin instead of default error page
+    error: "/signin",
   },
 };
