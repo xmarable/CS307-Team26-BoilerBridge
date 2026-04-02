@@ -1,3 +1,5 @@
+process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 

@@ -1,3 +1,5 @@
+process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
@@ -21,10 +23,22 @@ const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
   typeof nextAuth.getServerSession
 >;
 
-let GET: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let POST: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let PUT: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
-let DELETE: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let POST: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let PUT: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string; id: string }> },
+) => Promise<Response>;
+let DELETE: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string; id: string }> },
+) => Promise<Response>;
 
 let groupId: string;
 let leaderId: string;
@@ -40,9 +54,24 @@ beforeAll(async () => {
 
   const hash = await bcrypt.hash("pass", 10);
 
-  const leader = await User.create({ username: "leader", email: "leader@test.com", passwordHash: hash, school: "Purdue" });
-  const member = await User.create({ username: "member", email: "member@test.com", passwordHash: hash, school: "Purdue" });
-  const outsider = await User.create({ username: "outsider", email: "outsider@test.com", passwordHash: hash, school: "Purdue" });
+  const leader = await User.create({
+    username: "leader",
+    email: "leader@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
+  const member = await User.create({
+    username: "member",
+    email: "member@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
+  const outsider = await User.create({
+    username: "outsider",
+    email: "outsider@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
 
   leaderId = leader.userId.toString();
   memberId = member.userId.toString();
@@ -58,11 +87,13 @@ beforeAll(async () => {
   });
   groupId = group.groupID.toString();
 
-  const collectionRoute = await import("@/app/api/groups/[groupId]/cost-splits/route");
+  const collectionRoute =
+    await import("@/app/api/groups/[groupId]/cost-splits/route");
   GET = collectionRoute.GET as any;
   POST = collectionRoute.POST as any;
 
-  const itemRoute = await import("@/app/api/groups/[groupId]/cost-splits/[id]/route");
+  const itemRoute =
+    await import("@/app/api/groups/[groupId]/cost-splits/[id]/route");
   PUT = itemRoute.PUT as any;
   DELETE = itemRoute.DELETE as any;
 });
@@ -86,7 +117,9 @@ afterAll(async () => {
 beforeEach(() => jest.clearAllMocks());
 
 function makeGetRequest(groupId: string, query = "") {
-  return new Request(`http://localhost/api/groups/${groupId}/cost-splits${query}`);
+  return new Request(
+    `http://localhost/api/groups/${groupId}/cost-splits${query}`,
+  );
 }
 
 function makePostRequest(groupId: string, body: object) {
@@ -98,17 +131,23 @@ function makePostRequest(groupId: string, body: object) {
 }
 
 function makePutRequest(groupId: string, id: string, body: object) {
-  return new Request(`http://localhost/api/groups/${groupId}/cost-splits/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return new Request(
+    `http://localhost/api/groups/${groupId}/cost-splits/${id}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 function makeDeleteRequest(groupId: string, id: string) {
-  return new Request(`http://localhost/api/groups/${groupId}/cost-splits/${id}`, {
-    method: "DELETE",
-  });
+  return new Request(
+    `http://localhost/api/groups/${groupId}/cost-splits/${id}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 // ─── GET ──────────────────────────────────────────────────────────────────────
@@ -275,7 +314,10 @@ describe("POST /api/groups/:groupId/cost-splits", () => {
     expect(data.costSplit).toBeDefined();
     expect(data.costSplit.splitType).toBe("equal");
     const amounts = data.costSplit.participants.map((p: any) => p.amount);
-    expect(amounts.reduce((a: number, b: number) => a + b, 0)).toBeCloseTo(100, 1);
+    expect(amounts.reduce((a: number, b: number) => a + b, 0)).toBeCloseTo(
+      100,
+      1,
+    );
     for (const amt of amounts) expect(amt).toBeCloseTo(50, 1);
   });
 
@@ -298,8 +340,14 @@ describe("POST /api/groups/:groupId/cost-splits", () => {
     );
     expect(res.status).toBe(201);
     const data = await res.json();
-    expect(data.costSplit.participants.find((p: any) => p.userId === leaderId)?.amount).toBe(70);
-    expect(data.costSplit.participants.find((p: any) => p.userId === memberId)?.amount).toBe(30);
+    expect(
+      data.costSplit.participants.find((p: any) => p.userId === leaderId)
+        ?.amount,
+    ).toBe(70);
+    expect(
+      data.costSplit.participants.find((p: any) => p.userId === memberId)
+        ?.amount,
+    ).toBe(30);
   });
 });
 
