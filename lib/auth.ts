@@ -28,6 +28,9 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!user) return null;
+        if (user.settings.deletion.requested) {
+          return null;
+        }
 
         const mongoId = (user as any)._id?.toString();
         const uuid = (user as any).userId;

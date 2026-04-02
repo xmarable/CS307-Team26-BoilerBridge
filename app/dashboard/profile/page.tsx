@@ -16,9 +16,7 @@ export default async function MePage() {
   if (!session || !session.user?.email) {
     redirect("/signin");
   }
-
-  const client = await clientPromise;
-  const db = client.db("BoilerBridge");
+  
   const dbUser = await User.findOne({ email: session.user.email }).lean();
 
   if (!dbUser) {
