@@ -4,9 +4,9 @@ services:
   - name: boilerbridge-web
     image:
       registry_type: DOCR
-      repository: boilerbridge
-      tag: latest
-    run_command: npm start
+      repository: boilerbridge-registry/boilerbridge
+      tag: ${IMAGE_TAG_BOILERBRIDGE_WEB}
+    run_command: node server.js
     http_port: 3000
     instance_count: 1
     instance_size_slug: basic-xs
@@ -22,7 +22,7 @@ services:
         value: "production"
       - key: NEXTAUTH_URL
         scope: RUN_TIME
-        value: https://cs307-team26-boilerbridge-o9gmr.ondigitalocean.app
+        value: ${APP_URL}
       - key: NEXTAUTH_SECRET
         scope: RUN_TIME
         value: ${NEXTAUTH_SECRET}

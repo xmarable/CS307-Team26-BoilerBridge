@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone", // This is required for the standalone output to work correctly
   images: {
     remotePatterns: [
       {
