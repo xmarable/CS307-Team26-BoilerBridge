@@ -1,0 +1,694 @@
+import { jest } from "@jest/globals";
+import mongoose from "mongoose";
+
+await jest.unstable_mockModule("next-auth", () => ({
+  getServerSession: jest.fn(),
+}));
+
+await jest.unstable_mockModule("@/lib/auth", () => ({
+  authOptions: {},
+}));
+
+const nextAuth = await import("next-auth");
+const { default: bcrypt } = await import("bcryptjs");
+const { default: dbConnect } = await import("@/lib/dbConnect");
+const { default: User } = await import("@/models/User");
+const { default: TravelGroup } = await import("@/models/TravelGroup");
+const { default: MustHave } = await import("@/models/MustHave");
+const { default: CalendarEvent } = await import("@/models/CalendarEvent");
+const { default: Trip } = await import("@/models/Trip");
+
+const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
+  typeof nextAuth.getServerSession
+>;
+
+let GET: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
+let POST: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
+let PUT: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
+let DELETE: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
+let GENERATE: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
+
+let groupUUID: string;
+let leaderId: string;
+let memberId: string;
+let outsiderId: string;
+
+beforeAll(async () => {
+  await dbConnect();
+  await MustHave.deleteMany({});
+  await CalendarEvent.deleteMany({});
+  await Trip.deleteMany({});
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
+
+  const hash = await bcrypt.hash("pass", 10);
+
+  const leader = await User.create({
+    username: "mh_leader",
+    email: "mh_leader@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
+  const member = await User.create({
+    username: "mh_member",
+    email: "mh_member@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
+  const outsider = await User.create({
+    username: "mh_outsider",
+    email: "mh_outsider@test.com",
+    passwordHash: hash,
+    school: "Purdue",
+  });
+
+  leaderId = leader.userId.toString();
+  memberId = member.userId.toString();
+  outsiderId = outsider.userId.toString();
+
+  const group = await TravelGroup.create({
+    groupName: "Must-Haves Test Group",
+    leaderID: leaderId,
+    membersList: [
+      { userId: leaderId, role: "Leader" },
+      { userId: memberId, role: "Viewer" },
+    ],
+  });
+
+  groupUUID = group.groupID.toString();
+
+  const collectionRoute = await import(
+    "@/app/api/groups/[groupId]/must-haves/route"
+  );
+  GET = collectionRoute.GET as any;
+  POST = collectionRoute.POST as any;
+
+  const itemRoute = await import(
+    "@/app/api/groups/[groupId]/must-haves/[id]/route"
+  );
+  PUT = itemRoute.PUT as any;
+  DELETE = itemRoute.DELETE as any;
+
+  const generateRoute = await import(
+    "@/app/api/groups/[groupId]/itinerary/generate/route"
+  );
+  GENERATE = generateRoute.POST as any;
+});
+
+afterAll(async () => {
+  await MustHave.deleteMany({});
+  await CalendarEvent.deleteMany({});
+  await Trip.deleteMany({});
+  await TravelGroup.deleteMany({});
+  await User.deleteMany({});
+
+  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+  if ((global as any).mongoose) {
+    (global as any).mongoose.conn = null;
+    (global as any).mongoose.promise = null;
+  }
+
+  jest.resetModules();
+  jest.clearAllMocks();
+});
+
+beforeEach(() => jest.clearAllMocks());
+
+function makeGetRequest(gId: string, query = "") {
+  return new Request(`http://localhost/api/groups/${gId}/must-haves${query}`);
+}
+
+function makePostRequest(gId: string, body: object) {
+  return new Request(`http://localhost/api/groups/${gId}/must-haves`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function makePutRequest(gId: string, id: string, body: object) {
+  return new Request(`http://localhost/api/groups/${gId}/must-haves/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function makeDeleteRequest(gId: string, id: string) {
+  return new Request(`http://localhost/api/groups/${gId}/must-haves/${id}`, {
+    method: "DELETE",
+  });
+}
+
+function makeGenerateRequest(gId: string) {
+  return new Request(
+    `http://localhost/api/groups/${gId}/itinerary/generate`,
+    { method: "POST" },
+  );
+}
+
+// ─── GET ─────────────────────────────────────────────────────────────────────
+
+describe("GET /api/groups/:groupId/must-haves", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await GET(makeGetRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-members", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsiderId },
+      expires: "9999",
+    });
+    const res = await GET(makeGetRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 200 with must-haves array for group members", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await GET(makeGetRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data.mustHaves)).toBe(true);
+  });
+
+  it("returns 200 with must-haves array for group leader", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await GET(makeGetRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(Array.isArray(data.mustHaves)).toBe(true);
+  });
+
+  it("filters results by status", async () => {
+    await MustHave.create([
+      { groupId: groupUUID, name: "Proposed Place", addedBy: leaderId, status: "proposed" },
+      { groupId: groupUUID, name: "Approved Place", addedBy: leaderId, status: "approved" },
+    ] as any[]);
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await GET(makeGetRequest(groupUUID, "?status=approved"), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.mustHaves.every((m: any) => m.status === "approved")).toBe(true);
+  });
+
+  it("filters results by category", async () => {
+    await MustHave.create({
+      groupId: groupUUID,
+      name: "Italian Restaurant",
+      addedBy: leaderId,
+      status: "proposed",
+      category: "food",
+    } as any);
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await GET(makeGetRequest(groupUUID, "?category=food"), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.mustHaves.every((m: any) => m.category === "food")).toBe(true);
+  });
+});
+
+// ─── POST ─────────────────────────────────────────────────────────────────────
+
+describe("POST /api/groups/:groupId/must-haves", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await POST(makePostRequest(groupUUID, { name: "Test" }), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-members", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsiderId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, { name: "Test Place" }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 when name is missing", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, { category: "food" }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when priority is out of range", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, { name: "Bad Priority", priority: 10 }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("creates a must-have and returns 201 with correct fields", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, {
+        name: "Eiffel Tower",
+        category: "landmark",
+        address: "Champ de Mars, Paris",
+        priority: 5,
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.mustHave).toBeDefined();
+    expect(data.mustHave.name).toBe("Eiffel Tower");
+    expect(data.mustHave.status).toBe("proposed");
+    expect(data.mustHave.priority).toBe(5);
+    expect(data.mustHave.category).toBe("landmark");
+  });
+
+  it("uses default priority=3 and status=proposed when not provided", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, { name: "Louvre Museum" }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.mustHave.priority).toBe(3);
+    expect(data.mustHave.status).toBe("proposed");
+  });
+
+  it("returns 409 when duplicate placeId is submitted", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    await POST(
+      makePostRequest(groupUUID, {
+        name: "Colosseum",
+        placeId: "place-colosseum-001",
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    const res = await POST(
+      makePostRequest(groupUUID, {
+        name: "Colosseum Again",
+        placeId: "place-colosseum-001",
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error).toMatch(/duplicate/i);
+  });
+
+  it("returns 409 when same name+address already exists", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    await POST(
+      makePostRequest(groupUUID, {
+        name: "Trevi Fountain",
+        address: "Piazza di Trevi, Rome",
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    const res = await POST(
+      makePostRequest(groupUUID, {
+        name: "Trevi Fountain",
+        address: "Piazza di Trevi, Rome",
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(409);
+  });
+});
+
+// ─── PUT ─────────────────────────────────────────────────────────────────────
+
+describe("PUT /api/groups/:groupId/must-haves/:id", () => {
+  let leaderItemId: string;
+  let memberItemId: string;
+
+  beforeAll(async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const leaderRes = await POST(
+      makePostRequest(groupUUID, { name: "Leader's Landmark", priority: 4 }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    leaderItemId = (await leaderRes.json()).mustHave._id;
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const memberRes = await POST(
+      makePostRequest(groupUUID, { name: "Member's Spot", priority: 2 }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    memberItemId = (await memberRes.json()).mustHave._id;
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await PUT(
+      makePutRequest(groupUUID, leaderItemId, { priority: 5 }),
+      { params: Promise.resolve({ groupId: groupUUID, id: leaderItemId }) },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-members", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsiderId },
+      expires: "9999",
+    });
+    const res = await PUT(
+      makePutRequest(groupUUID, leaderItemId, { priority: 5 }),
+      { params: Promise.resolve({ groupId: groupUUID, id: leaderItemId }) },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 for a non-existent must-have", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await PUT(
+      makePutRequest(groupUUID, fakeId, { priority: 5 }),
+      { params: Promise.resolve({ groupId: groupUUID, id: fakeId }) },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when non-creator non-leader tries to edit", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await PUT(
+      makePutRequest(groupUUID, leaderItemId, { priority: 1 }),
+      { params: Promise.resolve({ groupId: groupUUID, id: leaderItemId }) },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("allows creator to update their must-have", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await PUT(
+      makePutRequest(groupUUID, memberItemId, { priority: 5, notes: "Must visit!" }),
+      { params: Promise.resolve({ groupId: groupUUID, id: memberItemId }) },
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.mustHave.priority).toBe(5);
+    expect(data.mustHave.notes).toBe("Must visit!");
+  });
+
+  it("allows leader to update any must-have (including status)", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await PUT(
+      makePutRequest(groupUUID, memberItemId, { status: "approved" }),
+      { params: Promise.resolve({ groupId: groupUUID, id: memberItemId }) },
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.mustHave.status).toBe("approved");
+  });
+});
+
+// ─── DELETE ──────────────────────────────────────────────────────────────────
+
+describe("DELETE /api/groups/:groupId/must-haves/:id", () => {
+  let itemId: string;
+
+  beforeEach(async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, {
+        name: `Delete Test ${Date.now()}`,
+        priority: 1,
+      }),
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    itemId = (await res.json()).mustHave._id;
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    mockGetServerSession.mockResolvedValue(null);
+    const res = await DELETE(makeDeleteRequest(groupUUID, itemId), {
+      params: Promise.resolve({ groupId: groupUUID, id: itemId }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-members", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsiderId },
+      expires: "9999",
+    });
+    const res = await DELETE(makeDeleteRequest(groupUUID, itemId), {
+      params: Promise.resolve({ groupId: groupUUID, id: itemId }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("allows creator to delete their own must-have", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const res = await DELETE(makeDeleteRequest(groupUUID, itemId), {
+      params: Promise.resolve({ groupId: groupUUID, id: itemId }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+  });
+
+  it("allows group leader to delete any must-have", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const res = await DELETE(makeDeleteRequest(groupUUID, itemId), {
+      params: Promise.resolve({ groupId: groupUUID, id: itemId }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 404 for a must-have that does not exist", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const fakeId = new mongoose.Types.ObjectId().toString();
+    const res = await DELETE(makeDeleteRequest(groupUUID, fakeId), {
+      params: Promise.resolve({ groupId: groupUUID, id: fakeId }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── ITINERARY GENERATION ─────────────────────────────────────────────────────
+
+describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)", () => {
+  beforeAll(async () => {
+    await MustHave.deleteMany({});
+    await CalendarEvent.deleteMany({ source: "itinerary" } as any);
+    await Trip.deleteMany({});
+
+    await Trip.create({
+      groupID: groupUUID,
+      userId: leaderId,
+      fromCity: "New York",
+      toCity: "Paris",
+      fromDate: new Date("2026-06-01"),
+      toDate: new Date("2026-06-10"),
+      mode: "flight",
+      budget: 5000,
+    } as any);
+
+    await MustHave.insertMany([
+      {
+        groupId: groupUUID,
+        name: "Eiffel Tower",
+        address: "Champ de Mars, Paris",
+        category: "landmark",
+        priority: 5,
+        addedBy: leaderId,
+        status: "approved",
+      },
+      {
+        groupId: groupUUID,
+        name: "Louvre Museum",
+        address: "Rue de Rivoli, Paris",
+        category: "museum",
+        priority: 4,
+        addedBy: memberId,
+        status: "approved",
+      },
+    ] as any[]);
+  });
+
+  it("generates calendar events from approved must-haves", async () => {
+    const res = await GENERATE(makeGenerateRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.count).toBe(2);
+    expect(data.message).toMatch(/itinerary/i);
+
+    const events = await CalendarEvent.find({
+      groupId: groupUUID,
+      source: "itinerary",
+    } as any);
+    expect(events.length).toBe(2);
+    const titles = events.map((e) => e.title);
+    expect(titles).toContain("Eiffel Tower");
+    expect(titles).toContain("Louvre Museum");
+  });
+
+  it("prioritizes higher-priority must-haves (sorted by priority desc)", async () => {
+    const events = await CalendarEvent.find({
+      groupId: groupUUID,
+      source: "itinerary",
+    } as any).sort({ startTime: 1 });
+    expect(events[0].title).toBe("Eiffel Tower");
+  });
+
+  it("does not include proposed or rejected must-haves in the itinerary", async () => {
+    await CalendarEvent.deleteMany({ source: "itinerary" } as any);
+
+    await MustHave.create([
+      { groupId: groupUUID, name: "Proposed Spot", addedBy: leaderId, status: "proposed" },
+      { groupId: groupUUID, name: "Rejected Spot", addedBy: leaderId, status: "rejected" },
+    ] as any[]);
+
+    const res = await GENERATE(makeGenerateRequest(groupUUID), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(res.status).toBe(200);
+
+    const events = await CalendarEvent.find({
+      groupId: groupUUID,
+      source: "itinerary",
+    } as any);
+    const titles = events.map((e) => e.title);
+    expect(titles).not.toContain("Proposed Spot");
+    expect(titles).not.toContain("Rejected Spot");
+  });
+
+  it("returns 400 when no approved must-haves exist", async () => {
+    const hash = await bcrypt.hash("pass", 10);
+    const emptyLeader = await User.create({
+      username: "gen_empty_leader",
+      email: "gen_empty@test.com",
+      passwordHash: hash,
+      school: "Purdue",
+    });
+    const emptyGroup = await TravelGroup.create({
+      groupName: "Empty Group",
+      leaderID: emptyLeader.userId.toString(),
+      membersList: [{ userId: emptyLeader.userId.toString(), role: "Leader" }],
+    });
+    const emptyUUID = emptyGroup.groupID.toString();
+
+    await Trip.create({
+      groupID: emptyUUID,
+      userId: emptyLeader.userId.toString(),
+      fromCity: "NYC",
+      toCity: "LA",
+      fromDate: new Date("2026-07-01"),
+      toDate: new Date("2026-07-05"),
+      mode: "flight",
+      budget: 1000,
+    } as any);
+
+    const res = await GENERATE(makeGenerateRequest(emptyUUID), {
+      params: Promise.resolve({ groupId: emptyUUID }),
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/no approved/i);
+  });
+
+  it("returns 404 when no trip is found for the group", async () => {
+    const hash = await bcrypt.hash("pass", 10);
+    const noTripLeader = await User.create({
+      username: "gen_notrip_leader",
+      email: "gen_notrip@test.com",
+      passwordHash: hash,
+      school: "Purdue",
+    });
+    const noTripGroup = await TravelGroup.create({
+      groupName: "No Trip Group",
+      leaderID: noTripLeader.userId.toString(),
+      membersList: [{ userId: noTripLeader.userId.toString(), role: "Leader" }],
+    });
+    const noTripUUID = noTripGroup.groupID.toString();
+
+    const res = await GENERATE(makeGenerateRequest(noTripUUID), {
+      params: Promise.resolve({ groupId: noTripUUID }),
+    });
+    expect(res.status).toBe(404);
+  });
+});

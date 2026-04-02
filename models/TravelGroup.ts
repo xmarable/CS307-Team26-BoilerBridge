@@ -158,6 +158,32 @@ const pendingRequestSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const pollSchema = new mongoose.Schema(
+  {
+    pollID: {
+      type: mongoose.Types.UUID,
+      default: () => randomUUID()
+    },
+    createdBy: {
+      type: mongoose.Types.UUID,
+      required: true
+    },
+    choices: {
+      type: [String],
+      default: [],
+      required: true
+    },
+    endsAt: {
+      type: Date,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }
+)
+
 const travelGroupSchema = new mongoose.Schema(
   {
     groupID: {

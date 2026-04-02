@@ -44,7 +44,10 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
   const full = Math.floor(rating);
   const hasHalf = rating % 1 >= 0.5;
   return (
-    <div className="flex items-center gap-0.5" aria-label={`${rating} out of ${max} stars`}>
+    <div
+      className="flex items-center gap-0.5"
+      aria-label={`${rating} out of ${max} stars`}
+    >
       {Array.from({ length: max }, (_, i) => (
         <Star
           key={i}
@@ -54,7 +57,7 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
               ? "fill-amber-500 text-amber-500"
               : i === full && hasHalf
                 ? "fill-amber-500/50 text-amber-500"
-                : "text-gray-200"
+                : "text-gray-200",
           )}
         />
       ))}
@@ -70,19 +73,25 @@ interface ActivityReviewsProps {
 }
 
 function fetchReviews(activityId: string): Promise<ReviewsResponse> {
-  return fetch(`/api/activities/${activityId}/reviews`, { credentials: "include" }).then(
-    (res) => {
-      if (!res.ok) {
-        return res.json().then((body) => {
-          throw new Error(body?.error ?? `Failed to load reviews (${res.status})`);
-        });
-      }
-      return res.json();
+  return fetch(`/api/activities/${activityId}/reviews`, {
+    credentials: "include",
+  }).then((res) => {
+    if (!res.ok) {
+      return res.json().then((body) => {
+        throw new Error(
+          body?.error ?? `Failed to load reviews (${res.status})`,
+        );
+      });
     }
-  );
+    return res.json();
+  });
 }
 
-export function ActivityReviews({ activityId, className, currentUserDisplayName }: ActivityReviewsProps) {
+export function ActivityReviews({
+  activityId,
+  className,
+  currentUserDisplayName,
+}: ActivityReviewsProps) {
   const [data, setData] = useState<ReviewsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +121,8 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activityId || writeRating < 1 || writeRating > 5 || !writeText.trim()) return;
+    if (!activityId || writeRating < 1 || writeRating > 5 || !writeText.trim())
+      return;
     setSubmitError(null);
     setSubmitting(true);
     fetch(`/api/activities/${activityId}/reviews`, {
@@ -122,7 +132,10 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
       body: JSON.stringify({ text: writeText.trim(), rating: writeRating }),
     })
       .then((res) => {
-        if (!res.ok) return res.json().then((body: { error?: string }) => { throw new Error(body?.error ?? "Failed to submit"); });
+        if (!res.ok)
+          return res.json().then((body: { error?: string }) => {
+            throw new Error(body?.error ?? "Failed to submit");
+          });
         return res.json();
       })
       .then(() => {
@@ -190,7 +203,9 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
                   <Star
                     className={cn(
                       "h-8 w-8 transition-colors",
-                      r <= writeRating ? "fill-amber-500 text-amber-500" : "text-gray-200"
+                      r <= writeRating
+                        ? "fill-amber-500 text-amber-500"
+                        : "text-gray-200",
                     )}
                   />
                 </button>
@@ -198,7 +213,9 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
             </div>
           </div>
           <div>
-            <Label htmlFor="review-text" className="text-sm">Your review</Label>
+            <Label htmlFor="review-text" className="text-sm">
+              Your review
+            </Label>
             <Textarea
               id="review-text"
               value={writeText}
@@ -209,7 +226,9 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
               className="mt-1 resize-none"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">{writeText.length}/2000</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {writeText.length}/2000
+            </p>
           </div>
           {submitError && <p className="text-sm text-red-600">{submitError}</p>}
           <Button
@@ -244,46 +263,48 @@ export function ActivityReviews({ activityId, className, currentUserDisplayName 
     <>
       {WriteReviewForm}
       <Card className={cn("overflow-hidden", className)}>
-      <CardHeader className="border-b">
-        <div className="flex items-center gap-3">
-          {rating != null && (
-            <div className="flex items-center gap-2">
-              <StarRating rating={rating} />
-              <span className="text-sm font-medium text-gray-700">
-                {rating.toFixed(1)}
-              </span>
-            </div>
-          )}
-          <span className="text-sm text-gray-500">
-            {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
-          </span>
-        </div>
-        <CardTitle className="sr-only">Reviews</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="h-[320px] px-6">
-          <div className="space-y-4 py-4 pr-4">
-            {reviews.map((review, index) => (
-              <div
-                key={index}
-                className="border-b border-gray-100 pb-4 last:border-0 last:pb-0"
-              >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-medium text-gray-900">{review.author}</span>
-                  <div className="flex items-center gap-2">
-                    <StarRating rating={review.rating} />
-                    <span className="text-xs text-gray-500">
-                      {formatRelativeTime(review.time)}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600">{review.text}</p>
+        <CardHeader className="border-b">
+          <div className="flex items-center gap-3">
+            {rating != null && (
+              <div className="flex items-center gap-2">
+                <StarRating rating={rating} />
+                <span className="text-sm font-medium text-gray-700">
+                  {rating.toFixed(1)}
+                </span>
               </div>
-            ))}
+            )}
+            <span className="text-sm text-gray-500">
+              {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+            </span>
           </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+          <CardTitle className="sr-only">Reviews</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="h-80 px-6">
+            <div className="space-y-4 py-4 pr-4">
+              {reviews.map((review, index) => (
+                <div
+                  key={index}
+                  className="border-b border-gray-100 pb-4 last:border-0 last:pb-0"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="font-medium text-gray-900">
+                      {review.author}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={review.rating} />
+                      <span className="text-xs text-gray-500">
+                        {formatRelativeTime(review.time)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600">{review.text}</p>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </>
   );
 }

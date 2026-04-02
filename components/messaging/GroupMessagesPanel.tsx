@@ -1,7 +1,7 @@
 "use client"
 
 import { MessageSquare, Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 
@@ -18,6 +18,27 @@ type MessageSummary = {
 export default function GroupMessagesPanel({ activeGroup, userId }: { activeGroup: GroupSummary | null, userId: string }) {
     const [messages, setMessages] = useState<MessageSummary[]>([])
     const [message, setMessage] = useState("");
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [atBottom, setAtBottom] = useState(true);
+
+    const handleScroll = () => {
+        const cont = containerRef.current;
+        if (!cont) return;
+
+        const tolerance = 100;
+        const atBottom = cont.scrollHeight - cont.scrollTop - cont.clientHeight < tolerance;
+
+        setAtBottom(atBottom);
+    }
+
+    useEffect(() => {
+        const cont = containerRef.current;
+        if (!cont) return;
+
+        if (atBottom) {
+            cont.scrollTop = cont.scrollHeight;
+        }
+    }, [messages])
 
     const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -88,50 +109,25 @@ export default function GroupMessagesPanel({ activeGroup, userId }: { activeGrou
                             </p>
                         </div>
                     </div>
-                ) : (
-                    <div>
-                        <h2 className="font-semibold text-gray-900">
-                            No Group Selected
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                            Choose a group from the left to start chatting.
-                        </p>
-                    </div>
-                )}
+                ) : ( <div></div> )}
             </div>
 
             {/* Messages body */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-white">
-                {activeGroup ? (
-                    <div className="space-y-4">
-                        {/* Placeholder messages */}
-                        {messages.map((m, i) => (
-                            <div key={`${m.senderID}-${i}`} className={`flex ${m.senderID === userId ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${m.senderID === userId
-                                        ? "bg-amber-500 text-white"
-                                        : "bg-gray-100 text-gray-800"
-                                    }`}>
-                                    {m.content}
-                                </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-white" ref={containerRef} onScroll={handleScroll}>
+                <div className="space-y-4">
+                    {/* Placeholder messages */}
+                    {messages.map((m, i) => (
+                        <div key={`${m.senderID}-${i}`} className={`flex ${m.senderID === userId ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${m.senderID === userId
+                                    ? "bg-amber-500 text-white"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}>
+                                {m.content}
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="h-full flex items-center justify-center text-center text-gray-500">
-                        <div>
-                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                                <MessageSquare size={28} />
-                            </div>
-                            <p className="font-medium text-gray-700 mb-1">
-                                No conversation selected
-                            </p>
-                            <p className="text-sm text-gray-500">
-                                Pick a group on the left to view messages.
-                            </p>
                         </div>
-                    </div>
-                )}
-            </div>
+                    ))}
+                </div>
+        </div>
 
             {/* Composer */}
             <div className="shrink-0 p-4 border-t border-gray-200 bg-white">

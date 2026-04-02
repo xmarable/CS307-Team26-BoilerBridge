@@ -21,7 +21,8 @@ import {
   UserPlus,
   Search,
   X,
-  Image
+  Image,
+  AlignEndHorizontal
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ import PaymentRequestsPanel from "@/components/group/PaymentRequestsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import SplitCostsPanel from "@/components/group/SplitCostsPanel";
+import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+
+
+
 
 type GroupSummary = {
     groupID: string;
@@ -72,6 +78,9 @@ export default function GroupDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
   const [paymentRequestsRefresh, setPaymentRequestsRefresh] = useState(0);
+
+  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits">("ledger");
+
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -253,8 +262,14 @@ export default function GroupDashboard() {
               label="Itinerary"
             />
             <SidebarButton
-              active={activeSection === "expenses"}
-              onClick={() => setActiveSection("expenses")}
+              active={activeSection === "polls"}
+              onClick={() => setActiveSection("polls")}
+              icon={<AlignEndHorizontal size={22} />}
+              label="Polls"
+            />
+            <SidebarButton
+              active={activeSection === "expenseSummary"}
+              onClick={() => setActiveSection("expenseSummary")}
               icon={<DollarSign size={22} />}
               label="Expense summary"
             />
@@ -276,11 +291,17 @@ export default function GroupDashboard() {
               icon={<Users size={22} />}
               label="Members"
             />
+            <SidebarButton
+              active={activeSection === "expenses"}
+              onClick={() => setActiveSection("expenses")}
+              icon={<DollarSign size={22} />}
+              label="Expenses"
+            />
           </div>
         </aside>
 
         <main className="lg:col-span-10">
-          {activeSection === "expenses" && (
+          {activeSection === "expenseSummary" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
@@ -509,6 +530,41 @@ export default function GroupDashboard() {
             />
             </div>
           )}
+          {activeSection === "expenses" && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex gap-3 px-1">
+                {(["ledger", "splits"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setExpensesTab(tab)}
+                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+                      expensesTab === tab
+                        ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                        : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tab === "ledger" ? "Ledger" : "Splits"}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+                {expensesTab === "ledger" ? (
+                  <SharedCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                ) : (
+                  <SplitCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
     </div>
