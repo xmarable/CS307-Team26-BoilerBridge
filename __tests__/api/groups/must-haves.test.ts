@@ -1,3 +1,5 @@
+process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
@@ -22,11 +24,26 @@ const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
   typeof nextAuth.getServerSession
 >;
 
-let GET: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let POST: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let PUT: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
-let DELETE: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
-let GENERATE: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let POST: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
+let PUT: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string; id: string }> },
+) => Promise<Response>;
+let DELETE: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string; id: string }> },
+) => Promise<Response>;
+let GENERATE: (
+  req: Request,
+  ctx: { params: Promise<{ groupId: string }> },
+) => Promise<Response>;
 
 let groupUUID: string;
 let leaderId: string;
@@ -77,21 +94,18 @@ beforeAll(async () => {
 
   groupUUID = group.groupID.toString();
 
-  const collectionRoute = await import(
-    "@/app/api/groups/[groupId]/must-haves/route"
-  );
+  const collectionRoute =
+    await import("@/app/api/groups/[groupId]/must-haves/route");
   GET = collectionRoute.GET as any;
   POST = collectionRoute.POST as any;
 
-  const itemRoute = await import(
-    "@/app/api/groups/[groupId]/must-haves/[id]/route"
-  );
+  const itemRoute =
+    await import("@/app/api/groups/[groupId]/must-haves/[id]/route");
   PUT = itemRoute.PUT as any;
   DELETE = itemRoute.DELETE as any;
 
-  const generateRoute = await import(
-    "@/app/api/groups/[groupId]/itinerary/generate/route"
-  );
+  const generateRoute =
+    await import("@/app/api/groups/[groupId]/itinerary/generate/route");
   GENERATE = generateRoute.POST as any;
 });
 
@@ -141,10 +155,9 @@ function makeDeleteRequest(gId: string, id: string) {
 }
 
 function makeGenerateRequest(gId: string) {
-  return new Request(
-    `http://localhost/api/groups/${gId}/itinerary/generate`,
-    { method: "POST" },
-  );
+  return new Request(`http://localhost/api/groups/${gId}/itinerary/generate`, {
+    method: "POST",
+  });
 }
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
@@ -197,8 +210,18 @@ describe("GET /api/groups/:groupId/must-haves", () => {
 
   it("filters results by status", async () => {
     await MustHave.create([
-      { groupId: groupUUID, name: "Proposed Place", addedBy: leaderId, status: "proposed" },
-      { groupId: groupUUID, name: "Approved Place", addedBy: leaderId, status: "approved" },
+      {
+        groupId: groupUUID,
+        name: "Proposed Place",
+        addedBy: leaderId,
+        status: "proposed",
+      },
+      {
+        groupId: groupUUID,
+        name: "Approved Place",
+        addedBy: leaderId,
+        status: "approved",
+      },
     ] as any[]);
 
     mockGetServerSession.mockResolvedValue({
@@ -210,7 +233,9 @@ describe("GET /api/groups/:groupId/must-haves", () => {
     });
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.mustHaves.every((m: any) => m.status === "approved")).toBe(true);
+    expect(data.mustHaves.every((m: any) => m.status === "approved")).toBe(
+      true,
+    );
   });
 
   it("filters results by category", async () => {
@@ -251,10 +276,9 @@ describe("POST /api/groups/:groupId/must-haves", () => {
       user: { userId: outsiderId },
       expires: "9999",
     });
-    const res = await POST(
-      makePostRequest(groupUUID, { name: "Test Place" }),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await POST(makePostRequest(groupUUID, { name: "Test Place" }), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(403);
   });
 
@@ -263,10 +287,9 @@ describe("POST /api/groups/:groupId/must-haves", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await POST(
-      makePostRequest(groupUUID, { category: "food" }),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await POST(makePostRequest(groupUUID, { category: "food" }), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -422,10 +445,9 @@ describe("PUT /api/groups/:groupId/must-haves/:id", () => {
       expires: "9999",
     });
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const res = await PUT(
-      makePutRequest(groupUUID, fakeId, { priority: 5 }),
-      { params: Promise.resolve({ groupId: groupUUID, id: fakeId }) },
-    );
+    const res = await PUT(makePutRequest(groupUUID, fakeId, { priority: 5 }), {
+      params: Promise.resolve({ groupId: groupUUID, id: fakeId }),
+    });
     expect(res.status).toBe(404);
   });
 
@@ -447,7 +469,10 @@ describe("PUT /api/groups/:groupId/must-haves/:id", () => {
       expires: "9999",
     });
     const res = await PUT(
-      makePutRequest(groupUUID, memberItemId, { priority: 5, notes: "Must visit!" }),
+      makePutRequest(groupUUID, memberItemId, {
+        priority: 5,
+        notes: "Must visit!",
+      }),
       { params: Promise.resolve({ groupId: groupUUID, id: memberItemId }) },
     );
     expect(res.status).toBe(200);
@@ -619,8 +644,18 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     await CalendarEvent.deleteMany({ source: "itinerary" } as any);
 
     await MustHave.create([
-      { groupId: groupUUID, name: "Proposed Spot", addedBy: leaderId, status: "proposed" },
-      { groupId: groupUUID, name: "Rejected Spot", addedBy: leaderId, status: "rejected" },
+      {
+        groupId: groupUUID,
+        name: "Proposed Spot",
+        addedBy: leaderId,
+        status: "proposed",
+      },
+      {
+        groupId: groupUUID,
+        name: "Rejected Spot",
+        addedBy: leaderId,
+        status: "rejected",
+      },
     ] as any[]);
 
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
