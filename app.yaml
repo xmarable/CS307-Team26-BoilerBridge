@@ -1,7 +1,7 @@
 name: cs307-team26-boilerbridge
 region: nyc3
 services:
-  - name: boilerbridge-web
+  - name: boilerbridge
     image:
       registry_type: DOCR
       repository: boilerbridge-registry/boilerbridge
