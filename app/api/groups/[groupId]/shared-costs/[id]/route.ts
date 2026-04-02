@@ -55,7 +55,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -113,8 +113,8 @@ export async function PUT(
 
     if (paidBy !== undefined) {
       const validPayers = new Set<string>([
-        ...(Array.isArray(group?.membersList) ? group.membersList : []),
-        group?.leaderID,
+        ...(Array.isArray(group?.membersList) ? group.membersList.map((m: any) => m.userId?.toString()) : []),
+        group?.leaderID?.toString(),
         ...userIds,
       ].filter(Boolean));
 
@@ -209,7 +209,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
