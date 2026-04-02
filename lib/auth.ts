@@ -85,7 +85,7 @@ export const authOptions: NextAuthOptions = {
             // user was deleted from the cluster
             return {
               ...token,
-              isDeleted: true, // flag this for the session callback lol
+              isDeleted: true, // flag this for the session callback
             } as any;
           }
 
