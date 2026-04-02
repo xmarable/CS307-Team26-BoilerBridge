@@ -6,7 +6,7 @@ services:
       registry_type: DOCR
       repository: boilerbridge-registry/boilerbridge
       tag: latest
-    run_command: npm start
+    run_command: node server.js
     http_port: 3000
     instance_count: 1
     instance_size_slug: basic-xs

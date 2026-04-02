@@ -55,10 +55,8 @@ jobs:
         id: deploy
         uses: digitalocean/app_action/deploy@v2
         env:
-          IMAGE_TAG_boilerbridge: "latest"
+          IMAGE_TAG_BOILERBRIDGE: "latest"
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_spec_location: app.yaml
           app_name: "cs307-team26-boilerbridge"
-          print_build_logs: true
-          print_deploy_logs: true
