@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import useSWR from "swr";
@@ -27,23 +29,31 @@ export function NotificationBell() {
   ) => {
     if (!requests || !Array.isArray(requests)) return;
 
+    const targetRequest = requests.find((r: any) => r.id === requestId);
+    if (!targetRequest) return;
+
     const previousRequests = requests;
     const updatedRequests = requests.filter((r: any) => r.id !== requestId);
     mutate(updatedRequests, false);
 
     const endpoint =
       action === "accept" ? "/api/friends/accept" : "/api/friends/request";
-    const method = action === "accept" ? "PATCH" : "DELETE";
+    const method = action === "accept" ? "POST" : "DELETE";
 
     try {
       const res = await fetch(endpoint, {
         method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId }),
+        body: JSON.stringify({
+          requestId: targetRequest.id, // matches requestId in API
+          senderId: targetRequest.requesterId, // matches senderId in API
+        }),
       });
 
       if (!res.ok) throw new Error();
       mutate();
+
+      globalMutate("/api/friends/list"); // refresh friends list after accepting
     } catch (err) {
       mutate(previousRequests);
     }
@@ -127,4 +137,7 @@ export function NotificationBell() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+function globalMutate(arg0: string) {
+  throw new Error("Function not implemented.");
 }

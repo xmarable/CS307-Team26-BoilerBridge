@@ -9,61 +9,88 @@ import {
   Trash2,
   ShoppingBag,
   CheckCircle2,
+  Link as LinkIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface Reminder {
   id: string;
   task: string;
   isCompleted: boolean;
   dueDate?: string;
+  linkedEventId?: string;
+}
+
+interface CalendarEvent {
+  _id: string;
+  title: string;
 }
 
 export function TripChecklist({ groupId }: { groupId: string }) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [newTask, setNewTask] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState<string>("none");
 
-  // grabbing the existing data for u when it loads
+  // fetch reminders and events for linking
   useEffect(() => {
-    const fetchReminders = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(`/api/groups/${groupId}/reminders`);
-        if (res.ok) {
-          const data = await res.json();
-          setReminders(data);
+        const [remRes, evRes] = await Promise.all([
+          fetch(`/api/groups/${groupId}/reminders`),
+          fetch(`/api/groups/${groupId}/calendar/events`),
+        ]);
+
+        if (remRes.ok) setReminders(await remRes.json());
+        if (evRes.ok) {
+          const evData = await evRes.json();
+          setEvents(evData.events || []);
         }
       } catch (err) {
-        console.error("Failed to fetch reminders", err);
+        console.error("Failed to fetch trip data", err);
       }
     };
-    fetchReminders();
+    fetchData();
   }, [groupId]);
 
   const handleAddReminder = async () => {
     if (!newTask.trim()) return;
 
+    const payload = {
+      task: newTask,
+      linkedEventId: selectedEventId === "none" ? null : selectedEventId,
+      offsetMinutes: selectedEventId === "none" ? 0 : 180, // default 3 hours before
+    };
+
     try {
       const res = await fetch(`/api/groups/${groupId}/reminders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task: newTask }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const added = await res.json();
         setReminders([...reminders, added]);
         setNewTask("");
+        setSelectedEventId("none");
       }
     } catch (err) {
-      console.error("Failed to add reminder", err);
+      console.error("failed to add reminder", err);
     }
   };
 
   const toggleCompletion = async (id: string, currentStatus: boolean) => {
-    // optimistic update so the ui feels instantly responsive
     setReminders((prev) =>
       prev.map((r) =>
         r.id === id ? { ...r, isCompleted: !currentStatus } : r,
@@ -77,7 +104,22 @@ export function TripChecklist({ groupId }: { groupId: string }) {
         body: JSON.stringify({ id, isCompleted: !currentStatus }),
       });
     } catch (err) {
-      console.error("Failed to update status", err);
+      console.error("failed to update status", err);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // optimistic delete
+    setReminders((prev) => prev.filter((r) => r.id !== id));
+
+    try {
+      await fetch(`/api/groups/${groupId}/reminders`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch (err) {
+      console.error("failed to delete reminder", err);
     }
   };
 
@@ -103,20 +145,43 @@ export function TripChecklist({ groupId }: { groupId: string }) {
       </CardHeader>
 
       <CardContent className="p-8">
-        <div className="flex gap-3 mb-10">
-          <Input
-            placeholder="Add a new packing item or task..."
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            className="h-14 rounded-2xl border-gray-200 bg-gray-50/50 px-6 font-medium focus:ring-amber-500 focus:border-amber-500 transition-all"
-            onKeyDown={(e) => e.key === "Enter" && handleAddReminder()}
-          />
-          <Button
-            onClick={handleAddReminder}
-            className="h-14 w-14 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl shadow-md transition-all active:scale-95"
-          >
-            <Plus size={24} />
-          </Button>
+        <div className="space-y-3 mb-10">
+          <div className="flex gap-3">
+            <Input
+              placeholder="Add a new packing item or task..."
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              className="h-14 rounded-2xl border-gray-200 bg-gray-50/50 px-6 font-medium focus:ring-amber-500 focus:border-amber-500 transition-all"
+              onKeyDown={(e) => e.key === "Enter" && handleAddReminder()}
+            />
+            <Button
+              onClick={handleAddReminder}
+              className="h-14 w-14 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl shadow-md transition-all active:scale-95"
+            >
+              <Plus size={24} />
+            </Button>
+          </div>
+
+          {/* event linker dropdown */}
+          <div className="flex items-center gap-2 px-2 text-gray-500">
+            <LinkIcon size={14} />
+            <span className="text-xs font-bold uppercase tracking-tighter">
+              Link to Event:
+            </span>
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger className="h-8 border-none bg-transparent shadow-none focus:ring-0 font-bold text-amber-600 w-fit p-0 gap-1 capitalize">
+                <SelectValue placeholder="Select Event" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Manual Entry Only</SelectItem>
+                {events.map((ev) => (
+                  <SelectItem key={ev._id} value={ev._id}>
+                    {ev.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -157,7 +222,7 @@ export function TripChecklist({ groupId }: { groupId: string }) {
                     >
                       {item.task}
                     </span>
-                    {item.dueDate && (
+                    {item.linkedEventId && (
                       <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-amber-600 uppercase tracking-tighter">
                         <CalendarClock size={14} />
                         <span>Auto-Synced with Calendar</span>
@@ -171,7 +236,10 @@ export function TripChecklist({ groupId }: { groupId: string }) {
                     className={`${item.isCompleted ? "text-gray-200" : "text-amber-400"} transition-colors`}
                     size={20}
                   />
-                  <button className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all">
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all"
+                  >
                     <Trash2 size={20} />
                   </button>
                 </div>

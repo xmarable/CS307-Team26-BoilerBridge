@@ -1,7 +1,7 @@
- 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
   Search,
@@ -67,6 +67,17 @@ export function Friends({ initialData }: FriendsProps) {
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(!initialData);
 
+  // References to track state inside the polling interval for cross-session sync
+  const friendsRef = useRef(friends);
+  const inboundRef = useRef(inboundRequests);
+  const sentRef = useRef(sentRequests);
+
+  useEffect(() => {
+    friendsRef.current = friends;
+    inboundRef.current = inboundRequests;
+    sentRef.current = sentRequests;
+  }, [friends, inboundRequests, sentRequests]);
+
   // Search debounce logic
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -79,27 +90,36 @@ export function Friends({ initialData }: FriendsProps) {
     return () => clearTimeout(delayDebounceFn);
   }, [query]);
 
-  // Parallel pre-fetching of social data on mount
+  // Parallel pre-fetching and Polling loop for multi-session synchronization
   useEffect(() => {
     const loadSocialData = async () => {
-      if (initialData) {
-        setInitialLoad(false);
-        return;
-      }
-
-      setInitialLoad(true);
       try {
         const [friendsRes, sentRes, inboundRes] = await Promise.all([
           fetch("/api/friends/manage"),
           fetch("/api/friends/sent"),
-          fetch("/api/friends/request"), // Your existing GET route for incoming requests
+          fetch("/api/friends/request"),
         ]);
 
-        if (friendsRes.ok) setFriends(await friendsRes.json());
-        if (sentRes.ok) setSentRequests(await sentRes.json());
-        if (inboundRes.ok) setInboundRequests(await inboundRes.json());
+        if (friendsRes.ok) {
+          const data = await friendsRes.json();
+          if (JSON.stringify(data) !== JSON.stringify(friendsRef.current)) {
+            setFriends(data);
+          }
+        }
+        if (sentRes.ok) {
+          const data = await sentRes.json();
+          if (JSON.stringify(data) !== JSON.stringify(sentRef.current)) {
+            setSentRequests(data);
+          }
+        }
+        if (inboundRes.ok) {
+          const data = await inboundRes.json();
+          if (JSON.stringify(data) !== JSON.stringify(inboundRef.current)) {
+            setInboundRequests(data);
+          }
+        }
       } catch (error) {
-        console.error("Initial data load error:", error);
+        console.error("Social data sync error:", error);
       } finally {
         setInitialLoad(false);
       }
@@ -107,8 +127,11 @@ export function Friends({ initialData }: FriendsProps) {
 
     if (session?.user) {
       loadSocialData();
+      // Poll every 3 seconds so the sender's screen updates when you accept
+      const interval = setInterval(loadSocialData, 3000);
+      return () => clearInterval(interval);
     }
-  }, [session, initialData]);
+  }, [session]);
 
   const searchUsers = async (searchQuery: string) => {
     setLoading(true);
@@ -167,16 +190,19 @@ export function Friends({ initialData }: FriendsProps) {
       const res = await fetch("/api/friends/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, senderId }),
+        body: JSON.stringify({
+          requestId: requestId,
+          senderId: senderId,
+        }),
       });
       if (res.ok) {
-        // Remove from pending incoming
         setInboundRequests((prev) => prev.filter((r) => r.id !== requestId));
-        // Optimistically add to friends list
         setFriends((prev) => [
           ...prev,
           { userId: senderId, username: senderName, email: senderEmail },
         ]);
+        // Optional: Manual reload to force global component sync
+        // window.location.reload();
       }
     } catch (error) {
       console.error("Accept error:", error);
