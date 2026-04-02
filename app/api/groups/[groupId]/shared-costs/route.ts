@@ -50,7 +50,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -115,7 +115,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -191,8 +191,8 @@ export async function POST(
     }
 
     const validPayers = new Set<string>([
-      ...(Array.isArray(group?.membersList) ? group.membersList : []),
-      group?.leaderID,
+      ...(Array.isArray(group?.membersList) ? group.membersList.map((m: any) => m.userId?.toString()) : []),
+      group?.leaderID?.toString(),
       ...userIds,
     ].filter(Boolean));
 
@@ -220,7 +220,7 @@ export async function POST(
     });
     
     try {
-      await TravelGroup.findByIdAndUpdate(groupId, {
+      await TravelGroup.findByIdAndUpdate(group._id, {
         $push: {
           ledger: {
             payerID: paidBy.trim(),
