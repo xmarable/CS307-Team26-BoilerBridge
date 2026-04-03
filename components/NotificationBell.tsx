@@ -172,7 +172,7 @@ export function NotificationBell() {
             className={isValidating && !friendRequests ? "animate-pulse" : ""}
           />
           {totalBadge > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-amber-600 rounded-full border-2 border-white">
+            <span className="absolute -top-0.5 -right-0.5 min-w-4.5 h-4.5 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-amber-600 rounded-full border-2 border-white">
               {totalBadge > 99 ? "99+" : totalBadge}
             </span>
           )}

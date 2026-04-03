@@ -87,6 +87,16 @@ export async function POST(
       notes: (m as { notes?: string }).notes,
     }));
 
+    if (approvedMustHaves.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No approved must-haves found. Please approve at least one place to generate an itinerary.",
+        },
+        { status: 400 },
+      );
+    }
+
     const tripCtx: TripContext = {
       fromCity: String((trip as { fromCity: string }).fromCity),
       toCity: String((trip as { toCity: string }).toCity),

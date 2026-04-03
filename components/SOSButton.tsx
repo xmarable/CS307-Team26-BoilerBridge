@@ -28,15 +28,32 @@ const EMERGENCY_NUMBERS: Record<
   },
 };
 
-export function SOSButton({ initialLocation = "US" }: { initialLocation?: string }) {
+export function SOSButton({
+  initialLocation = "US",
+}: {
+  initialLocation?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
-  const [locationCode] = useState(initialLocation);
+  const [locationCode, setLocationCode] = useState(initialLocation);
 
   const openModal = useCallback(() => {
     setIsOpen(true);
   }, []);
 
   useEffect(() => {
+    // detect country by timezone
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz.includes("London") || tz.includes("Europe/London")) {
+        setLocationCode("GB");
+      } else if (tz.includes("Paris")) {
+        setLocationCode("FR");
+      } else if (tz.includes("America")) {
+        setLocationCode("US");
+      }
+    } catch (e) {
+      console.error("failed to detect location", e);
+    }
     // Listen ONLY for the custom event to prevent double-firing
     window.addEventListener("open-sos", openModal);
 

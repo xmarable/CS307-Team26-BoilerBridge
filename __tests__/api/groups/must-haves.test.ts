@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
@@ -21,6 +23,20 @@ await jest.unstable_mockModule("next-auth", () => ({
 
 await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
+}));
+
+await jest.unstable_mockModule("@/lib/itinerary/generateFull", () => ({
+  generateFullTripEvents: jest.fn(async (ctx: any, mustHaves: any[]) => {
+    return mustHaves.map((mh: any, i: number) => ({
+      title: mh.name,
+      description: mh.notes || "Mock description",
+      startTime: new Date(ctx.fromDate.getTime() + i * 3600000),
+      endTime: new Date(ctx.fromDate.getTime() + (i + 1) * 3600000),
+      location: mh.address,
+      eventType: mh.category || "activity",
+      timezone: "UTC",
+    }));
+  }),
 }));
 
 beforeAll(async () => {
@@ -611,6 +627,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
   });
 
   it("generates calendar events from approved must-haves", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
       params: Promise.resolve({ groupId: groupUUID }),
     });
@@ -630,6 +651,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
   });
 
   it("prioritizes higher-priority must-haves (sorted by priority desc)", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+
     const events = await CalendarEvent.find({
       groupId: groupUUID,
       source: "itinerary",
@@ -654,6 +680,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
         status: "rejected",
       },
     ] as any[]);
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
 
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
       params: Promise.resolve({ groupId: groupUUID }),
@@ -695,6 +726,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       budget: 1000,
     } as any);
 
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: emptyLeader.userId.toString() },
+      expires: "9999",
+    });
+
     const res = await GENERATE(makeGenerateRequest(emptyUUID), {
       params: Promise.resolve({ groupId: emptyUUID }),
     });
@@ -717,6 +753,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       membersList: [{ userId: noTripLeader.userId.toString(), role: "Leader" }],
     });
     const noTripUUID = noTripGroup.groupID.toString();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: noTripLeader.userId.toString() },
+      expires: "9999",
+    });
 
     const res = await GENERATE(makeGenerateRequest(noTripUUID), {
       params: Promise.resolve({ groupId: noTripUUID }),
