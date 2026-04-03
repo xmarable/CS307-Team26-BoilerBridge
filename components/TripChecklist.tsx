@@ -44,6 +44,7 @@ export function TripChecklist({ groupId }: { groupId: string }) {
 
   // fetch reminders and events for linking
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
       try {
         const [remRes, evRes] = await Promise.all([
@@ -51,9 +52,14 @@ export function TripChecklist({ groupId }: { groupId: string }) {
           fetch(`/api/groups/${groupId}/calendar/events`),
         ]);
 
-        if (remRes.ok) setReminders(await remRes.json());
-        if (evRes.ok) {
-          const evData = await evRes.json();
+        if (!remRes.ok || !evRes.ok) return;
+
+        const remData = await remRes.json();
+        const evData = await evRes.json();
+
+        // ONLY update state if the component hasn't unmounted
+        if (isMounted) {
+          setReminders(Array.isArray(remData) ? remData : []);
           setEvents(evData.events || []);
         }
       } catch (err) {
@@ -61,6 +67,9 @@ export function TripChecklist({ groupId }: { groupId: string }) {
       }
     };
     fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, [groupId]);
 
   const handleAddReminder = async () => {
@@ -136,8 +145,10 @@ export function TripChecklist({ groupId }: { groupId: string }) {
                 Trip Checklist
               </CardTitle>
               <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">
-                {reminders.filter((r) => r.isCompleted).length} /{" "}
-                {reminders.length} Completed
+                {Array.isArray(reminders)
+                  ? reminders.filter((r) => r.isCompleted).length
+                  : 0}{" "}
+                / {Array.isArray(reminders) ? reminders.length : 0} Completed
               </p>
             </div>
           </div>

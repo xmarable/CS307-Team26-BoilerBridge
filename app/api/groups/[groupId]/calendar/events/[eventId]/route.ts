@@ -184,7 +184,7 @@ export async function DELETE(
 
     await CalendarEvent.deleteOne({ _id: eventId, groupId });
 
-    // clean up orphaned reminders if the event is deleted lol
+    // clean up orphaned reminders if the event is deleted
     if (group.reminders) {
       group.reminders = group.reminders.filter(
         (r: any) => r.linkedEventId !== eventId,

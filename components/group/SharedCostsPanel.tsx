@@ -152,7 +152,9 @@ export default function SharedCostsPanel({
     try {
       const [membersRes, costsRes] = await Promise.all([
         fetch(`/api/groups/${groupId}/members`, { credentials: "include" }),
-        fetch(`/api/groups/${groupId}/shared-costs`, { credentials: "include" }),
+        fetch(`/api/groups/${groupId}/shared-costs`, {
+          credentials: "include",
+        }),
       ]);
       if (membersRes.ok) {
         const data = await membersRes.json();
@@ -220,8 +222,7 @@ export default function SharedCostsPanel({
     .map(([name, amount]) => ({
       name,
       amount,
-      percentage:
-        totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
+      percentage: totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
       color: CATEGORY_COLORS[name] || "bg-gray-400",
     }))
     .sort((a, b) => b.amount - a.amount);
@@ -333,9 +334,7 @@ export default function SharedCostsPanel({
       setShowModal(false);
       await fetchData();
     } catch (err: unknown) {
-      setFormError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setFormError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
@@ -377,7 +376,7 @@ export default function SharedCostsPanel({
         </div>
         <Button
           onClick={openCreateModal}
-          className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold"
+          className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold"
         >
           <Plus size={18} className="mr-2" />
           Add Expense
@@ -386,16 +385,21 @@ export default function SharedCostsPanel({
 
       {/* Summary cards */}
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white">
+        <div className="bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={20} />
             <span className="text-sm opacity-90">Total Spent</span>
           </div>
           <p className="text-4xl font-bold mb-1">
-            ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {totalSpent.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
           <p className="text-sm opacity-90">
-            {sharedCosts.length} expense{sharedCosts.length !== 1 ? "s" : ""} recorded
+            {sharedCosts.length} expense{sharedCosts.length !== 1 ? "s" : ""}{" "}
+            recorded
           </p>
         </div>
 
@@ -417,7 +421,9 @@ export default function SharedCostsPanel({
             <TrendingUp size={20} className="text-gray-600" />
             <span className="text-sm text-gray-600">Your Balance</span>
           </div>
-          <p className={`text-4xl font-bold mb-1 ${myBalance >= 0 ? "text-green-600" : "text-red-500"}`}>
+          <p
+            className={`text-4xl font-bold mb-1 ${myBalance >= 0 ? "text-green-600" : "text-red-500"}`}
+          >
             {myBalance >= 0 ? "+" : ""}${myBalance.toFixed(2)}
           </p>
           <p className="text-sm text-gray-600">
@@ -448,7 +454,7 @@ export default function SharedCostsPanel({
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
                         <AvatarFallback
-                          className={`bg-gradient-to-br ${getMemberColor(s.userId)} text-white text-sm font-bold`}
+                          className={`bg-linear-to-br ${getMemberColor(s.userId)} text-white text-sm font-bold`}
                         >
                           {getInitials(getMemberName(s.userId))}
                         </AvatarFallback>
@@ -469,7 +475,7 @@ export default function SharedCostsPanel({
                       variant={s.amount < 0 ? "default" : "outline"}
                       className={
                         s.amount < 0
-                          ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                          ? "bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
                           : ""
                       }
                     >
@@ -497,7 +503,7 @@ export default function SharedCostsPanel({
                       onClick={() => setFilter(f)}
                       className={
                         filter === f
-                          ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+                          ? "bg-linear-to-r from-amber-500 to-orange-600 text-white"
                           : ""
                       }
                     >
@@ -515,7 +521,7 @@ export default function SharedCostsPanel({
                 {sharedCosts.length === 0 && (
                   <Button
                     onClick={openCreateModal}
-                    className="mt-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold"
+                    className="mt-4 bg-linear-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold"
                   >
                     <Plus size={16} className="mr-2" />
                     Add First Expense
@@ -526,8 +532,7 @@ export default function SharedCostsPanel({
               <div className="divide-y divide-gray-100">
                 {filteredCosts.map((cost) => {
                   const paidByMe = cost.paidBy === currentUserId;
-                  const share =
-                    cost.amount / (cost.participants.length || 1);
+                  const share = cost.amount / (cost.participants.length || 1);
                   return (
                     <div
                       key={cost._id}
@@ -535,7 +540,7 @@ export default function SharedCostsPanel({
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
                             <Receipt className="text-amber-600" size={20} />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -547,9 +552,7 @@ export default function SharedCostsPanel({
                               <span
                                 className={`font-semibold ${paidByMe ? "text-amber-600" : "text-gray-700"}`}
                               >
-                                {paidByMe
-                                  ? "You"
-                                  : getMemberName(cost.paidBy)}
+                                {paidByMe ? "You" : getMemberName(cost.paidBy)}
                               </span>
                             </p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -574,7 +577,7 @@ export default function SharedCostsPanel({
                             </div>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0 ml-4">
+                        <div className="text-right shrink-0 ml-4">
                           <p className="text-xl font-black text-gray-900">
                             {cost.currency} {cost.amount.toFixed(2)}
                           </p>
@@ -596,7 +599,7 @@ export default function SharedCostsPanel({
                                 className="w-6 h-6 -ml-1 first:ml-0 border-2 border-white"
                               >
                                 <AvatarFallback
-                                  className={`bg-gradient-to-br ${getMemberColor(p.userId)} text-white text-[10px] font-bold`}
+                                  className={`bg-linear-to-br ${getMemberColor(p.userId)} text-white text-[10px] font-bold`}
                                 >
                                   {getInitials(getMemberName(p.userId))}
                                 </AvatarFallback>
@@ -678,10 +681,8 @@ export default function SharedCostsPanel({
             )}
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              💡 Pro Tip
-            </h3>
+          <div className="bg-linear-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">💡 Pro Tip</h3>
             <p className="text-sm text-gray-600">
               Add receipts to expenses by clicking on them. Use the Splits tab
               to manage custom per-person amounts.
@@ -737,9 +738,7 @@ export default function SharedCostsPanel({
                 </Label>
                 <Select
                   value={form.currency}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, currency: v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}
                 >
                   <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue />
@@ -775,9 +774,7 @@ export default function SharedCostsPanel({
                 </Label>
                 <Select
                   value={form.category}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, category: v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
                 >
                   <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue placeholder="Select..." />
@@ -807,9 +804,7 @@ export default function SharedCostsPanel({
                 <SelectContent>
                   {members.map((m) => (
                     <SelectItem key={m.userId} value={m.userId}>
-                      {m.userId === currentUserId
-                        ? `You (${m.name})`
-                        : m.name}
+                      {m.userId === currentUserId ? `You (${m.name})` : m.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -861,7 +856,7 @@ export default function SharedCostsPanel({
                     />
                     <Avatar className="w-7 h-7">
                       <AvatarFallback
-                        className={`bg-gradient-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
+                        className={`bg-linear-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
                       >
                         {getInitials(m.name)}
                       </AvatarFallback>
@@ -890,7 +885,7 @@ export default function SharedCostsPanel({
 
             {formError && (
               <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
-                <X size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <X size={16} className="text-red-500 shrink-0 mt-0.5" />
                 <p className="text-sm font-medium text-red-700">{formError}</p>
               </div>
             )}
@@ -907,7 +902,7 @@ export default function SharedCostsPanel({
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-bold"
+              className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-bold"
             >
               {submitting && (
                 <Loader2 size={16} className="animate-spin mr-2" />

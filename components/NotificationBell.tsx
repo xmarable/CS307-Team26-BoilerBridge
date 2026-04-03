@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import useSWR from "swr";
-import { Bell, UserPlus, Check, X, Loader2 } from "lucide-react";
+import useSWR, { mutate as globalMutate } from "swr";
+import { Bell, UserPlus, Check, X, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,29 +10,41 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+interface FriendRequest {
+  id: string;
+  requesterId: string;
+  senderName: string;
+}
+
+interface GroupInvite {
+  groupID: string;
+  groupName: string;
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function NotificationBell() {
-  const {
-    data: requests,
-    mutate,
-    isValidating,
-  } = useSWR("/api/friends/request", fetcher, {
-    refreshInterval: 10000,
+  const { data: friendRequests, mutate: mutateFriends } = useSWR<
+    FriendRequest[]
+  >("/api/friends/request", fetcher, {
+    refreshInterval: 5000,
   });
 
-  const handleAction = async (
+  const { data: groupInvites, mutate: mutateGroups } = useSWR<GroupInvite[]>(
+    "/api/groups/invites",
+    fetcher,
+    {
+      refreshInterval: 5000,
+    },
+  );
+
+  const handleFriendAction = async (
     requestId: string,
     action: "accept" | "decline",
   ) => {
-    if (!requests || !Array.isArray(requests)) return;
-
-    const targetRequest = requests.find((r: any) => r.id === requestId);
-    if (!targetRequest) return;
-
-    const previousRequests = requests;
-    const updatedRequests = requests.filter((r: any) => r.id !== requestId);
-    mutate(updatedRequests, false);
+    if (!friendRequests || !Array.isArray(friendRequests)) return;
+    const target = friendRequests.find((r) => r.id === requestId);
+    if (!target) return;
 
     const endpoint =
       action === "accept" ? "/api/friends/accept" : "/api/friends/request";
@@ -45,32 +55,55 @@ export function NotificationBell() {
         method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requestId: targetRequest.id, // matches requestId in API
-          senderId: targetRequest.requesterId, // matches senderId in API
+          requestId: target.id,
+          senderId: target.requesterId,
         }),
       });
-
-      if (!res.ok) throw new Error();
-      mutate();
-
-      globalMutate("/api/friends/list"); // refresh friends list after accepting
+      if (res.ok) {
+        mutateFriends();
+        globalMutate("/api/friends/manage");
+      }
     } catch (err) {
-      mutate(previousRequests);
+      console.error("Friend action request failed:", err);
     }
   };
 
-  const requestList = Array.isArray(requests) ? requests : [];
-  const hasNotifications = requestList.length > 0;
+  const handleGroupAction = async (
+    groupId: string,
+    action: "accept" | "decline",
+  ) => {
+    const endpoint =
+      action === "accept"
+        ? `/api/groups/${groupId}/accept`
+        : `/api/groups/${groupId}/members`;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: action === "accept" ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body:
+          action === "decline" ? JSON.stringify({ email: "current" }) : null,
+      });
+
+      if (res.ok) {
+        mutateGroups();
+        globalMutate("/api/groups/list");
+      }
+    } catch (err) {
+      console.error("Group action request failed:", err);
+    }
+  };
+
+  const fList = Array.isArray(friendRequests) ? friendRequests : [];
+  const gList = Array.isArray(groupInvites) ? groupInvites : [];
+  const totalCount = fList.length + gList.length;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="relative text-gray-600 hover:text-gray-900 p-2 outline-none">
-          <Bell
-            size={20}
-            className={isValidating && !requests ? "animate-pulse" : ""}
-          />
-          {hasNotifications && (
+          <Bell size={20} />
+          {totalCount > 0 && (
             <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>
           )}
         </button>
@@ -78,66 +111,99 @@ export function NotificationBell() {
 
       <DropdownMenuContent
         align="end"
-        className="w-80 mt-2 rounded-xl shadow-lg bg-white p-2"
+        className="w-80 mt-2 rounded-xl shadow-lg bg-white p-2 border border-gray-100"
       >
         <div className="flex items-center justify-between px-2 py-1">
           <DropdownMenuLabel className="text-gray-900 font-bold p-0">
             Notifications
           </DropdownMenuLabel>
-          {isValidating && (
-            <Loader2 size={12} className="animate-spin text-gray-400" />
-          )}
         </div>
         <DropdownMenuSeparator className="bg-gray-100" />
 
-        <div className="max-h-64 overflow-y-auto">
-          {requestList.length === 0 ? (
-            <div className="py-6 text-center text-sm text-gray-500">
-              {isValidating && !requests
-                ? "Loading..."
-                : "No new notifications"}
+        <div className="max-h-80 overflow-y-auto">
+          {totalCount === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-400 font-medium">
+              No new notifications
             </div>
           ) : (
-            requestList.map((req: any) => (
-              <div
-                key={req.id}
-                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
-                    <UserPlus size={16} />
+            <>
+              {fList.map((req) => (
+                <div
+                  key={req.id}
+                  className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-amber-50 rounded-full flex items-center justify-center text-amber-600">
+                      <UserPlus size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-sm font-bold text-gray-900 leading-tight">
+                        @{req.senderName}
+                      </p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Friend request
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium text-gray-900 leading-tight">
-                      @{req.senderName}
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      Sent a friend request
-                    </p>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleFriendAction(req.id, "accept")}
+                      className="p-1.5 hover:bg-green-50 text-green-600 rounded-md transition-colors"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleFriendAction(req.id, "decline")}
+                      className="p-1.5 hover:bg-red-50 text-red-600 rounded-md transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleAction(req.id, "accept")}
-                    className="p-1.5 hover:bg-green-50 text-green-600 rounded-md transition-colors"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleAction(req.id, "decline")}
-                    className="p-1.5 hover:bg-red-50 text-red-600 rounded-md transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
+              ))}
+
+              {gList.map((invite) => (
+                <div
+                  key={invite.groupID}
+                  className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                      <Users size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-sm font-bold text-gray-900 leading-tight">
+                        {invite.groupName}
+                      </p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Group invitation
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        handleGroupAction(invite.groupID, "accept")
+                      }
+                      className="p-1.5 hover:bg-green-50 text-green-600 rounded-md transition-colors"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleGroupAction(invite.groupID, "decline")
+                      }
+                      className="p-1.5 hover:bg-red-50 text-red-600 rounded-md transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-function globalMutate(arg0: string) {
-  throw new Error("Function not implemented.");
 }

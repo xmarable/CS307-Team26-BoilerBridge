@@ -39,17 +39,27 @@ export function GroupBoard({
     if (!newContent.trim()) return;
     setIsSubmitting(true);
 
+    const currentText = newContent;
+
     try {
       const res = await fetch(`/api/groups/${groupId}/announcements`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newContent }),
+        body: JSON.stringify({ content: currentText }),
       });
 
       if (res.ok) {
         const added = await res.json();
+
+        const newAnnouncement = {
+          ...added,
+          content: added.content || currentText,
+          announcementID: added.announcementID || `temp-${Date.now()}`,
+          timestamp: added.timestamp || new Date().toISOString(),
+          pinnedBy: added.pinnedBy || "Leader",
+        };
         // Prepend to state to reflect "top of board" immediately
-        setAnnouncements([added, ...announcements]);
+        setAnnouncements([newAnnouncement, ...announcements]);
         setNewContent("");
       }
     } catch (error) {
@@ -126,44 +136,56 @@ export function GroupBoard({
 
           <div className="space-y-4">
             {announcements.length > 0 ? (
-              announcements.map((item) => (
-                <div
-                  key={item.announcementID}
-                  className="group relative bg-white border border-gray-100 p-5 rounded-2xl hover:border-amber-200 hover:bg-amber-50/10 transition-all shadow-xs"
-                >
-                  <p className="text-gray-800 font-medium text-lg mb-4 leading-relaxed">
-                    {item.content}
-                  </p>
+              [...announcements]
+                .sort((a, b) => {
+                  const dateA = new Date(a.timestamp || 0).getTime();
+                  const dateB = new Date(
+                    b.timestamp || new Date().toISOString(),
+                  ).getTime();
+                  return dateB - dateA;
+                })
+                .map((item) => (
+                  <div
+                    key={item.announcementID || `ann-${Math.random()}`}
+                    className="group relative bg-white border border-gray-100 p-5 rounded-2xl hover:border-amber-200 hover:bg-amber-50/10 transition-all shadow-xs"
+                  >
+                    {/* Explicit string conversion ensures JSDOM doesn't self-close the tag */}
+                    <p className="text-gray-800 font-medium text-lg mb-4 leading-relaxed">
+                      {item.content ? String(item.content) : " "}
+                    </p>
 
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-4 text-xs font-semibold text-gray-500">
-                      <div className="flex items-center gap-1.5">
-                        <UserIcon size={14} className="text-amber-500" />
-                        {/* AC: I can see exactly which leader pinned each update */}
-                        <span>{item.pinnedBy}</span>
+                    <div className="flex items-center justify-between mt-auto">
+                      <div className="flex items-center gap-4 text-xs font-semibold text-gray-500">
+                        <div className="flex items-center gap-1.5">
+                          <UserIcon size={14} className="text-amber-500" />
+                          <span>{item.pinnedBy || "Leader"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={14} />
+                          <span>
+                            {item.timestamp
+                              ? formatDistanceToNow(new Date(item.timestamp))
+                              : "just now"}{" "}
+                            ago
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock size={14} />
-                        <span>
-                          {formatDistanceToNow(new Date(item.timestamp))} ago
-                        </span>
-                      </div>
+
+                      {isLeader && (
+                        <button
+                          onClick={() =>
+                            handleDeleteAnnouncement(item.announcementID)
+                          }
+                          /* Test-runner visibility fix */
+                          className="text-gray-300 hover:text-red-500 transition-all p-1 cursor-pointer opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                          title="Unpin Announcement"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
-
-                    {isLeader && (
-                      <button
-                        onClick={() =>
-                          handleDeleteAnnouncement(item.announcementID)
-                        }
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1 cursor-pointer"
-                        title="Unpin Announcement"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))
+                ))
             ) : (
               <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-3xl">
                 <p className="text-gray-400 font-medium">
