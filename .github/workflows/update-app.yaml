@@ -57,13 +57,14 @@ jobs:
 
       - name: Cleanup
         run: |
-          # 1. isolate only the first column (the tag) to fix 'invalid tag format'
+          # 1. use awk to isolate the first column and fix 'invalid tag format'
           NEW_TAG="v${{ steps.vars.outputs.tag }}"
 
-          # awk '{print $1}' stops the '0 B' and 'UTC' junk from breaking the command, and grep -v excludes 'latest' and the new tag from deletion
+          # we use awk here to make sure 'Compressed Size' doesn't break the command
           TAGS_TO_DELETE=$(doctl registry repository list-tags boilerbridge --no-header | awk '{print $1}' | grep -v '^latest$' | grep -v "$NEW_TAG")
 
           if [ ! -z "$TAGS_TO_DELETE" ]; then
+            # this now only sends the clean tag names to doctl
             echo "$TAGS_TO_DELETE" | xargs -I {} doctl registry repository delete-tag boilerbridge {} --force || true
           fi
 
