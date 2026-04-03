@@ -1,7 +1,5 @@
 /** @jest-environment node */
 
-process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
-
 import { jest } from "@jest/globals";
 
 const generateRainyDayPlan = (primary: any[]) => {

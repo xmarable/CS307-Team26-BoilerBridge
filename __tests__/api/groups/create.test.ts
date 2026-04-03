@@ -1,7 +1,10 @@
-process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
-
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
+
+// declare vars here so they are in scope for the tests
+let POST: any;
+let User: any, TravelGroup: any, dbConnect: any, bcrypt: any;
+let mockGetServerSession: any;
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -11,28 +14,28 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { default: bcrypt } = await import("bcryptjs");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-
-// Properly type the mock to avoid "never" or assignment errors
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
-let POST: (req: Request) => Promise<Response>;
-
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
+  // 1. wipe module cache
+  jest.resetModules();
+
+  // 2. dynamic imports inside beforeAll so they see TEST_MONGODB_URI
+  const nextAuth = await import("next-auth");
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  ({ default: bcrypt } = await import("bcryptjs"));
+  ({ default: dbConnect } = await import("@/lib/dbConnect"));
+  ({ default: User } = await import("@/models/User"));
+  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+
+  // 3. connect
   await dbConnect();
 
   await TravelGroup.deleteMany({});
   await User.deleteMany({});
 
-  // Sync indexes for both models to manage race conditions
+  // sync indexes to manage race conditions
   await User.syncIndexes();
   await TravelGroup.syncIndexes();
 
@@ -44,13 +47,16 @@ beforeAll(async () => {
   } catch (error) {
     // index might not exist
   }
+
   const createRoute = await import("@/app/api/groups/create/route");
   POST = createRoute.POST;
 });
 
 afterAll(async () => {
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
+  if (TravelGroup && User) {
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+  }
 
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
@@ -68,6 +74,8 @@ afterAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+// ─── TESTS ────────────────────────────────────────────────────────────────────
 
 describe("POST /api/groups/create", () => {
   it("rejects unauthenticated requests with 401", async () => {

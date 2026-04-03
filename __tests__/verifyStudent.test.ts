@@ -1,19 +1,25 @@
 /** @jest-environment node */
-process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
 
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
-import dbConnect from "../lib/dbConnect";
-import UserImport from "../models/User";
-import VerificationCodeImport from "../models/VerificationCode";
 
-const User = (UserImport as any).default || UserImport;
-const VerificationCode =
-  (VerificationCodeImport as any).default || VerificationCodeImport;
+// declare vars to be assigned in beforeAll
+let User: any, VerificationCode: any, dbConnect: any;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
+  // 1. wipe cache
+  jest.resetModules();
+
+  // 2. dynamic imports inside beforeAll
+  ({ default: dbConnect } = await import("../lib/dbConnect"));
+  const UserMod = await import("../models/User");
+  User = UserMod.default || UserMod;
+  const VerifyMod = await import("../models/VerificationCode");
+  VerificationCode = VerifyMod.default || VerifyMod;
+
+  // 3. connect
   await dbConnect();
 
   await User.deleteMany({});
@@ -24,12 +30,14 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await User.deleteMany({});
-  await VerificationCode.deleteMany({});
+  if (User && VerificationCode) {
+    await User.deleteMany({});
+    await VerificationCode.deleteMany({});
+  }
 
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
-    await mongoose.connection.close(true); // close the connection after tests complete
+    await mongoose.connection.close(true);
   }
 
   if ((global as any).mongoose) {

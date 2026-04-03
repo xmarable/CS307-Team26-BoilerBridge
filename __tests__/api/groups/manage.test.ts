@@ -1,9 +1,17 @@
-process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
-
 import { jest } from "@jest/globals";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { randomUUID } from "crypto";
+
+let GETGroups: any,
+  GETGroup: any,
+  PATCHGroup: any,
+  POSTMember: any,
+  DELETEMember: any,
+  PATCHLeader: any,
+  POSTLeave: any;
+let User: any, TravelGroup: any, dbConnect: any, bcrypt: any;
+let mockGetServerSession: jest.MockedFunction<any>;
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -13,24 +21,6 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { default: bcrypt } = await import("bcryptjs");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
-let GETGroups: () => Promise<Response>;
-let GETGroup: (req: Request, ctx: any) => Promise<Response>;
-let PATCHGroup: (req: Request, ctx: any) => Promise<Response>;
-let POSTMember: (req: Request, ctx: any) => Promise<Response>;
-let DELETEMember: (req: Request, ctx: any) => Promise<Response>;
-let PATCHLeader: (req: Request, ctx: any) => Promise<Response>;
-let POSTLeave: (req: Request, ctx: any) => Promise<Response>;
-
 function paramsManage(p: { groupId: string; memberId?: string }) {
   return Promise.resolve(p);
 }
@@ -38,7 +28,18 @@ function paramsManage(p: { groupId: string; memberId?: string }) {
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
+  jest.resetModules();
+
+  const nextAuth = await import("next-auth");
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  ({ default: bcrypt } = await import("bcryptjs"));
+  ({ default: dbConnect } = await import("@/lib/dbConnect"));
+  ({ default: User } = await import("@/models/User"));
+  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+
   await dbConnect();
+
   const groupsRoute = await import("@/app/api/groups/route");
   GETGroups = groupsRoute.GET;
 
@@ -60,19 +61,32 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (mongoose.connection.readyState === 1) {
+  if (TravelGroup && User) {
     await TravelGroup.deleteMany({});
     await User.deleteMany({});
-    await mongoose.connection.close();
   }
+
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+
+  if ((global as any).mongoose) {
+    (global as any).mongoose.conn = null;
+    (global as any).mongoose.promise = null;
+  }
+
   await new Promise((resolve) =>
     setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS),
   );
+
+  jest.clearAllMocks();
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+// ─── TESTS ────────────────────────────────────────────────────────────────────
 
 describe("GET /api/groups", () => {
   it("returns 401 when unauthenticated", async () => {
@@ -80,7 +94,6 @@ describe("GET /api/groups", () => {
     const res = await GETGroups();
     const data = await res.json();
     expect(res.status).toBe(401);
-    // use a more flexible regex to handle 'unauthorized' vs 'not logged in'
     expect(data.error).toMatch(/logged in|unauthorized/i);
   });
 
@@ -156,7 +169,7 @@ describe("GET /api/groups/[groupId]", () => {
     const res = await GETGroup(new Request("http://localhost"), {
       params: paramsManage({ groupId: group.groupID }),
     });
-    const data = await res.json();
+
     expect(res.status).toBe(401);
     await TravelGroup.deleteOne({ groupID: group.groupID });
     await User.deleteOne({ userId: user.userId });
@@ -513,7 +526,7 @@ describe("DELETE /api/groups/[groupId]/members/[memberId]", () => {
         memberId: leader.userId,
       }),
     });
-    const data = await res.json();
+
     expect(res.status).toBe(403);
     await TravelGroup.deleteOne({ groupID: group.groupID });
     await User.deleteMany({ userId: { $in: [leader.userId, member.userId] } });
@@ -834,7 +847,6 @@ describe("POST /api/groups/[groupId]/leave", () => {
     );
     const data = await res.json();
     expect(res.status).toBe(401);
-    // handle flexible unauthorized strings
     expect(data.error).toMatch(/logged in|unauthorized/i);
   });
 
@@ -890,8 +902,6 @@ describe("POST /api/groups/[groupId]/leave", () => {
   });
 
   it("returns 200 and transfers leadership if leader leaves and members exist", async () => {
-    // this test is failing with a 500. check your logic in leave/route.ts
-    // likely an unhandled error during leader selection or role update
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
       username: "leave_lead_leader",
@@ -924,7 +934,6 @@ describe("POST /api/groups/[groupId]/leave", () => {
       },
     );
     const data = await res.json();
-    // check if it fails with 200. if it keeps hitting 500, check server logs
     expect(res.status).toBe(200);
     expect(data.group).toBeDefined();
     expect(data.group.leaderID.toString()).toBe(member.userId.toString());

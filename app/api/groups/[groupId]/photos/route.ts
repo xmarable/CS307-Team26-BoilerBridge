@@ -6,11 +6,15 @@ import User from "@/models/User";
 import TravelGroup from "@/models/TravelGroup";
 import z from "zod";
 import { uploadImage } from "@/lib/cloudinary";
+import { randomUUID } from "crypto";
 
 const ImageSchema = z.object({
     images: z.array(z.string().trim()).min(1)
 });
 
+const ImageDeletionSchema = z.object({
+    imageId: z.uuid()
+});
  
 async function verifyUser(params: Promise<any>) {
     // Verify user logged in
@@ -56,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     }
 
     const newImages = images.data.images.map((i) => ({
+        photoId: randomUUID(),
         uploaderID: info.userId,
         image: i
     }));
@@ -99,8 +104,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ g
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await req.json();
+    const imageId = ImageDeletionSchema.safeParse(body);
+    if (!imageId.success) {
+        return NextResponse.json(
+            { error: "Invalid deletion", details: imageId.error.flatten() },
+            { status: 400 }
+        );
+    }
+
     // TODO logic for removing images
     const images = info.group.photos ?? [];
+    info.group.photos = images.filter((img: any) => img.photoId.toString() !== imageId.data.imageId);
+    
+    await info.group.save();
 
-    return NextResponse.json({ images: images }, { status: 200 });
+    return NextResponse.json({ message: "Success" }, { status: 200 });
 }
