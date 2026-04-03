@@ -31,6 +31,8 @@ import { Input } from "@/components/ui/input";
 import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
+import ExpenseSummaryPanel from "@/components/group/ExpenseSummaryPanel";
+import PaymentRequestsPanel from "@/components/group/PaymentRequestsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
@@ -75,10 +77,11 @@ export default function GroupDashboard() {
   const [loading, setLoading] = useState(!!groupId);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
+  const [paymentRequestsRefresh, setPaymentRequestsRefresh] = useState(0);
 
-  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits" | any>(
-    "ledger",
-  );
+  const [expensesTab, setExpensesTab] = useState<
+    "summary" | "ledger" | "splits"
+  >("summary");
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -519,8 +522,8 @@ export default function GroupDashboard() {
           )}
           {activeSection === "expenses" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex gap-3 px-1">
-                {(["ledger", "splits"] as const).map((tab) => (
+              <div className="flex flex-wrap gap-3 px-1">
+                {(["summary", "ledger", "splits"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setExpensesTab(tab)}
@@ -530,12 +533,24 @@ export default function GroupDashboard() {
                         : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
                     }`}
                   >
-                    {tab === "ledger" ? "Ledger" : "Splits"}
+                    {tab === "summary"
+                      ? "Summary"
+                      : tab === "ledger"
+                        ? "Ledger"
+                        : "Splits"}
                   </button>
                 ))}
               </div>
               <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
-                {expensesTab === "ledger" ? (
+                {expensesTab === "summary" ? (
+                  <ExpenseSummaryPanel
+                    groupId={groupId!}
+                    currentUserId={group?.currentUserId}
+                    onPaymentRequestCreated={() =>
+                      setPaymentRequestsRefresh((n) => n + 1)
+                    }
+                  />
+                ) : expensesTab === "ledger" ? (
                   <SharedCostsPanel
                     groupId={groupId!}
                     currentUserId={group.currentUserId}
@@ -549,6 +564,13 @@ export default function GroupDashboard() {
                   />
                 )}
               </div>
+              {group?.currentUserId ? (
+                <PaymentRequestsPanel
+                  groupId={groupId!}
+                  currentUserId={group.currentUserId}
+                  refreshKey={paymentRequestsRefresh}
+                />
+              ) : null}
             </div>
           )}
 

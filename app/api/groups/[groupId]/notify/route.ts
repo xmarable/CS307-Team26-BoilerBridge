@@ -21,7 +21,7 @@ export async function POST(
   { params }: { params: Promise<{ groupId: string }> },
 ) {
   const session = await getServerSession(authOptions);
-   
+
   const userId = (session?.user as any)?.userId as string | undefined;
 
   if (!userId) {
@@ -43,7 +43,6 @@ export async function POST(
 
   if (
     !group.membersList.some(
-       
       (m: any) => m.userId.toString() === userId && m.role === "Leader",
     )
   ) {
