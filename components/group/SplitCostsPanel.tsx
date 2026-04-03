@@ -540,6 +540,15 @@ export default function SplitCostsPanel({
             const split = costSplits.find((s) => s.expenseId === expense._id);
             const isExpanded = expandedExpense === expense._id;
             const paidByMe = expense.paidBy === currentUserId;
+            const equalShare = expense.amount / (expense.participants.length || 1);
+            const effectiveSplit = split ?? {
+              participants: expense.participants.map((p) => ({
+                userId: p.userId,
+                amount: equalShare,
+                percentage: undefined as number | undefined,
+              })),
+              splitType: "equal" as const,
+            };
 
             return (
               <div
@@ -617,7 +626,7 @@ export default function SplitCostsPanel({
                       ) : (
                         <ChevronDown size={16} />
                       )}
-                      {split ? "View split breakdown" : "No split recorded"}
+                      {isExpanded ? "Hide breakdown" : "View split breakdown"}
                     </button>
                     {canModify(expense.createdBy) && (
                       <div className="flex items-center gap-2">
@@ -647,13 +656,13 @@ export default function SplitCostsPanel({
                 </div>
 
                 {/* Expanded breakdown */}
-                {isExpanded && split && (
+                {isExpanded && (
                   <div className="bg-gray-50 border-t border-gray-100 px-6 py-5">
                     <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3">
-                      Split Breakdown
+                      Split Breakdown{!split && <span className="ml-2 font-normal normal-case text-gray-400">(equal — no custom split recorded)</span>}
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {split.participants.map((p) => {
+                      {effectiveSplit.participants.map((p) => {
                         const name = getMemberName(p.userId);
                         const isMe = p.userId === currentUserId;
                         return (
