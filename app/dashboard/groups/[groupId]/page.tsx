@@ -182,11 +182,11 @@ export default function GroupDashboard() {
           <p className="text-red-600 font-bold mb-6">
             {error || "Group not found"}
           </p>
-          <link href="/dashboard">
+          <Link href="/dashboard">
             <Button variant="outline" className="rounded-xl w-full">
               Back to Dashboard
             </Button>
-          </link>
+          </Link>
         </div>
       </div>
     );
@@ -207,7 +207,7 @@ export default function GroupDashboard() {
     <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
-          <link href="/dashboard">
+          <Link href="/dashboard">
             <Button
               variant="ghost"
               size="icon"
@@ -215,7 +215,7 @@ export default function GroupDashboard() {
             >
               <ChevronLeft size={28} className="text-gray-600" />
             </Button>
-          </link>
+          </Link>
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">
               {group.groupName}
@@ -317,12 +317,12 @@ export default function GroupDashboard() {
                     </h2>
                   </div>
                   {groupId ? (
-                    <link
+                    <Link
                       href={`/dashboard/groups/${groupId}/trip`}
                       className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
                     >
                       Trip settings
-                    </link>
+                    </Link>
                   ) : null}
                 </div>
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6 overflow-hidden flex-1">
