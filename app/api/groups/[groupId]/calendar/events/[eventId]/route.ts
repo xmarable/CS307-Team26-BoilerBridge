@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -13,7 +14,7 @@ function isMemberOrLeader(group: any, userId: string) {
   const leader = group?.leaderID?.toString() === userId;
   const member =
     Array.isArray(group?.membersList) &&
-    group.membersList.some((m: any) => (m.userId || m)?.toString() === userId,);
+    group.membersList.some((m: any) => (m.userId || m)?.toString() === userId);
   return leader || member;
 }
 
@@ -44,14 +45,14 @@ export async function PUT(
 
     const { groupId, eventId } = await params;
 
-    // event id is a objectid for calendarevent model
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
     }
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    // we need the full group document (not lean) because we might save reminders to it
+    const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -65,8 +66,10 @@ export async function PUT(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Creator OR leader can edit
-    const creator = !!(await CalendarEvent.exists({ _id: eventId, createdBy: userId }));
+    const creator = !!(await CalendarEvent.exists({
+      _id: eventId,
+      createdBy: userId,
+    }));
     const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -82,6 +85,12 @@ export async function PUT(
     }
 
     const updates = parsed.data;
+
+    // track if the startTime is actually changing to avoid unnecessary loops
+    const timeChanged =
+      updates.startTime !== undefined &&
+      new Date(updates.startTime).getTime() !==
+        new Date(event.startTime).getTime();
 
     if (updates.title !== undefined) event.title = updates.title;
     if (updates.description !== undefined)
@@ -100,6 +109,26 @@ export async function PUT(
     }
 
     await event.save();
+
+    // ─── REMINDER AUTO-UPDATE LOGIC ───
+    if (timeChanged && group.reminders && group.reminders.length > 0) {
+      const newEventStart = new Date(event.startTime).getTime();
+
+      group.reminders = group.reminders.map((reminder: any) => {
+        // if this reminder is linked to the event we just moved...
+        if (reminder.linkedEventId === eventId) {
+          // recalculate the dueDate using the stored offset
+          reminder.dueDate = new Date(
+            newEventStart - reminder.offsetMinutes * 60000,
+          );
+        }
+        return reminder;
+      });
+
+      // mark the reminders array as modified so mongoose saves it
+      group.markModified("reminders");
+      await group.save();
+    }
 
     return NextResponse.json({ event }, { status: 200 });
   } catch (err: any) {
@@ -130,8 +159,7 @@ export async function DELETE(
 
     await dbConnect();
 
-    // Use findOne with groupID UUID instead of findById
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -145,14 +173,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Creator OR leader can delete
-    const creator = !!(await CalendarEvent.exists({ _id: eventId, createdBy: userId }));
+    const creator = !!(await CalendarEvent.exists({
+      _id: eventId,
+      createdBy: userId,
+    }));
     const leader = isLeader(group, userId);
     if (!creator && !leader) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     await CalendarEvent.deleteOne({ _id: eventId, groupId });
+
+    // clean up orphaned reminders if the event is deleted
+    if (group.reminders) {
+      group.reminders = group.reminders.filter(
+        (r: any) => r.linkedEventId !== eventId,
+      );
+      group.markModified("reminders");
+      await group.save();
+    }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {

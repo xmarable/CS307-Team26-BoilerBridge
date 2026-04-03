@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import TravelGroup from "@/models/TravelGroup";
+import CalendarEvent from "@/models/CalendarEvent";
 import { randomUUID } from "crypto";
 
 export async function GET(
@@ -17,7 +18,7 @@ export async function GET(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    // returning the checklist array
+    // returning the reminders array (the checklist)
     return NextResponse.json(group.reminders || []);
   } catch (error) {
     return NextResponse.json(
@@ -41,15 +42,27 @@ export async function POST(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    // if a calendar event is linked we would calculate the due date here
-    // this handles the auto shift logic for push notifications
-    const autoDueDate = body.linkedEventId ? new Date() : null;
+    let calculatedDueDate = body.dueDate ? new Date(body.dueDate) : null;
+
+    // logic for linking to a calendar event (e.g., flight)
+    if (body.linkedEventId && body.offsetMinutes !== undefined) {
+      const event = await CalendarEvent.findById(body.linkedEventId);
+      if (event) {
+        // shift the time back by the offset (e.g. 180 mins for 3 hours before)
+        calculatedDueDate = new Date(
+          new Date(event.startTime).getTime() - body.offsetMinutes * 60000,
+        );
+      }
+    }
 
     const newReminder = {
       id: randomUUID(),
       task: body.task,
       isCompleted: false,
-      dueDate: autoDueDate,
+      dueDate: calculatedDueDate,
+      linkedEventId: body.linkedEventId || null,
+      offsetMinutes: body.offsetMinutes || 0,
+      createdBy: body.userId, // for the personal checklist filter
     };
 
     if (!group.reminders) {
@@ -59,11 +72,12 @@ export async function POST(
     group.reminders.push(newReminder);
     await group.save();
 
-    // here is where you would trigger the push notification service
-    // to alert the group about the new task or calendar sync
+    // this is where your notification service would pick up the dueDate
+    // to schedule a push/sms alert for the user
 
     return NextResponse.json(newReminder, { status: 201 });
   } catch (error) {
+    console.error("Reminder POST Error:", error);
     return NextResponse.json(
       { error: "Failed to create reminder" },
       { status: 500 },
@@ -78,14 +92,13 @@ export async function PATCH(
   try {
     await dbConnect();
     const { groupId } = await context.params;
-    const { id, isCompleted } = await req.json();
+    const { id, isCompleted, task } = await req.json();
 
     const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    // find the specific reminder and flip the status
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const reminderIndex = group.reminders.findIndex((r: any) => r.id === id);
     if (reminderIndex === -1) {
@@ -95,7 +108,11 @@ export async function PATCH(
       );
     }
 
-    group.reminders[reminderIndex].isCompleted = isCompleted;
+    // update completion or task text
+    if (isCompleted !== undefined)
+      group.reminders[reminderIndex].isCompleted = isCompleted;
+    if (task !== undefined) group.reminders[reminderIndex].task = task;
+
     await group.save();
 
     return NextResponse.json({
@@ -105,6 +122,31 @@ export async function PATCH(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update reminder" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ groupId: string }> },
+) {
+  try {
+    await dbConnect();
+    const { groupId } = await context.params;
+    const { id } = await req.json();
+
+    const group = await TravelGroup.findOne({ groupID: groupId });
+    if (!group)
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+
+    group.reminders = group.reminders.filter((r: any) => r.id !== id);
+    await group.save();
+
+    return NextResponse.json({ message: "Reminder removed" }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Internal Server Error" },
       { status: 500 },
     );
   }
