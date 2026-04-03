@@ -339,8 +339,8 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
                           type="button"
                           onClick={() => !isExpired && handleChoiceSelect(p.pollId, idx)}
                           className={`w-full text-left rounded-2xl border px-4 py-3 transition-all ${isSelected
-                              ? "border-amber-300 bg-amber-50 ring-2 ring-amber-100"
-                              : "border-gray-200 bg-gray-50 hover:border-amber-200 hover:bg-amber-50/40"
+                            ? "border-amber-300 bg-amber-50 ring-2 ring-amber-100"
+                            : "border-gray-200 bg-gray-50 hover:border-amber-200 hover:bg-amber-50/40"
                             } ${isExpired ? "cursor-not-allowed opacity-70" : ""}`}
                         >
                           <div className="flex items-center justify-between gap-3">
