@@ -197,7 +197,11 @@ export default function SharedCostsPanel({
 
   const myShare = sharedCosts
     .filter((c) => c.participants.some((p) => p.userId === currentUserId))
-    .reduce((sum, c) => sum + c.amount / (c.participants.length || 1), 0);
+    .reduce((sum, c) => {
+      const split = costSplits.find((s) => s.expenseId === c._id);
+      const myPart = split?.participants.find((p) => p.userId === currentUserId);
+      return sum + (myPart ? myPart.amount : c.amount / (c.participants.length || 1));
+    }, 0);
 
   const iPaid = sharedCosts
     .filter((c) => c.paidBy === currentUserId)
