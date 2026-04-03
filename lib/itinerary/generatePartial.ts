@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-import { ProposedEventSchema, type ProposedEventInput } from "@/lib/itinerary/schemas";
+import {
+  ProposedEventSchema,
+  type ProposedEventInput,
+} from "@/lib/itinerary/schemas";
+import {
+  ollamaChatJson,
+  parseJsonFromOllamaContent,
+} from "@/lib/itinerary/ollamaClient";
 
 export { ProposedEventSchema, type ProposedEventInput } from "@/lib/itinerary/schemas";
 
@@ -84,54 +91,21 @@ Use the SAME number of events as the slice (${targetEvents.length}), in the same
 `;
 }
 
-async function callOpenAI(prompt: string, eventCount: number): Promise<unknown> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_ITINERARY_MODEL ?? "gpt-4o-mini",
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`OpenAI error: ${res.status} ${errText}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("Empty OpenAI response");
-  }
-
+async function callOllamaPartial(
+  prompt: string,
+  eventCount: number,
+): Promise<unknown> {
+  const content = await ollamaChatJson([{ role: "user", content: prompt }]);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = parseJsonFromOllamaContent(content);
   } catch {
-    throw new Error("OpenAI returned non-JSON");
+    throw new Error("Ollama returned non-JSON");
   }
 
   const withEvents = parsed as { events?: unknown };
   if (!Array.isArray(withEvents.events)) {
-    throw new Error("OpenAI JSON must include an events array");
+    throw new Error("Model JSON must include an events array");
   }
   if (withEvents.events.length !== eventCount) {
     throw new Error(
@@ -152,7 +126,7 @@ function stubProposedEvents(input: GeneratePartialItineraryInput): ProposedEvent
       title: `Regenerated: ${e.title}`,
       description: e.description
         ? `(Updated) ${e.description}`
-        : "Stub regeneration (set OPENAI_API_KEY for AI output).",
+        : "Stub regeneration (OLLAMA_SKIP or offline).",
       startTime: newStart,
       endTime: newEnd,
       location: e.location,
@@ -164,7 +138,7 @@ function stubProposedEvents(input: GeneratePartialItineraryInput): ProposedEvent
 
 /**
  * Generates replacement itinerary events for the selected slice.
- * Uses OpenAI when OPENAI_API_KEY is set; otherwise returns a deterministic stub for dev/tests.
+ * Uses local Ollama unless OLLAMA_SKIP=1 (stub) or Ollama errors (thrown to route).
  */
 export async function generatePartialItinerary(
   input: GeneratePartialItineraryInput,
@@ -173,11 +147,11 @@ export async function generatePartialItinerary(
     return [];
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (process.env.OLLAMA_SKIP === "1") {
     return stubProposedEvents(input);
   }
 
   const prompt = buildPrompt(input);
-  const rawList = await callOpenAI(prompt, input.targetEvents.length);
+  const rawList = await callOllamaPartial(prompt, input.targetEvents.length);
   return validateProposedList(rawList);
 }

@@ -12,3 +12,7 @@ export const ProposedEventSchema = z.object({
 });
 
 export type ProposedEventInput = z.infer<typeof ProposedEventSchema>;
+
+export const ProposedEventsResponseSchema = z.object({
+  events: z.array(ProposedEventSchema).min(1),
+});

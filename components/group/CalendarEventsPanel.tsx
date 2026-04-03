@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [popupMsg, setPopupMsg] = useState("");
+  const [errorPopupTripLink, setErrorPopupTripLink] = useState(false);
 
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
@@ -210,8 +212,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       });
       const data = await res.json();
       if (!res.ok) {
-        // show error if the generation fails
         setPopupMsg(data?.error || "Failed to generate itinerary.");
+        setErrorPopupTripLink(res.status === 404);
         setShowErrorPopup(true);
       } else {
         // show success if it worked
@@ -412,7 +414,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               itinerary
             </h3>
             <p className="text-gray-400 font-bold text-sm">
-              Converts your must-haves into a scheduled timeline
+              Builds a full timeline with Ollama (local) from your trip and
+              approved must-haves
             </p>
           </div>
           <Button
@@ -779,7 +782,13 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       </Dialog>
 
       {/* Error Popup Alert */}
-      <Dialog open={showErrorPopup} onOpenChange={setShowErrorPopup}>
+      <Dialog
+        open={showErrorPopup}
+        onOpenChange={(open) => {
+          setShowErrorPopup(open);
+          if (!open) setErrorPopupTripLink(false);
+        }}
+      >
         <DialogContent className="rounded-[2.5rem] border-4 border-red-600 p-10 bg-white shadow-[10px_10px_0px_0px_rgba(220,38,38,1)] max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
@@ -791,6 +800,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             <p className="text-xl font-black text-gray-900 leading-tight">
               {popupMsg}
             </p>
+            {errorPopupTripLink ? (
+              <Link
+                href={`/dashboard/groups/${groupId}/trip`}
+                className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+              >
+                Open trip settings
+              </Link>
+            ) : null}
           </div>
 
           <DialogFooter>

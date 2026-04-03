@@ -69,11 +69,11 @@ beforeAll(async () => {
   });
 
   const reg = await import("@/app/api/groups/[groupId]/itinerary/regenerate/route");
-  POSTRegenerate = reg.POST;
+  POSTRegenerate = reg.POST as any;
   const app = await import(
     "@/app/api/groups/[groupId]/itinerary/regenerate/apply/route"
   );
-  POSTApply = app.POST;
+  POSTApply = app.POST as any;
 });
 
 afterAll(async () => {
@@ -267,10 +267,10 @@ describe("POST /api/groups/[groupId]/itinerary/regenerate", () => {
     const { leaderId, groupID } = await createLeaderAndGroup();
 
     await MustHave.create({
-      groupId: groupID as unknown as import("mongoose").Types.UUID,
+      groupId: groupID as never,
       name: "Approved Museum",
       status: "approved",
-      addedBy: leaderId as unknown as import("mongoose").Types.UUID,
+      addedBy: leaderId as never,
     });
 
     const ev = await CalendarEvent.create({
