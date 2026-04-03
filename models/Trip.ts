@@ -56,22 +56,9 @@ const TripSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-
+    // new fields for rainy day plans
     primaryItinerary: [ActivitySchema],
     rainyDayItinerary: [ActivitySchema],
-
-    /** Activity/location names or IDs to exclude from itinerary recommendations (US14) */
-    avoidActivities: {
-      type: [String],
-      default: [],
-    },
-    avoidLocations: {
-      type: [String],
-      default: [],
-    },
-    /** Optional budget range for suggestions (US14) */
-    budgetMin: { type: Number, default: undefined },
-    budgetMax: { type: Number, default: undefined },
   },
 
   { timestamps: true },

@@ -139,7 +139,7 @@ export function Dashboard({ initialData }: DashboardProps) {
                 Add Activity
               </Button>
             </Link>
-            <Link href="/dashboard/trip">
+            <Link href="/dashboard/groups">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
                 Plan a trip
@@ -153,6 +153,7 @@ export function Dashboard({ initialData }: DashboardProps) {
             <Link key={trip.groupID} href={`/dashboard/groups/${trip.groupID}`}>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all group">
                 <div className="h-44 overflow-hidden relative">
+                  { }
                   <img
                     src={trip.image}
                     alt={trip.name}

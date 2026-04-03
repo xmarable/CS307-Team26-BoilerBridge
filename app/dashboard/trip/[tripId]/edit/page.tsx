@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,10 +26,6 @@ interface TripData {
   budget: number;
   tripConfirmed: boolean;
   mustHaves?: { name: string; address?: string }[];
-  avoidActivities?: string[];
-  avoidLocations?: string[];
-  budgetMin?: number;
-  budgetMax?: number;
 }
 
 export default function EditTripPage() {
@@ -41,17 +37,6 @@ export default function EditTripPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([]);
-  const [avoidActivities, setAvoidActivities] = useState<string[]>([]);
-  const [avoidLocations, setAvoidLocations] = useState<string[]>([]);
-  const [budgetMin, setBudgetMin] = useState<string>("");
-  const [budgetMax, setBudgetMax] = useState<string>("");
-  const [newAvoidActivity, setNewAvoidActivity] = useState("");
-  const [newAvoidLocation, setNewAvoidLocation] = useState("");
-  const [activitySuggestions, setActivitySuggestions] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<
-    { _id: string; name: string; address?: string; estimatedCost?: number }[]
-  >([]);
-  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
 
   useEffect(() => {
     if (!tripId) {
@@ -74,28 +59,10 @@ export default function EditTripPage() {
             address: m.address ?? "",
           })),
         );
-        setAvoidActivities(data.avoidActivities ?? []);
-        setAvoidLocations(data.avoidLocations ?? []);
-        setBudgetMin(data.budgetMin != null ? String(data.budgetMin) : "");
-        setBudgetMax(data.budgetMax != null ? String(data.budgetMax) : "");
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [tripId]);
-
-  useEffect(() => {
-    fetch("/api/activities?limit=30", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : { activities: [] }))
-      .then((data: { activities?: { name: string }[] }) => {
-        const names = (data.activities ?? []).map((a) => a.name).filter(Boolean);
-        setActivitySuggestions(names);
-      })
-      .catch(() => setActivitySuggestions([]));
-  }, []);
-
-  useEffect(() => {
-    if (tripId && trip) fetchRecommendations();
-  }, [tripId, trip?._id]);
 
   const addMustHave = () => {
     setMustHaves((prev) => [
@@ -118,41 +85,6 @@ export default function EditTripPage() {
     );
   };
 
-  const addAvoidActivity = () => {
-    const v = newAvoidActivity.trim();
-    if (v && !avoidActivities.includes(v)) {
-      setAvoidActivities((prev) => [...prev, v]);
-      setNewAvoidActivity("");
-    }
-  };
-  const removeAvoidActivity = (item: string) => {
-    setAvoidActivities((prev) => prev.filter((a) => a !== item));
-  };
-  const addAvoidLocation = () => {
-    const v = newAvoidLocation.trim();
-    if (v && !avoidLocations.includes(v)) {
-      setAvoidLocations((prev) => [...prev, v]);
-      setNewAvoidLocation("");
-    }
-  };
-  const removeAvoidLocation = (item: string) => {
-    setAvoidLocations((prev) => prev.filter((a) => a !== item));
-  };
-
-  const fetchRecommendations = () => {
-    if (!tripId) return;
-    setRecommendationsLoading(true);
-    fetch(`/api/trip/budget-recommendations?tripId=${tripId}&limit=20`, {
-      credentials: "include",
-    })
-      .then((res) => (res.ok ? res.json() : { recommendations: [] }))
-      .then((data: { recommendations?: { _id: string; name: string; address?: string; estimatedCost?: number }[] }) => {
-        setRecommendations(data.recommendations ?? []);
-      })
-      .catch(() => setRecommendations([]))
-      .finally(() => setRecommendationsLoading(false));
-  };
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!tripId || !trip) return;
@@ -168,8 +100,6 @@ export default function EditTripPage() {
         }))
         .filter((r) => r.name.length > 0);
 
-      const bMin = budgetMin.trim() ? Number(budgetMin) : undefined;
-      const bMax = budgetMax.trim() ? Number(budgetMax) : undefined;
       const payload = {
         fromCity: String(formData.get("fromCity") || "").trim(),
         toCity: String(formData.get("toCity") || "").trim(),
@@ -179,10 +109,6 @@ export default function EditTripPage() {
         budget: Number(formData.get("budget") || 0),
         tripConfirmed: formData.get("tripConfirmed") === "on",
         mustHaves: mustHaveList,
-        avoidActivities,
-        avoidLocations,
-        ...(bMin != null && !Number.isNaN(bMin) && { budgetMin: bMin }),
-        ...(bMax != null && !Number.isNaN(bMax) && { budgetMax: bMax }),
       };
 
       if (
@@ -341,162 +267,6 @@ export default function EditTripPage() {
             required
             className="mt-1"
           />
-        </div>
-
-        <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-          <Label className="text-base font-medium">Activity preferences (US14)</Label>
-          <p className="text-sm text-gray-500 mt-1 mb-3">
-            Mark activities or locations to avoid; suggestions will respect your budget range.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm">Activities to avoid</Label>
-              <div className="flex gap-2 mt-1 flex-wrap">
-                <Input
-                  placeholder="Type or select activity"
-                  value={newAvoidActivity}
-                  onChange={(e) => setNewAvoidActivity(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAvoidActivity())}
-                  className="max-w-[200px]"
-                />
-                <select
-                  className="rounded-md border border-input bg-transparent px-3 py-2 text-sm h-9"
-                  value=""
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v && !avoidActivities.includes(v)) {
-                      setAvoidActivities((prev) => [...prev, v]);
-                    }
-                  }}
-                >
-                  <option value="">Suggestions…</option>
-                  {activitySuggestions
-                    .filter((s) => !avoidActivities.includes(s))
-                    .slice(0, 15)
-                    .map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                </select>
-                <Button type="button" variant="outline" size="sm" onClick={addAvoidActivity}>
-                  Add
-                </Button>
-              </div>
-              {avoidActivities.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {avoidActivities.map((item) => (
-                    <span
-                      key={item}
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-sm"
-                    >
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => removeAvoidActivity(item)}
-                        className="hover:text-red-600"
-                        aria-label={`Remove ${item}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <Label className="text-sm">Locations to avoid</Label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  placeholder="e.g. Downtown, Airport"
-                  value={newAvoidLocation}
-                  onChange={(e) => setNewAvoidLocation(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAvoidLocation())}
-                  className="max-w-[200px]"
-                />
-                <Button type="button" variant="outline" size="sm" onClick={addAvoidLocation}>
-                  Add
-                </Button>
-              </div>
-              {avoidLocations.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {avoidLocations.map((item) => (
-                    <span
-                      key={item}
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-sm"
-                    >
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => removeAvoidLocation(item)}
-                        className="hover:text-red-600"
-                        aria-label={`Remove ${item}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="budgetMin" className="text-sm">Budget range (min $)</Label>
-                <Input
-                  id="budgetMin"
-                  type="number"
-                  min={0}
-                  placeholder="Optional"
-                  value={budgetMin}
-                  onChange={(e) => setBudgetMin(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="budgetMax" className="text-sm">Budget range (max $)</Label>
-                <Input
-                  id="budgetMax"
-                  type="number"
-                  min={0}
-                  placeholder="Optional"
-                  value={budgetMax}
-                  onChange={(e) => setBudgetMax(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <Label className="text-base font-medium">Budget suggestions</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={fetchRecommendations}
-              disabled={recommendationsLoading}
-            >
-              {recommendationsLoading ? "Loading…" : "Refresh suggestions"}
-            </Button>
-          </div>
-          <p className="text-sm text-gray-500 mb-2">
-            Recommendations based on your avoid list and budget range. Update preferences above and refresh.
-          </p>
-          {recommendations.length === 0 && !recommendationsLoading && (
-            <p className="text-sm text-gray-400 py-2">No suggestions yet. Click Refresh.</p>
-          )}
-          {recommendations.length > 0 && (
-            <ul className="space-y-1.5 text-sm">
-              {recommendations.map((r) => (
-                <li key={r._id} className="flex justify-between gap-2">
-                  <span className="font-medium">{r.name}</span>
-                  {r.estimatedCost != null && (
-                    <span className="text-gray-500">${r.estimatedCost}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4">

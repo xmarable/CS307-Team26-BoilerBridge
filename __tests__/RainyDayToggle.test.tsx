@@ -9,7 +9,6 @@ await jest.unstable_mockModule("lucide-react", () => ({
   CloudRain: () => <span data-testid="rain-icon" />,
   Sun: () => <span data-testid="sun-icon" />,
   Columns: () => <span data-testid="compare-icon" />,
-  ChevronRight: () => <span data-testid="chevron-icon" />,
 }));
 
 const { RainyDayToggle } = await import("@/components/RainyDayToggle");
