@@ -1,6 +1,6 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import Link from "next/link";
 import {
   Bell,
@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   Banknote,
+  Users,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -17,6 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+
+interface GroupInvite {
+  groupID: string;
+  groupName: string;
+}
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -44,6 +50,14 @@ export function NotificationBell() {
     refreshInterval: 10000,
   });
 
+  const { data: groupInvites, mutate: mutateGroups } = useSWR<GroupInvite[]>(
+    "/api/groups/invites",
+    fetcher,
+    {
+      refreshInterval: 5000,
+    },
+  );
+
   const {
     data: notifPayload,
     mutate: mutateNotifs,
@@ -59,7 +73,9 @@ export function NotificationBell() {
     if (!requests || !Array.isArray(requests)) return;
 
     const previousRequests = requests;
-    const updatedRequests = requests.filter((r: { id: string }) => r.id !== requestId);
+    const updatedRequests = requests.filter(
+      (r: { id: string }) => r.id !== requestId,
+    );
     mutateFriends(updatedRequests, false);
 
     const endpoint =
@@ -75,8 +91,35 @@ export function NotificationBell() {
 
       if (!res.ok) throw new Error();
       mutateFriends();
+      globalMutate("/api/friends/manage");
     } catch {
       mutateFriends(previousRequests);
+    }
+  };
+
+  const handleGroupAction = async (
+    groupId: string,
+    action: "accept" | "decline",
+  ) => {
+    const endpoint =
+      action === "accept"
+        ? `/api/groups/${groupId}/accept`
+        : `/api/groups/${groupId}/members`;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: action === "accept" ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body:
+          action === "decline" ? JSON.stringify({ email: "current" }) : null,
+      });
+
+      if (res.ok) {
+        mutateGroups();
+        globalMutate("/api/groups/list");
+      }
+    } catch (err) {
+      console.error("Group action request failed:", err);
     }
   };
 
@@ -93,15 +136,19 @@ export function NotificationBell() {
   };
 
   const requestList = Array.isArray(requests) ? requests : [];
+  const gList = Array.isArray(groupInvites) ? groupInvites : [];
   const payload = notifPayload as NotificationsPayload | undefined;
   const inAppList: InAppNotification[] = Array.isArray(payload?.notifications)
     ? payload!.notifications!
     : [];
   const unreadInApp = Number(payload?.unreadCount ?? 0);
 
-  const totalBadge = unreadInApp + requestList.length;
+  const totalBadge = unreadInApp + requestList.length + gList.length;
   const isValidating =
     (friendsValidating && !requests) || (notifsValidating && !notifPayload);
+
+  const nothingToShow =
+    requestList.length === 0 && gList.length === 0 && inAppList.length === 0;
 
   return (
     <DropdownMenu>
@@ -125,7 +172,7 @@ export function NotificationBell() {
 
       <DropdownMenuContent
         align="end"
-        className="w-80 mt-2 rounded-xl shadow-lg bg-white p-2"
+        className="w-80 mt-2 rounded-xl shadow-lg bg-white p-2 border border-gray-100"
       >
         <div className="flex items-center justify-between px-2 py-1">
           <DropdownMenuLabel className="text-gray-900 font-bold p-0">
@@ -186,9 +233,64 @@ export function NotificationBell() {
             </div>
           )}
 
-          {inAppList.length > 0 && (
+          {gList.length > 0 && (
             <div>
               {requestList.length > 0 ? (
+                <DropdownMenuSeparator className="bg-gray-100 my-2" />
+              ) : null}
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
+                Group invites
+              </p>
+              <ul className="space-y-1">
+                {gList.map((invite) => (
+                  <li
+                    key={invite.groupID}
+                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                        <Users size={16} />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <p className="text-sm font-medium text-gray-900 leading-tight truncate">
+                          {invite.groupName}
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          Group invitation
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleGroupAction(invite.groupID, "accept")
+                        }
+                        className="p-1.5 hover:bg-green-50 text-green-600 rounded-md transition-colors"
+                        aria-label="Accept group invite"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleGroupAction(invite.groupID, "decline")
+                        }
+                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-md transition-colors"
+                        aria-label="Decline group invite"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {inAppList.length > 0 && (
+            <div>
+              {requestList.length > 0 || gList.length > 0 ? (
                 <DropdownMenuSeparator className="bg-gray-100 my-2" />
               ) : null}
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
@@ -226,7 +328,7 @@ export function NotificationBell() {
             </div>
           )}
 
-          {requestList.length === 0 && inAppList.length === 0 && (
+          {nothingToShow && (
             <div className="py-6 text-center text-sm text-gray-500">
               {isValidating && !requests && !notifPayload
                 ? "Loading..."

@@ -1,6 +1,20 @@
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
+const CONNECTION_CLEANUP_DELAY_MS = 500;
+
+let GET: any, POST: any, PUT: any, DELETE: any, GENERATE: any;
+let User: any,
+  TravelGroup: any,
+  MustHave: any,
+  CalendarEvent: any,
+  Trip: any,
+  dbConnect: any,
+  bcrypt: any;
+let mockGetServerSession: any;
+
+let groupUUID: string, leaderId: string, memberId: string, outsiderId: string;
+
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
@@ -9,32 +23,22 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { default: bcrypt } = await import("bcryptjs");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-const { default: MustHave } = await import("@/models/MustHave");
-const { default: CalendarEvent } = await import("@/models/CalendarEvent");
-const { default: Trip } = await import("@/models/Trip");
-
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
-let GET: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let POST: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let PUT: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
-let DELETE: (req: Request, ctx: { params: Promise<{ groupId: string; id: string }> }) => Promise<Response>;
-let GENERATE: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-
-let groupUUID: string;
-let leaderId: string;
-let memberId: string;
-let outsiderId: string;
-
 beforeAll(async () => {
+  jest.resetModules();
+
+  const nextAuth = await import("next-auth");
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  ({ default: bcrypt } = await import("bcryptjs"));
+  ({ default: dbConnect } = await import("@/lib/dbConnect"));
+  ({ default: User } = await import("@/models/User"));
+  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+  ({ default: MustHave } = await import("@/models/MustHave"));
+  ({ default: CalendarEvent } = await import("@/models/CalendarEvent"));
+  ({ default: Trip } = await import("@/models/Trip"));
+
   await dbConnect();
+
   await MustHave.deleteMany({});
   await CalendarEvent.deleteMany({});
   await Trip.deleteMany({});
@@ -77,39 +81,46 @@ beforeAll(async () => {
 
   groupUUID = group.groupID.toString();
 
-  const collectionRoute = await import(
-    "@/app/api/groups/[groupId]/must-haves/route"
-  );
-  GET = collectionRoute.GET as any;
-  POST = collectionRoute.POST as any;
+  const collectionRoute =
+    await import("@/app/api/groups/[groupId]/must-haves/route");
+  GET = collectionRoute.GET;
+  POST = collectionRoute.POST;
 
-  const itemRoute = await import(
-    "@/app/api/groups/[groupId]/must-haves/[id]/route"
-  );
-  PUT = itemRoute.PUT as any;
-  DELETE = itemRoute.DELETE as any;
+  const itemRoute =
+    await import("@/app/api/groups/[groupId]/must-haves/[id]/route");
+  PUT = itemRoute.PUT;
+  DELETE = itemRoute.DELETE;
 
-  const generateRoute = await import(
-    "@/app/api/groups/[groupId]/itinerary/generate/route"
-  );
-  GENERATE = generateRoute.POST as any;
+  const generateRoute =
+    await import("@/app/api/groups/[groupId]/itinerary/generate/route");
+  GENERATE = generateRoute.POST;
 });
 
 afterAll(async () => {
-  await MustHave.deleteMany({});
-  await CalendarEvent.deleteMany({});
-  await Trip.deleteMany({});
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
+  if (MustHave && CalendarEvent && Trip && TravelGroup && User) {
+    await MustHave.deleteMany({});
+    await CalendarEvent.deleteMany({});
+    await Trip.deleteMany({});
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+  }
 
-  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+    await mongoose.connection.close(true);
+  }
+
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
     (global as any).mongoose.promise = null;
   }
 
-  jest.resetModules();
   jest.clearAllMocks();
+  jest.resetModules();
+
+  await new Promise((resolve) =>
+    setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS),
+  );
 });
 
 beforeEach(() => jest.clearAllMocks());
@@ -141,10 +152,9 @@ function makeDeleteRequest(gId: string, id: string) {
 }
 
 function makeGenerateRequest(gId: string) {
-  return new Request(
-    `http://localhost/api/groups/${gId}/itinerary/generate`,
-    { method: "POST" },
-  );
+  return new Request(`http://localhost/api/groups/${gId}/itinerary/generate`, {
+    method: "POST",
+  });
 }
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
@@ -197,8 +207,18 @@ describe("GET /api/groups/:groupId/must-haves", () => {
 
   it("filters results by status", async () => {
     await MustHave.create([
-      { groupId: groupUUID, name: "Proposed Place", addedBy: leaderId, status: "proposed" },
-      { groupId: groupUUID, name: "Approved Place", addedBy: leaderId, status: "approved" },
+      {
+        groupId: groupUUID,
+        name: "Proposed Place",
+        addedBy: leaderId,
+        status: "proposed",
+      },
+      {
+        groupId: groupUUID,
+        name: "Approved Place",
+        addedBy: leaderId,
+        status: "approved",
+      },
     ] as any[]);
 
     mockGetServerSession.mockResolvedValue({
@@ -210,7 +230,9 @@ describe("GET /api/groups/:groupId/must-haves", () => {
     });
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.mustHaves.every((m: any) => m.status === "approved")).toBe(true);
+    expect(data.mustHaves.every((m: any) => m.status === "approved")).toBe(
+      true,
+    );
   });
 
   it("filters results by category", async () => {
@@ -251,10 +273,9 @@ describe("POST /api/groups/:groupId/must-haves", () => {
       user: { userId: outsiderId },
       expires: "9999",
     });
-    const res = await POST(
-      makePostRequest(groupUUID, { name: "Test Place" }),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await POST(makePostRequest(groupUUID, { name: "Test Place" }), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(403);
   });
 
@@ -263,10 +284,9 @@ describe("POST /api/groups/:groupId/must-haves", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await POST(
-      makePostRequest(groupUUID, { category: "food" }),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await POST(makePostRequest(groupUUID, { category: "food" }), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -422,10 +442,9 @@ describe("PUT /api/groups/:groupId/must-haves/:id", () => {
       expires: "9999",
     });
     const fakeId = new mongoose.Types.ObjectId().toString();
-    const res = await PUT(
-      makePutRequest(groupUUID, fakeId, { priority: 5 }),
-      { params: Promise.resolve({ groupId: groupUUID, id: fakeId }) },
-    );
+    const res = await PUT(makePutRequest(groupUUID, fakeId, { priority: 5 }), {
+      params: Promise.resolve({ groupId: groupUUID, id: fakeId }),
+    });
     expect(res.status).toBe(404);
   });
 
@@ -447,7 +466,10 @@ describe("PUT /api/groups/:groupId/must-haves/:id", () => {
       expires: "9999",
     });
     const res = await PUT(
-      makePutRequest(groupUUID, memberItemId, { priority: 5, notes: "Must visit!" }),
+      makePutRequest(groupUUID, memberItemId, {
+        priority: 5,
+        notes: "Must visit!",
+      }),
       { params: Promise.resolve({ groupId: groupUUID, id: memberItemId }) },
     );
     expect(res.status).toBe(200);
@@ -602,7 +624,7 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       source: "itinerary",
     } as any);
     expect(events.length).toBe(2);
-    const titles = events.map((e) => e.title);
+    const titles = events.map((e: { title: any }) => e.title);
     expect(titles).toContain("Eiffel Tower");
     expect(titles).toContain("Louvre Museum");
   });
@@ -619,8 +641,18 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     await CalendarEvent.deleteMany({ source: "itinerary" } as any);
 
     await MustHave.create([
-      { groupId: groupUUID, name: "Proposed Spot", addedBy: leaderId, status: "proposed" },
-      { groupId: groupUUID, name: "Rejected Spot", addedBy: leaderId, status: "rejected" },
+      {
+        groupId: groupUUID,
+        name: "Proposed Spot",
+        addedBy: leaderId,
+        status: "proposed",
+      },
+      {
+        groupId: groupUUID,
+        name: "Rejected Spot",
+        addedBy: leaderId,
+        status: "rejected",
+      },
     ] as any[]);
 
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
@@ -632,7 +664,7 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       groupId: groupUUID,
       source: "itinerary",
     } as any);
-    const titles = events.map((e) => e.title);
+    const titles = events.map((e: { title: any }) => e.title);
     expect(titles).not.toContain("Proposed Spot");
     expect(titles).not.toContain("Rejected Spot");
   });

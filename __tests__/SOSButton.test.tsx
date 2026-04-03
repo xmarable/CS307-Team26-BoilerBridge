@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+
 import { jest } from "@jest/globals";
 import "@testing-library/jest-dom";
 import React from "react";
@@ -40,11 +41,11 @@ describe("SOSButton Acceptance Criteria", () => {
 
     // [Assertion] Verify the region label updated to France
     expect(await screen.findByText(/France/i)).toBeInTheDocument();
-    
+
     // [Assertion] Verify local French numbers (17, 18, 15) are displayed instead of 911
-    expect(screen.getByText("17")).toBeInTheDocument(); 
-    expect(screen.getByText("18")).toBeInTheDocument(); 
-    expect(screen.getByText("15")).toBeInTheDocument(); 
+    expect(screen.getByText("17")).toBeInTheDocument();
+    expect(screen.getByText("18")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
     expect(screen.queryByText("911")).not.toBeInTheDocument();
   });
 

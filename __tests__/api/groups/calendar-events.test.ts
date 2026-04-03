@@ -1,6 +1,18 @@
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
+// types
+let GET: any, POST: any, PUT: any, DELETE: any;
+let User: any,
+  TravelGroup: any,
+  CalendarEvent: any,
+  dbConnect: any,
+  bcrypt: any;
+let mockGetServerSession: jest.MockedFunction<any>;
+
+// Use the UUID groupID field (what the routes use to find groups), not MongoDB _id
+let groupUUID: string, leaderId: string, memberId: string, outsiderId: string;
+
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
@@ -9,30 +21,22 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { default: bcrypt } = await import("bcryptjs");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-const { default: CalendarEvent } = await import("@/models/CalendarEvent");
-
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
-let GET: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let POST: (req: Request, ctx: { params: Promise<{ groupId: string }> }) => Promise<Response>;
-let PUT: (req: Request, ctx: { params: Promise<{ groupId: string; eventId: string }> }) => Promise<Response>;
-let DELETE: (req: Request, ctx: { params: Promise<{ groupId: string; eventId: string }> }) => Promise<Response>;
-
-// Use the UUID groupID field (what the routes use to find groups), not MongoDB _id
-let groupUUID: string;
-let leaderId: string;
-let memberId: string;
-let outsiderId: string;
-
 beforeAll(async () => {
+  // 1. wipe cache
+  jest.resetModules();
+
+  const nextAuth = await import("next-auth");
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  ({ default: bcrypt } = await import("bcryptjs"));
+  ({ default: dbConnect } = await import("@/lib/dbConnect"));
+  ({ default: User } = await import("@/models/User"));
+  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+  ({ default: CalendarEvent } = await import("@/models/CalendarEvent"));
+
+  // 2. connect
   await dbConnect();
+
   await CalendarEvent.deleteMany({});
   await TravelGroup.deleteMany({});
   await User.deleteMany({});
@@ -74,31 +78,31 @@ beforeAll(async () => {
   // Routes use TravelGroup.findOne({ groupID }) so we need the UUID groupID field
   groupUUID = group.groupID.toString();
 
-  const collectionRoute = await import(
-    "@/app/api/groups/[groupId]/calendar/events/route"
-  );
-  GET = collectionRoute.GET as any;
-  POST = collectionRoute.POST as any;
+  const collectionRoute =
+    await import("@/app/api/groups/[groupId]/calendar/events/route");
+  GET = collectionRoute.GET;
+  POST = collectionRoute.POST;
 
-  const itemRoute = await import(
-    "@/app/api/groups/[groupId]/calendar/events/[eventId]/route"
-  );
-  PUT = itemRoute.PUT as any;
-  DELETE = itemRoute.DELETE as any;
+  const itemRoute =
+    await import("@/app/api/groups/[groupId]/calendar/events/[eventId]/route");
+  PUT = itemRoute.PUT;
+  DELETE = itemRoute.DELETE;
 });
 
 afterAll(async () => {
-  await CalendarEvent.deleteMany({});
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
+  if (CalendarEvent && TravelGroup && User) {
+    await CalendarEvent.deleteMany({});
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+  }
 
   if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
     (global as any).mongoose.promise = null;
   }
 
-  jest.resetModules();
   jest.clearAllMocks();
 });
 
@@ -214,10 +218,9 @@ describe("GET /api/groups/:groupId/calendar/events", () => {
     });
     const from = new Date(Date.now() + 86400000).toISOString();
     const to = new Date(Date.now()).toISOString();
-    const res = await GET(
-      makeGetRequest(groupUUID, `?from=${from}&to=${to}`),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await GET(makeGetRequest(groupUUID, `?from=${from}&to=${to}`), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(400);
   });
 
@@ -245,10 +248,9 @@ describe("GET /api/groups/:groupId/calendar/events", () => {
 
     const from = new Date().toISOString();
     const to = new Date(Date.now() + 7 * 86400000).toISOString();
-    const res = await GET(
-      makeGetRequest(groupUUID, `?from=${from}&to=${to}`),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
+    const res = await GET(makeGetRequest(groupUUID, `?from=${from}&to=${to}`), {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.events.some((e: any) => e.title === "In Range")).toBe(true);
@@ -389,7 +391,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     mockGetServerSession.mockResolvedValue(null);
     const res = await PUT(
       makePutRequest(groupUUID, leaderEventId, { title: "Updated" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }),
+      },
     );
     expect(res.status).toBe(401);
   });
@@ -401,7 +405,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     });
     const res = await PUT(
       makePutRequest(groupUUID, leaderEventId, { title: "Updated" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }),
+      },
     );
     expect(res.status).toBe(403);
   });
@@ -413,7 +419,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     });
     const res = await PUT(
       makePutRequest(groupUUID, leaderEventId, { title: "Updated" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }),
+      },
     );
     expect(res.status).toBe(403);
   });
@@ -425,7 +433,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     });
     const res = await PUT(
       makePutRequest(groupUUID, memberEventId, { title: "Updated by Member" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: memberEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: memberEventId }),
+      },
     );
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -439,7 +449,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     });
     const res = await PUT(
       makePutRequest(groupUUID, memberEventId, { title: "Updated by Leader" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: memberEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: memberEventId }),
+      },
     );
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -456,7 +468,9 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
         startTime: futureEnd(),
         endTime: futureStart(),
       }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }) },
+      {
+        params: Promise.resolve({ groupId: groupUUID, eventId: leaderEventId }),
+      },
     );
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -470,7 +484,12 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     });
     const res = await PUT(
       makePutRequest(groupUUID, "not-a-valid-objectid", { title: "X" }),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: "not-a-valid-objectid" }) },
+      {
+        params: Promise.resolve({
+          groupId: groupUUID,
+          eventId: "not-a-valid-objectid",
+        }),
+      },
     );
     expect(res.status).toBe(400);
   });
@@ -574,10 +593,9 @@ describe("DELETE /api/groups/:groupId/calendar/events/:eventId", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await DELETE(
-      makeDeleteRequest(groupUUID, "not-valid"),
-      { params: Promise.resolve({ groupId: groupUUID, eventId: "not-valid" }) },
-    );
+    const res = await DELETE(makeDeleteRequest(groupUUID, "not-valid"), {
+      params: Promise.resolve({ groupId: groupUUID, eventId: "not-valid" }),
+    });
     expect(res.status).toBe(400);
   });
 

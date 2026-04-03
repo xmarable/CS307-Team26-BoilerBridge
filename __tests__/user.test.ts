@@ -1,15 +1,19 @@
 /** @jest-environment node */
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose"; // import mongoose for db interaction
-import dbConnect from "../lib/dbConnect"; // utility to connect to our mongo instance
-import UserImport from "../models/User"; // grab the user model for testing
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const User = (UserImport as any).default || UserImport; // IMPORTANT: handle potential cjs/esm default export mismatch
+let User: any, dbConnect: any;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500; // time to wait for mongo to actually kill the connection
 
 beforeAll(async () => {
+  jest.resetModules();
+
+  ({ default: dbConnect } = await import("../lib/dbConnect"));
+  const UserMod = await import("../models/User");
+  User = UserMod.default || UserMod;
+
   await dbConnect();
 
   await User.deleteMany({}); // clear the users collection before starting the tests to ensure a clean slate
@@ -18,7 +22,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (User !== null && typeof User.deleteMany === "function") {
+  if (User && typeof User.deleteMany === "function") {
     await User.deleteMany({}); // IMPORTANT: wipe the user collection so we dont leak state between runs
   }
 
@@ -34,12 +38,17 @@ afterAll(async () => {
 
   jest.resetModules();
   jest.clearAllMocks();
+
+  await new Promise((resolve) =>
+    setTimeout(resolve, CONNECTION_CLEANUP_DELAY_MS),
+  );
 });
 
 describe("User Model Test Suite", () => {
   beforeEach(async () => {
     await User.deleteMany({});
   });
+
   it("should create and save a valid user successfully", async () => {
     const savedUser = await User.create({
       username: "xavy_test",
@@ -64,7 +73,6 @@ describe("User Model Test Suite", () => {
       passwordHash: "hash123",
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let error: any = null; // local var to capture the thrown error
     try {
       await User.create({
@@ -81,7 +89,6 @@ describe("User Model Test Suite", () => {
   });
 
   it("should fail to save a user without a password", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let error: any = null; // another var for error catching
     try {
       await User.create({

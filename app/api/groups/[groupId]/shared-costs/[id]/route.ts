@@ -113,8 +113,8 @@ export async function PUT(
 
     if (paidBy !== undefined) {
       const validPayers = new Set<string>([
-        ...(Array.isArray(group?.membersList) ? group.membersList : []),
-        group?.leaderID,
+        ...(Array.isArray(group?.membersList) ? group.membersList.map((m: any) => m.userId?.toString()) : []),
+        group?.leaderID?.toString(),
         ...userIds,
       ].filter(Boolean));
 
