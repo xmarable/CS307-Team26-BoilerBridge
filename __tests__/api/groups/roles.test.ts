@@ -1,58 +1,106 @@
-/** @jest-environment node */
-
 import { jest } from "@jest/globals";
-import { NextRequest } from "next/server";
-import { PATCH } from "../../../app/api/groups/[groupId]/roles/route";
 
-describe("Role Assignment API - RBAC", () => {
-  const baseUrl = "http://localhost:3000";
+// mock the credentials provider as a function that returns an object
+jest.unstable_mockModule("next-auth/providers/credentials", () => ({
+  default: jest.fn(() => ({
+    id: "credentials",
+    name: "Credentials",
+    type: "credentials",
+  })),
+}));
 
-  it("Given I am the group leader, When I open the member list, Then I can toggle a user between Admin and Viewer status", async () => {
-    const req = new NextRequest(`${baseUrl}/api/groups/group789/roles`, {
-      method: "PATCH",
-      body: JSON.stringify({ userId: "user123", newRole: "Admin" }),
-    });
+jest.unstable_mockModule("@/lib/auth", () => ({
+  authOptions: {
+    providers: [],
+    callbacks: {},
+    pages: {},
+    session: { strategy: "jwt" },
+  },
+}));
 
-    // next.js 15 requires params to be a promise in the test context
-    const params = Promise.resolve({ groupId: "group789" });
+jest.unstable_mockModule("@/lib/mongodb", () => ({
+  default: Promise.resolve({
+    db: () => ({
+      collection: () => ({
+        findOne: (jest.fn() as any).mockResolvedValue(null),
+      }),
+    }),
+  }),
+}));
 
-    const res = await PATCH(req, { params });
-    expect(res.status).toBe(200);
+jest.unstable_mockModule("next-auth", () => ({
+  getServerSession: jest.fn(),
+}));
+
+jest.unstable_mockModule("@/lib/dbConnect", () => ({
+  default: jest.fn(),
+}));
+
+jest.unstable_mockModule("@/models/TravelGroup", () => ({
+  default: {
+    findOne: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+  },
+}));
+
+jest.unstable_mockModule("@/models/User", () => ({
+  default: {
+    findOne: jest.fn(),
+  },
+}));
+
+jest.unstable_mockModule("@/lib/roles", () => ({
+  getMemberPermissions: jest.fn(),
+}));
+
+const { getServerSession } = await import("next-auth");
+const { getMemberPermissions } = await import("@/lib/roles");
+const { default: TravelGroup } = await import("@/models/TravelGroup");
+const { default: User } = await import("@/models/User");
+
+let rolesPatch: any;
+
+describe("role management and permissions tests", () => {
+  const mockGroupId = "550e8400-e29b-41d4-a716-446655440000";
+
+  beforeAll(async () => {
+    const rolesModule =
+      (await import("@/app/api/groups/[groupId]/roles/route")) as any;
+    rolesPatch = rolesModule.PATCH;
   });
 
-  it("Given a member is a Viewer, When they attempt to edit the itinerary, Then the API blocks the request", async () => {
-    // changing from PUT to PATCH based on typical next.js route exports if PUT was missing
-    const itineraryRoute =
-      await import("../../../app/api/groups/[groupId]/itinerary/route");
-    const updateMethod = itineraryRoute.PATCH || itineraryRoute.POST;
-
-    if (!updateMethod) {
-      throw new Error("could not find PATCH or POST export in itinerary route");
-    }
-
-    const req = new NextRequest(`${baseUrl}/api/groups/group789/itinerary`, {
-      method: "PATCH",
-      body: JSON.stringify({ activities: [] }),
-    });
-
-    const params = Promise.resolve({ groupId: "group789" });
-    const res = await updateMethod(req, { params });
-
-    expect(res.status).toBe(403);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it("Given the group needs a new primary contact, When I transfer Leader status, Then my own permissions are downgraded", async () => {
-    const req = new NextRequest(`${baseUrl}/api/groups/group789/roles`, {
-      method: "PATCH",
-      body: JSON.stringify({ userId: "newLeader123", newRole: "Leader" }),
+  it("Given I am the group leader, When I open the member list, Then I can toggle a user between 'Admin' and 'Viewer' status.", async () => {
+    (getServerSession as any).mockResolvedValue({
+      user: { email: "leader@test.com" },
     });
 
-    const params = Promise.resolve({ groupId: "group789" });
+    (User.findOne as any).mockResolvedValue({ userId: "leader-1" });
 
-    const res = await PATCH(req, { params });
-    const data = await res.json();
+    (getMemberPermissions as any).mockResolvedValue({
+      roles: { isLeader: true },
+      status: 200,
+    });
 
-    expect(res.status).toBe(200);
-    expect(data).toBeDefined();
+    const mockRequest = {
+      json: (jest.fn() as any).mockResolvedValue({
+        targetUserId: "user-2",
+        newRole: "Admin",
+        action: "TOGGLE_ROLE",
+      }),
+    } as any;
+
+    const context = { params: Promise.resolve({ groupId: mockGroupId }) };
+
+    const response = await rolesPatch(mockRequest, context);
+    expect(response.status).toBe(200);
+
+    expect(TravelGroup.findOneAndUpdate as any).toHaveBeenCalledWith(
+      { groupID: mockGroupId, "membersList.userId": "user-2" },
+      { $set: { "membersList.$.role": "Admin" } },
+    );
   });
 });

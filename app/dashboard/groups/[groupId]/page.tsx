@@ -40,13 +40,7 @@ import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
-
-type GroupSummary = {
-  groupID: string;
-  groupName: string;
-  leaderID: string;
-  members: string[];
-};
+import { GroupBoard } from "@/components/GroupBoard";
 
 type GroupState = {
   _id: string;
@@ -54,8 +48,15 @@ type GroupState = {
   groupName: string;
   description?: string;
   leaderID?: string;
-  membersList: { userId: string; role: string }[];
+  membersList: {
+    userId: string;
+    role: string;
+    username?: string;
+    email?: string;
+  }[];
   pendingRequests?: { email: string; sentAt: string }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pinnedAnnouncements?: any[];
   isLeader?: boolean;
   currentUserId: string;
   budget?: { used: number; total: number };
@@ -182,11 +183,11 @@ export default function GroupDashboard() {
           <p className="text-red-600 font-bold mb-6">
             {error || "Group not found"}
           </p>
-          <link href="/dashboard">
+          <Link href="/dashboard">
             <Button variant="outline" className="rounded-xl w-full">
               Back to Dashboard
             </Button>
-          </link>
+          </Link>
         </div>
       </div>
     );
@@ -204,10 +205,10 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
+    <div className="p-6 lg:p-10 max-w-400 mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
-          <link href="/dashboard">
+          <Link href="/dashboard">
             <Button
               variant="ghost"
               size="icon"
@@ -215,7 +216,7 @@ export default function GroupDashboard() {
             >
               <ChevronLeft size={28} className="text-gray-600" />
             </Button>
-          </link>
+          </Link>
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">
               {group.groupName}
@@ -247,8 +248,8 @@ export default function GroupDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <aside className="lg:col-span-2">
+      <div className="flex flex-col lg:flex-row gap-10">
+        <aside className="w-full lg:w-70 shrink-0">
           <div className="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-2 sticky top-10 border border-gray-50">
             <SidebarButton
               active={activeSection === "overview"}
@@ -303,52 +304,11 @@ export default function GroupDashboard() {
           </div>
         </aside>
 
-        <main className="lg:col-span-10">
-          {activeSection === "itinerary" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <section className="space-y-4 h-full flex flex-col">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
-                      <Calendar size={20} />
-                    </div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                      Timeline
-                    </h2>
-                  </div>
-                  {groupId ? (
-                    <link
-                      href={`/dashboard/groups/${groupId}/trip`}
-                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
-                    >
-                      Trip settings
-                    </link>
-                  ) : null}
-                </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6 overflow-hidden flex-1">
-                  <CalendarEventsPanel groupId={groupId!} />
-                </div>
-              </section>
-
-              <section className="space-y-4 h-full flex flex-col">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="p-2 bg-pink-50 rounded-xl text-pink-600">
-                    <Heart size={20} />
-                  </div>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                    Must-Haves
-                  </h2>
-                </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6 overflow-hidden flex-1">
-                  <MustHavesPanel groupId={groupId!} />
-                </div>
-              </section>
-            </div>
-          )}
-
+        <main className="flex-1 min-w-0">
           {activeSection === "members" && (
             <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full">
+              {/* main member list container - added min-h-24 to ensure it displays */}
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full min-h-37.5">
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
@@ -481,20 +441,58 @@ export default function GroupDashboard() {
           )}
 
           {activeSection === "overview" && (
-            <div className="bg-white rounded-[2.5rem] p-16 border border-gray-100 shadow-sm text-center animate-in zoom-in-95 duration-500 w-full">
-              <div className="w-24 h-24 bg-amber-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 text-amber-600 shadow-inner">
-                <LayoutGrid size={48} />
-              </div>
-              <h3 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">
-                Group Hub
-              </h3>
-              <p className="text-gray-500 text-xl max-w-md mx-auto leading-relaxed font-medium">
-                {group.description ||
-                  "Every great trip starts with a plan. Welcome to your group's command center!"}
-              </p>
+            <div className="w-full min-w-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <GroupBoard
+                groupId={groupId!}
+                initialAnnouncements={group.pinnedAnnouncements || []}
+                isLeader={isLeader}
+              />
             </div>
           )}
 
+          {activeSection === "itinerary" && (
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
+              <section className="space-y-6 flex-1 min-w-100">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+                      <Calendar size={24} />
+                    </div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                      Timeline
+                    </h2>
+                  </div>
+                  {groupId && (
+                    <Link
+                      href={`/dashboard/groups/${groupId}/trip`}
+                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+                    >
+                      Trip settings
+                    </Link>
+                  )}
+                </div>
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex-1">
+                  <CalendarEventsPanel groupId={groupId!} />
+                </div>
+              </section>
+
+              <section className="space-y-6 flex-1 min-w-100">
+                <div className="flex items-center gap-3 px-2">
+                  <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
+                    <Heart size={24} />
+                  </div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                    Must-Haves
+                  </h2>
+                </div>
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex-1">
+                  <MustHavesPanel groupId={groupId!} />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ... other sections remain the same ... */}
           {activeSection === "messages" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
               <GroupMessagesPanel
@@ -532,6 +530,7 @@ export default function GroupDashboard() {
               />
             </div>
           )}
+
           {activeSection === "expenses" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex flex-wrap gap-3 px-1">
@@ -545,15 +544,11 @@ export default function GroupDashboard() {
                         : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
                     }`}
                   >
-                    {tab === "summary"
-                      ? "Summary"
-                      : tab === "ledger"
-                        ? "Ledger"
-                        : "Splits"}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
                   </button>
                 ))}
               </div>
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 min-w-0">
                 {expensesTab === "summary" ? (
                   <ExpenseSummaryPanel
                     groupId={groupId!}
@@ -576,18 +571,18 @@ export default function GroupDashboard() {
                   />
                 )}
               </div>
-              {group?.currentUserId ? (
+              {group?.currentUserId && (
                 <PaymentRequestsPanel
                   groupId={groupId!}
                   currentUserId={group.currentUserId}
                   refreshKey={paymentRequestsRefresh}
                 />
-              ) : null}
+              )}
             </div>
           )}
 
           {isLeader && activeSection === "notify" && (
-            <div>
+            <div className="min-w-0 w-full">
               <GroupNotification
                 activeGroup={{
                   groupID: group.groupID,
