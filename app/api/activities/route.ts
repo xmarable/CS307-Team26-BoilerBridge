@@ -169,14 +169,14 @@ export async function POST(req: NextRequest) {
       safeUrlString(infoUrl) || safeUrlString(resolved.infoUrl) || undefined;
     const mergedPlaceId = resolved.placeId?.trim() || undefined;
 
-    const links =
+    const links: { title: string; url: string }[] =
       referenceLinks
         ?.map((l) => {
           const url = safeUrlString(l.url);
           if (!url) return null;
           return { title: l.title, url };
         })
-        .filter(Boolean) ?? [];
+        .filter((x): x is { title: string; url: string } => x != null) ?? [];
 
     if (
       resolved.googleMapsUri &&
