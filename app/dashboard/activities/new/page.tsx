@@ -61,7 +61,7 @@ export default function AddActivityPage() {
 
       const activityId = data?.activity?._id;
       if (activityId) {
-        router.push(`/activities/${activityId}`);
+        router.push(`/dashboard/activities/${activityId}`);
       } else {
         setError("Activity created but could not redirect.");
       }
