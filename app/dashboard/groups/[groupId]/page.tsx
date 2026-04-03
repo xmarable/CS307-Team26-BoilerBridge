@@ -205,7 +205,7 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-400 mx-auto space-y-10">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Link href="/dashboard">
@@ -305,10 +305,99 @@ export default function GroupDashboard() {
         </aside>
 
         <main className="flex-1 min-w-0">
+          {activeSection === "overview" && (
+            <div className="w-full min-w-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <GroupBoard
+                groupId={groupId!}
+                initialAnnouncements={group.pinnedAnnouncements || []}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
+          {activeSection === "itinerary" && (
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
+              <section className="space-y-6 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+                      <Calendar size={24} />
+                    </div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                      Timeline
+                    </h2>
+                  </div>
+                  {groupId && (
+                    <Link
+                      href={`/dashboard/groups/${groupId}/trip`}
+                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+                    >
+                      Trip settings
+                    </Link>
+                  )}
+                </div>
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
+                  <CalendarEventsPanel groupId={groupId!} />
+                </div>
+              </section>
+
+              <section className="space-y-6 flex-1">
+                <div className="flex items-center gap-3 px-2">
+                  <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
+                    <Heart size={24} />
+                  </div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                    Must-Haves
+                  </h2>
+                </div>
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
+                  <MustHavesPanel groupId={groupId!} />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <GroupPollsPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
+          {activeSection === "messages" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <GroupMessagesPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+              />
+            </div>
+          )}
+
+          {activeSection === "photos" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <GroupPhotosPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
           {activeSection === "members" && (
             <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* main member list container - added min-h-24 to ensure it displays */}
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full min-h-37.5">
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full min-h-40">
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
@@ -440,97 +529,6 @@ export default function GroupDashboard() {
             </div>
           )}
 
-          {activeSection === "overview" && (
-            <div className="w-full min-w-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <GroupBoard
-                groupId={groupId!}
-                initialAnnouncements={group.pinnedAnnouncements || []}
-                isLeader={isLeader}
-              />
-            </div>
-          )}
-
-          {activeSection === "itinerary" && (
-            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
-              <section className="space-y-6 flex-1 min-w-100">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
-                      <Calendar size={24} />
-                    </div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">
-                      Timeline
-                    </h2>
-                  </div>
-                  {groupId && (
-                    <Link
-                      href={`/dashboard/groups/${groupId}/trip`}
-                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
-                    >
-                      Trip settings
-                    </Link>
-                  )}
-                </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex-1">
-                  <CalendarEventsPanel groupId={groupId!} />
-                </div>
-              </section>
-
-              <section className="space-y-6 flex-1 min-w-100">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
-                    <Heart size={24} />
-                  </div>
-                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">
-                    Must-Haves
-                  </h2>
-                </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex-1">
-                  <MustHavesPanel groupId={groupId!} />
-                </div>
-              </section>
-            </div>
-          )}
-
-          {/* ... other sections remain the same ... */}
-          {activeSection === "messages" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-              <GroupMessagesPanel
-                activeGroup={{
-                  groupID: group.groupID,
-                  groupName: group.groupName,
-                }}
-                userId={group.currentUserId}
-              />
-            </div>
-          )}
-
-          {activeSection === "photos" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-              <GroupPhotosPanel
-                activeGroup={{
-                  groupID: group.groupID,
-                  groupName: group.groupName,
-                }}
-                userId={group.currentUserId}
-                isLeader={isLeader}
-              />
-            </div>
-          )}
-
-          {activeSection === "polls" && (
-            <div className="overflow-y-auto">
-              <GroupPollsPanel
-                activeGroup={{
-                  groupID: group.groupID,
-                  groupName: group.groupName,
-                }}
-                userId={group.currentUserId}
-                isLeader={isLeader}
-              />
-            </div>
-          )}
-
           {activeSection === "expenses" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex flex-wrap gap-3 px-1">
@@ -582,7 +580,7 @@ export default function GroupDashboard() {
           )}
 
           {isLeader && activeSection === "notify" && (
-            <div className="min-w-0 w-full">
+            <div className="min-w-0 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
               <GroupNotification
                 activeGroup={{
                   groupID: group.groupID,
