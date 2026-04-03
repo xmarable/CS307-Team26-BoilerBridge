@@ -87,14 +87,11 @@ ${sliceBlock}
 
 Respond with a JSON object: { "events": [ ... ] }
 Each event must have: title (string), description (string, optional), startTime (ISO 8601 string), endTime (ISO 8601 string), location (string, optional), eventType (string, optional), timezone (string, optional, default UTC).
-Use the SAME number of events as the slice (${targetEvents.length}), in the same order, unless merging is clearly better (prefer same count).
+The "events" array MUST contain EXACTLY ${targetEvents.length} objects, in the same order as the slice above. Do not add or merge entries; one output event per input line.
 `;
 }
 
-async function callOllamaPartial(
-  prompt: string,
-  eventCount: number,
-): Promise<unknown> {
+async function callOllamaPartial(prompt: string): Promise<unknown[]> {
   const content = await ollamaChatJson([{ role: "user", content: prompt }]);
   let parsed: unknown;
   try {
@@ -107,33 +104,30 @@ async function callOllamaPartial(
   if (!Array.isArray(withEvents.events)) {
     throw new Error("Model JSON must include an events array");
   }
-  if (withEvents.events.length !== eventCount) {
-    throw new Error(
-      `Expected ${eventCount} proposed events, got ${withEvents.events.length}`,
-    );
-  }
   return withEvents.events;
 }
 
+function stubSingleProposed(e: TargetEventContext): ProposedEventInput {
+  const start = new Date(e.startTime);
+  const end = new Date(e.endTime);
+  const duration = Math.max(end.getTime() - start.getTime(), 15 * 60 * 1000);
+  const newStart = new Date(start.getTime() + 5 * 60 * 1000);
+  const newEnd = new Date(newStart.getTime() + duration);
+  return {
+    title: `Regenerated: ${e.title}`,
+    description: e.description
+      ? `(Updated) ${e.description}`
+      : "Fallback slot (model returned too few items).",
+    startTime: newStart,
+    endTime: newEnd,
+    location: e.location,
+    eventType: e.eventType ?? "activity",
+    timezone: "UTC",
+  };
+}
+
 function stubProposedEvents(input: GeneratePartialItineraryInput): ProposedEventInput[] {
-  return input.targetEvents.map((e) => {
-    const start = new Date(e.startTime);
-    const end = new Date(e.endTime);
-    const duration = Math.max(end.getTime() - start.getTime(), 15 * 60 * 1000);
-    const newStart = new Date(start.getTime() + 5 * 60 * 1000);
-    const newEnd = new Date(newStart.getTime() + duration);
-    return {
-      title: `Regenerated: ${e.title}`,
-      description: e.description
-        ? `(Updated) ${e.description}`
-        : "Stub regeneration (OLLAMA_SKIP or offline).",
-      startTime: newStart,
-      endTime: newEnd,
-      location: e.location,
-      eventType: e.eventType ?? "activity",
-      timezone: "UTC",
-    };
-  });
+  return input.targetEvents.map((e) => stubSingleProposed(e));
 }
 
 /**
@@ -152,6 +146,15 @@ export async function generatePartialItinerary(
   }
 
   const prompt = buildPrompt(input);
-  const rawList = await callOllamaPartial(prompt, input.targetEvents.length);
+  const n = input.targetEvents.length;
+  let rawList = await callOllamaPartial(prompt);
+  if (rawList.length > n) {
+    rawList = rawList.slice(0, n);
+  }
+  while (rawList.length < n) {
+    rawList.push(
+      stubSingleProposed(input.targetEvents[rawList.length]!),
+    );
+  }
   return validateProposedList(rawList);
 }
