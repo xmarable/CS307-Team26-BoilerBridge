@@ -59,7 +59,7 @@ export async function GET(
     if (userIds.length === 0)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group)
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
@@ -105,7 +105,7 @@ export async function POST(
     if (userIds.length === 0)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group)
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
 

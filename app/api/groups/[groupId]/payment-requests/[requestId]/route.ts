@@ -4,6 +4,7 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
+import { confirmPaymentRequestInGroup } from "@/lib/confirmPaymentRequestServer";
 
 const patchBodySchema = z.object({
   status: z.enum(["declined", "paid"]),
@@ -92,6 +93,21 @@ export async function PATCH(
       );
     }
 
+    if (nextStatus === "paid") {
+      const result = await confirmPaymentRequestInGroup(
+        group,
+        requestId,
+        uid,
+      );
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.status },
+        );
+      }
+      return NextResponse.json({ paymentRequest: result.paymentRequest });
+    }
+
     if (String(pr.status) !== "pending") {
       return NextResponse.json(
         { error: "Request is no longer pending" },
@@ -99,14 +115,10 @@ export async function PATCH(
       );
     }
 
-    if (nextStatus === "declined") {
-      (requests[idx] as { status: string; declineReason?: string }).status =
-        "declined";
-      if (reason != null && reason.length > 0) {
-        (requests[idx] as { declineReason?: string }).declineReason = reason;
-      }
-    } else {
-      (requests[idx] as { status: string }).status = "paid";
+    (requests[idx] as { status: string; declineReason?: string }).status =
+      "declined";
+    if (reason != null && reason.length > 0) {
+      (requests[idx] as { declineReason?: string }).declineReason = reason;
     }
 
     group.markModified("paymentRequests");

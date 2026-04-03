@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ import {
   Search,
   X,
   Image,
-  AlignEndHorizontal
+  AlignEndHorizontal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -35,18 +36,17 @@ import PaymentRequestsPanel from "@/components/group/PaymentRequestsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
-
-
-
+import GroupNotification from "@/components/Notification/GroupNotification";
 
 type GroupSummary = {
-    groupID: string;
-    groupName: string;
-    leaderID: string;
-    members: string[];
-}
+  groupID: string;
+  groupName: string;
+  leaderID: string;
+  members: string[];
+};
 
 type GroupState = {
   _id: string;
@@ -79,8 +79,9 @@ export default function GroupDashboard() {
   const [activeSection, setActiveSection] = useState("itinerary");
   const [paymentRequestsRefresh, setPaymentRequestsRefresh] = useState(0);
 
-  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits">("ledger");
-
+  const [expensesTab, setExpensesTab] = useState<
+    "summary" | "ledger" | "splits"
+  >("summary");
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -203,7 +204,7 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-(--突破-7xl) mx-auto space-y-10">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Link href="/dashboard">
@@ -267,16 +268,18 @@ export default function GroupDashboard() {
               icon={<AlignEndHorizontal size={22} />}
               label="Polls"
             />
-            <SidebarButton
-              active={activeSection === "expenseSummary"}
-              onClick={() => setActiveSection("expenseSummary")}
-              icon={<DollarSign size={22} />}
-              label="Expense summary"
-            />
+            {isLeader && (
+              <SidebarButton
+                active={activeSection === "notify"}
+                onClick={() => setActiveSection("notify")}
+                icon={<MessageSquare size={22} />}
+                label="Notify"
+              />
+            )}
             <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
-              icon={<MessageSquare size={22}/>}
+              icon={<MessageSquare size={22} />}
               label="Messages"
             />
             <SidebarButton
@@ -301,43 +304,26 @@ export default function GroupDashboard() {
         </aside>
 
         <main className="lg:col-span-10">
-          {activeSection === "expenseSummary" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
-                  <DollarSign size={22} />
-                </div>
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                  Expense summary
-                </h2>
-              </div>
-              <ExpenseSummaryPanel
-                groupId={groupId!}
-                currentUserId={group?.currentUserId}
-                onPaymentRequestCreated={() =>
-                  setPaymentRequestsRefresh((n) => n + 1)
-                }
-              />
-              {group?.currentUserId ? (
-                <PaymentRequestsPanel
-                  groupId={groupId!}
-                  currentUserId={group.currentUserId}
-                  refreshKey={paymentRequestsRefresh}
-                />
-              ) : null}
-            </div>
-          )}
-
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section className="space-y-4 h-full flex flex-col">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
-                    <Calendar size={20} />
+                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                      <Calendar size={20} />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                      Timeline
+                    </h2>
                   </div>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                    Timeline
-                  </h2>
+                  {groupId ? (
+                    <Link
+                      href={`/dashboard/groups/${groupId}/trip`}
+                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+                    >
+                      Trip settings
+                    </Link>
+                  ) : null}
                 </div>
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6 overflow-hidden flex-1">
                   <CalendarEventsPanel groupId={groupId!} />
@@ -366,7 +352,7 @@ export default function GroupDashboard() {
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
-                  onUpdate={fetchGroup} // added to refresh UI after member updates
+                  onUpdate={fetchGroup}
                 />
               </div>
 
@@ -470,7 +456,10 @@ export default function GroupDashboard() {
                           const alreadyIn = group.membersList?.some(
                             (m) => m.userId === friend.userId,
                           );
-                          if (alreadyIn) return null;
+                          const alreadyPending = group.pendingRequests?.some(
+                            (p) => p.email === friend.email,
+                          );
+                          if (alreadyIn || alreadyPending) return null;
                           return (
                             <button
                               key={friend.userId}
@@ -508,47 +497,72 @@ export default function GroupDashboard() {
 
           {activeSection === "messages" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-            <GroupMessagesPanel 
-              activeGroup={{
-                groupID: group.groupID,
-                groupName: group.groupName
-              }}
-              userId={group.currentUserId}
-            />
+              <GroupMessagesPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+              />
             </div>
           )}
 
           {activeSection === "photos" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-            <GroupPhotosPanel 
-              activeGroup={{
-                groupID: group.groupID,
-                groupName: group.groupName,
-              }}
-              userId={group.currentUserId}
-              isLeader={isLeader}
-            />
+              <GroupPhotosPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="overflow-y-auto">
+              <GroupPollsPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
             </div>
           )}
           {activeSection === "expenses" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex gap-3 px-1">
-                {(["ledger", "splits"] as const).map((tab) => (
+              <div className="flex flex-wrap gap-3 px-1">
+                {(["summary", "ledger", "splits"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setExpensesTab(tab)}
                     className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
                       expensesTab === tab
-                        ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
                         : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
                     }`}
                   >
-                    {tab === "ledger" ? "Ledger" : "Splits"}
+                    {tab === "summary"
+                      ? "Summary"
+                      : tab === "ledger"
+                        ? "Ledger"
+                        : "Splits"}
                   </button>
                 ))}
               </div>
               <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
-                {expensesTab === "ledger" ? (
+                {expensesTab === "summary" ? (
+                  <ExpenseSummaryPanel
+                    groupId={groupId!}
+                    currentUserId={group?.currentUserId}
+                    onPaymentRequestCreated={() =>
+                      setPaymentRequestsRefresh((n) => n + 1)
+                    }
+                  />
+                ) : expensesTab === "ledger" ? (
                   <SharedCostsPanel
                     groupId={groupId!}
                     currentUserId={group.currentUserId}
@@ -562,9 +576,26 @@ export default function GroupDashboard() {
                   />
                 )}
               </div>
+              {group?.currentUserId ? (
+                <PaymentRequestsPanel
+                  groupId={groupId!}
+                  currentUserId={group.currentUserId}
+                  refreshKey={paymentRequestsRefresh}
+                />
+              ) : null}
             </div>
           )}
 
+          {isLeader && activeSection === "notify" && (
+            <div>
+              <GroupNotification
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+              />
+            </div>
+          )}
         </main>
       </div>
     </div>

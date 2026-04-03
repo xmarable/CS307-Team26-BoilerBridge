@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     html: `
             <p>click the link below to reset ur password:</p>
             <p><a href="${url}">reset password</a></p>
-            <p>if u didn't request this u can just ignore it lol</p>
+            <p>if u didn't request this u can just ignore it</p>
         `,
   };
 

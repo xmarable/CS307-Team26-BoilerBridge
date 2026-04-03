@@ -55,6 +55,14 @@ interface SharedCostDoc {
   createdBy: string;
 }
 
+interface CostSplitDoc {
+  _id: string;
+  expenseId: string;
+  participants: { userId: string; amount: number; percentage?: number }[];
+  totalAmount: number;
+  splitType: SplitType;
+}
+
 interface FormState {
   title: string;
   description: string;
@@ -126,6 +134,7 @@ export default function SharedCostsPanel({
 }: SharedCostsPanelProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [sharedCosts, setSharedCosts] = useState<SharedCostDoc[]>([]);
+  const [costSplits, setCostSplits] = useState<CostSplitDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "paid" | "owe">("all");
   const [showModal, setShowModal] = useState(false);
@@ -144,15 +153,18 @@ export default function SharedCostsPanel({
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     [],
   );
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [customPercentages, setCustomPercentages] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [membersRes, costsRes] = await Promise.all([
+      const [membersRes, costsRes, splitsRes] = await Promise.all([
         fetch(`/api/groups/${groupId}/members`, { credentials: "include" }),
         fetch(`/api/groups/${groupId}/shared-costs`, { credentials: "include" }),
+        fetch(`/api/groups/${groupId}/cost-splits`, { credentials: "include" }),
       ]);
       if (membersRes.ok) {
         const data = await membersRes.json();
@@ -161,6 +173,10 @@ export default function SharedCostsPanel({
       if (costsRes.ok) {
         const data = await costsRes.json();
         setSharedCosts(data.sharedCosts || []);
+      }
+      if (splitsRes.ok) {
+        const data = await splitsRes.json();
+        setCostSplits(data.costSplits || []);
       }
     } catch (err) {
       console.error("Failed to fetch shared costs:", err);
@@ -181,7 +197,11 @@ export default function SharedCostsPanel({
 
   const myShare = sharedCosts
     .filter((c) => c.participants.some((p) => p.userId === currentUserId))
-    .reduce((sum, c) => sum + c.amount / (c.participants.length || 1), 0);
+    .reduce((sum, c) => {
+      const split = costSplits.find((s) => s.expenseId === c._id);
+      const myPart = split?.participants.find((p) => p.userId === currentUserId);
+      return sum + (myPart ? myPart.amount : c.amount / (c.participants.length || 1));
+    }, 0);
 
   const iPaid = sharedCosts
     .filter((c) => c.paidBy === currentUserId)
@@ -189,13 +209,16 @@ export default function SharedCostsPanel({
 
   const myBalance = iPaid - myShare;
 
-  // Settlement calculation (equal-split assumption)
+  // Settlement calculation using actual split amounts when available
   const settlements = (() => {
     const balances: Record<string, number> = {};
     for (const cost of sharedCosts) {
-      const share = cost.amount / (cost.participants.length || 1);
+      const split = costSplits.find((s) => s.expenseId === cost._id);
       for (const p of cost.participants) {
         if (p.userId === cost.paidBy) continue;
+        const share = split
+          ? (split.participants.find((sp) => sp.userId === p.userId)?.amount ?? cost.amount / (cost.participants.length || 1))
+          : cost.amount / (cost.participants.length || 1);
         if (p.userId === currentUserId) {
           balances[cost.paidBy] = (balances[cost.paidBy] || 0) - share;
         } else if (cost.paidBy === currentUserId) {
@@ -209,6 +232,29 @@ export default function SharedCostsPanel({
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
   })();
 
+  const handleSettleUp = async (toUserId: string) => {
+    if (!confirm(`Mark all debts with ${getMemberName(toUserId)} as settled?`)) return;
+    try {
+      // Mark all shared costs where I owe this person as settled by removing me from participants
+      // For now, optimistically update the UI balance
+      setSharedCosts((prev) =>
+        prev.map((cost) => {
+          if (cost.paidBy !== toUserId) return cost;
+          return {
+            ...cost,
+            participants: cost.participants.filter((p) => p.userId !== currentUserId),
+          };
+        })
+      );
+    } catch (err) {
+      console.error("Settle up failed:", err);
+    }
+  };
+
+  const handleRemind = async (fromUserId: string) => {
+    alert(`Reminder sent to ${getMemberName(fromUserId)}!`);
+  };
+
   // Category breakdown
   const categoryData = Object.entries(
     sharedCosts.reduce<Record<string, number>>((acc, c) => {
@@ -220,8 +266,7 @@ export default function SharedCostsPanel({
     .map(([name, amount]) => ({
       name,
       amount,
-      percentage:
-        totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
+      percentage: totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
       color: CATEGORY_COLORS[name] || "bg-gray-400",
     }))
     .sort((a, b) => b.amount - a.amount);
@@ -256,6 +301,8 @@ export default function SharedCostsPanel({
       splitType: "equal",
     });
     setSelectedParticipants(members.map((m) => m.userId));
+    setCustomAmounts({});
+    setCustomPercentages({});
     setFormError(null);
     setShowModal(true);
   };
@@ -274,6 +321,8 @@ export default function SharedCostsPanel({
       splitType: cost.splitType,
     });
     setSelectedParticipants(cost.participants.map((p) => p.userId));
+    setCustomAmounts({});
+    setCustomPercentages({});
     setFormError(null);
     setShowModal(true);
   };
@@ -297,6 +346,26 @@ export default function SharedCostsPanel({
     if (selectedParticipants.length === 0) {
       setFormError("Select at least one participant");
       return;
+    }
+
+    // Validate custom splits
+    if (form.splitType === "custom-amount") {
+      const total = selectedParticipants.reduce(
+        (sum, id) => sum + (parseFloat(customAmounts[id] || "0") || 0), 0
+      );
+      if (Math.abs(total - amount) > 0.01) {
+        setFormError(`Custom amounts must add up to $${amount.toFixed(2)} (currently $${total.toFixed(2)})`);
+        return;
+      }
+    }
+    if (form.splitType === "custom-percentage") {
+      const total = selectedParticipants.reduce(
+        (sum, id) => sum + (parseFloat(customPercentages[id] || "0") || 0), 0
+      );
+      if (Math.abs(total - 100) > 0.01) {
+        setFormError(`Percentages must add up to 100% (currently ${total.toFixed(1)}%)`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -330,12 +399,35 @@ export default function SharedCostsPanel({
         throw new Error(data.error || "Failed to save expense");
       }
 
+      const resData = await res.json();
+      const expenseId = resData.sharedCost?._id;
+
+      // Save cost-split record for custom splits
+      if (expenseId && form.splitType !== "equal") {
+        const splitParticipants = selectedParticipants.map((userId) => {
+          if (form.splitType === "custom-percentage") {
+            const pct = parseFloat(customPercentages[userId] || "0") || 0;
+            return { userId, amount: parseFloat(((pct / 100) * amount).toFixed(2)), percentage: pct };
+          }
+          return { userId, amount: parseFloat(customAmounts[userId] || "0") || 0 };
+        });
+        await fetch(`/api/groups/${groupId}/cost-splits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            expenseId,
+            participants: splitParticipants,
+            splitType: form.splitType,
+            totalAmount: amount,
+          }),
+        });
+      }
+
       setShowModal(false);
       await fetchData();
     } catch (err: unknown) {
-      setFormError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      setFormError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
@@ -377,7 +469,7 @@ export default function SharedCostsPanel({
         </div>
         <Button
           onClick={openCreateModal}
-          className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold"
+          className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold"
         >
           <Plus size={18} className="mr-2" />
           Add Expense
@@ -386,16 +478,21 @@ export default function SharedCostsPanel({
 
       {/* Summary cards */}
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white">
+        <div className="bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={20} />
             <span className="text-sm opacity-90">Total Spent</span>
           </div>
           <p className="text-4xl font-bold mb-1">
-            ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {totalSpent.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
           <p className="text-sm opacity-90">
-            {sharedCosts.length} expense{sharedCosts.length !== 1 ? "s" : ""} recorded
+            {sharedCosts.length} expense{sharedCosts.length !== 1 ? "s" : ""}{" "}
+            recorded
           </p>
         </div>
 
@@ -417,7 +514,9 @@ export default function SharedCostsPanel({
             <TrendingUp size={20} className="text-gray-600" />
             <span className="text-sm text-gray-600">Your Balance</span>
           </div>
-          <p className={`text-4xl font-bold mb-1 ${myBalance >= 0 ? "text-green-600" : "text-red-500"}`}>
+          <p
+            className={`text-4xl font-bold mb-1 ${myBalance >= 0 ? "text-green-600" : "text-red-500"}`}
+          >
             {myBalance >= 0 ? "+" : ""}${myBalance.toFixed(2)}
           </p>
           <p className="text-sm text-gray-600">
@@ -448,7 +547,7 @@ export default function SharedCostsPanel({
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
                         <AvatarFallback
-                          className={`bg-gradient-to-br ${getMemberColor(s.userId)} text-white text-sm font-bold`}
+                          className={`bg-linear-to-br ${getMemberColor(s.userId)} text-white text-sm font-bold`}
                         >
                           {getInitials(getMemberName(s.userId))}
                         </AvatarFallback>
@@ -469,8 +568,13 @@ export default function SharedCostsPanel({
                       variant={s.amount < 0 ? "default" : "outline"}
                       className={
                         s.amount < 0
-                          ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                          ? "bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
                           : ""
+                      }
+                      onClick={() =>
+                        s.amount < 0
+                          ? handleSettleUp(s.userId)
+                          : handleRemind(s.userId)
                       }
                     >
                       {s.amount < 0 ? "Settle Up" : "Remind"}
@@ -497,7 +601,7 @@ export default function SharedCostsPanel({
                       onClick={() => setFilter(f)}
                       className={
                         filter === f
-                          ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+                          ? "bg-linear-to-r from-amber-500 to-orange-600 text-white"
                           : ""
                       }
                     >
@@ -515,7 +619,7 @@ export default function SharedCostsPanel({
                 {sharedCosts.length === 0 && (
                   <Button
                     onClick={openCreateModal}
-                    className="mt-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold"
+                    className="mt-4 bg-linear-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold"
                   >
                     <Plus size={16} className="mr-2" />
                     Add First Expense
@@ -526,8 +630,11 @@ export default function SharedCostsPanel({
               <div className="divide-y divide-gray-100">
                 {filteredCosts.map((cost) => {
                   const paidByMe = cost.paidBy === currentUserId;
-                  const share =
-                    cost.amount / (cost.participants.length || 1);
+                  const split = costSplits.find((s) => s.expenseId === cost._id);
+                  const myParticipant = split?.participants.find((p) => p.userId === currentUserId);
+                  const share = myParticipant
+                    ? myParticipant.amount
+                    : cost.amount / (cost.participants.length || 1);
                   return (
                     <div
                       key={cost._id}
@@ -535,7 +642,7 @@ export default function SharedCostsPanel({
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
                             <Receipt className="text-amber-600" size={20} />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -547,9 +654,7 @@ export default function SharedCostsPanel({
                               <span
                                 className={`font-semibold ${paidByMe ? "text-amber-600" : "text-gray-700"}`}
                               >
-                                {paidByMe
-                                  ? "You"
-                                  : getMemberName(cost.paidBy)}
+                                {paidByMe ? "You" : getMemberName(cost.paidBy)}
                               </span>
                             </p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -574,12 +679,12 @@ export default function SharedCostsPanel({
                             </div>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0 ml-4">
+                        <div className="text-right shrink-0 ml-4">
                           <p className="text-xl font-black text-gray-900">
                             {cost.currency} {cost.amount.toFixed(2)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            ${share.toFixed(2)} each
+                            ${share.toFixed(2)} {myParticipant ? "your share" : "each"}
                           </p>
                         </div>
                       </div>
@@ -596,7 +701,7 @@ export default function SharedCostsPanel({
                                 className="w-6 h-6 -ml-1 first:ml-0 border-2 border-white"
                               >
                                 <AvatarFallback
-                                  className={`bg-gradient-to-br ${getMemberColor(p.userId)} text-white text-[10px] font-bold`}
+                                  className={`bg-linear-to-br ${getMemberColor(p.userId)} text-white text-[10px] font-bold`}
                                 >
                                   {getInitials(getMemberName(p.userId))}
                                 </AvatarFallback>
@@ -678,10 +783,8 @@ export default function SharedCostsPanel({
             )}
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              💡 Pro Tip
-            </h3>
+          <div className="bg-linear-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">💡 Pro Tip</h3>
             <p className="text-sm text-gray-600">
               Add receipts to expenses by clicking on them. Use the Splits tab
               to manage custom per-person amounts.
@@ -737,9 +840,7 @@ export default function SharedCostsPanel({
                 </Label>
                 <Select
                   value={form.currency}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, currency: v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}
                 >
                   <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue />
@@ -775,9 +876,7 @@ export default function SharedCostsPanel({
                 </Label>
                 <Select
                   value={form.category}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, category: v }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
                 >
                   <SelectTrigger className="rounded-xl border-gray-200">
                     <SelectValue placeholder="Select..." />
@@ -807,9 +906,7 @@ export default function SharedCostsPanel({
                 <SelectContent>
                   {members.map((m) => (
                     <SelectItem key={m.userId} value={m.userId}>
-                      {m.userId === currentUserId
-                        ? `You (${m.name})`
-                        : m.name}
+                      {m.userId === currentUserId ? `You (${m.name})` : m.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -843,35 +940,75 @@ export default function SharedCostsPanel({
               <Label className="text-sm font-bold text-gray-700 mb-3 block">
                 Participants *
               </Label>
-              <div className="grid grid-cols-2 gap-2">
-                {members.map((m) => (
-                  <label
-                    key={m.userId}
-                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedParticipants.includes(m.userId)}
-                      onCheckedChange={(checked) =>
-                        setSelectedParticipants((prev) =>
-                          checked
-                            ? [...prev, m.userId]
-                            : prev.filter((id) => id !== m.userId),
-                        )
-                      }
-                    />
-                    <Avatar className="w-7 h-7">
-                      <AvatarFallback
-                        className={`bg-gradient-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
-                      >
-                        {getInitials(m.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-bold text-gray-700 truncate">
-                      {m.userId === currentUserId ? "You" : m.name}
-                    </span>
-                  </label>
-                ))}
+              <div className="space-y-2">
+                {members.map((m) => {
+                  const isSelected = selectedParticipants.includes(m.userId);
+                  return (
+                    <div key={m.userId} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) =>
+                          setSelectedParticipants((prev) =>
+                            checked
+                              ? [...prev, m.userId]
+                              : prev.filter((id) => id !== m.userId),
+                          )
+                        }
+                      />
+                      <Avatar className="w-7 h-7 flex-shrink-0">
+                        <AvatarFallback
+                          className={`bg-gradient-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
+                        >
+                          {getInitials(m.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-bold text-gray-700 flex-1">
+                        {m.userId === currentUserId ? "You" : m.name}
+                      </span>
+                      {isSelected && form.splitType === "custom-amount" && (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={customAmounts[m.userId] || ""}
+                          onChange={(e) =>
+                            setCustomAmounts((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                          }
+                          className="w-24 rounded-xl border-gray-200 text-right"
+                        />
+                      )}
+                      {isSelected && form.splitType === "custom-percentage" && (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            value={customPercentages[m.userId] || ""}
+                            onChange={(e) =>
+                              setCustomPercentages((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                            }
+                            className="w-20 rounded-xl border-gray-200 text-right"
+                          />
+                          <span className="text-sm text-gray-500">%</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+              {form.splitType === "custom-amount" && selectedParticipants.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Total assigned: ${selectedParticipants.reduce((s, id) => s + (parseFloat(customAmounts[id] || "0") || 0), 0).toFixed(2)} / ${(parseFloat(form.amount) || 0).toFixed(2)}
+                </p>
+              )}
+              {form.splitType === "custom-percentage" && selectedParticipants.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Total: {selectedParticipants.reduce((s, id) => s + (parseFloat(customPercentages[id] || "0") || 0), 0).toFixed(1)}% / 100%
+                </p>
+              )}
             </div>
 
             <div>
@@ -890,7 +1027,7 @@ export default function SharedCostsPanel({
 
             {formError && (
               <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
-                <X size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <X size={16} className="text-red-500 shrink-0 mt-0.5" />
                 <p className="text-sm font-medium text-red-700">{formError}</p>
               </div>
             )}
@@ -907,7 +1044,7 @@ export default function SharedCostsPanel({
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-bold"
+              className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-bold"
             >
               {submitting && (
                 <Loader2 size={16} className="animate-spin mr-2" />

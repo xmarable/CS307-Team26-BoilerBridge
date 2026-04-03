@@ -16,9 +16,7 @@ export default async function MePage() {
   if (!session || !session.user?.email) {
     redirect("/signin");
   }
-
-  const client = await clientPromise;
-  const db = client.db("BoilerBridge");
+  
   const dbUser = await User.findOne({ email: session.user.email }).lean();
 
   if (!dbUser) {
@@ -41,7 +39,7 @@ export default async function MePage() {
     tripReminders: dbUser.settings.notifications.tripReminders,
     friendRequests: dbUser.settings.notifications.friendRequests,
     groupInvites: dbUser.settings.notifications.groupInvites,
-    groupNotifitaions: dbUser.settings.notifications.groupNotifitaions,
+    groupNotifications: dbUser.settings.notifications.groupNotifications,
   }
 
   return (

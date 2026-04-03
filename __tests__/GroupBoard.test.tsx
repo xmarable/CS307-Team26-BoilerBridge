@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+
 import { jest } from "@jest/globals";
 
 // 1. Mock the navigation and date-fns modules before any imports
@@ -21,7 +22,13 @@ const { GroupBoard } = await import("../components/GroupBoard");
 // 3. Standard library imports
 import "@testing-library/jest-dom";
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 
 const mockAnnouncements = [
   {
@@ -76,19 +83,25 @@ describe("Group Board Acceptance Criteria", () => {
       json: async () => newAnnouncement,
     } as Response);
 
-    render(
-      <GroupBoard
-        groupId="group-123"
-        initialAnnouncements={mockAnnouncements}
-        isLeader={true}
-      />,
-    );
+    await act(async () => {
+      render(
+        <GroupBoard
+          groupId="group-123"
+          initialAnnouncements={mockAnnouncements}
+          isLeader={true}
+        />,
+      );
+    });
 
     const input = screen.getByPlaceholderText(/Pin an important update/i);
     const pinButton = screen.getByRole("button", { name: /^pin$/i });
 
-    fireEvent.change(input, { target: { value: "IMPORTANT: Meeting at 5pm" } });
-    fireEvent.click(pinButton);
+    await act(async () => {
+      fireEvent.change(input, {
+        target: { value: "IMPORTANT: Meeting at 5pm" },
+      });
+      fireEvent.click(pinButton);
+    });
 
     // [Assertion] Verify the new message appears at the top (index 0)
     await waitFor(() => {
@@ -103,14 +116,16 @@ describe("Group Board Acceptance Criteria", () => {
    * When I view the board,
    * Then I can see exactly which leader pinned each update.
    */
-  it("Given there are multiple announcements, When I view the board, Then I can see exactly which leader pinned each update", () => {
-    render(
-      <GroupBoard
-        groupId="group-123"
-        initialAnnouncements={mockAnnouncements}
-        isLeader={false}
-      />,
-    );
+  it("Given there are multiple announcements, When I view the board, Then I can see exactly which leader pinned each update", async () => {
+    await act(async () => {
+      render(
+        <GroupBoard
+          groupId="group-123"
+          initialAnnouncements={mockAnnouncements}
+          isLeader={false}
+        />,
+      );
+    });
 
     // [Assertion] Confirm metadata reveals specific leaders for each pin
     expect(screen.getByText("Leader A")).toBeInTheDocument();
@@ -131,17 +146,22 @@ describe("Group Board Acceptance Criteria", () => {
       json: async () => ({ success: true }),
     } as Response);
 
-    render(
-      <GroupBoard
-        groupId="group-123"
-        initialAnnouncements={mockAnnouncements}
-        isLeader={true}
-      />,
-    );
+    await act(async () => {
+      render(
+        <GroupBoard
+          groupId="group-123"
+          initialAnnouncements={mockAnnouncements}
+          isLeader={true}
+        />,
+      );
+    });
 
     // [Action] Leader unpins the first message
     const unpinButtons = screen.getAllByTitle(/Unpin Announcement/i);
-    fireEvent.click(unpinButtons[0]);
+
+    await act(async () => {
+      fireEvent.click(unpinButtons[0]);
+    });
 
     // [Assertion] Item is removed from the view
     await waitFor(() => {

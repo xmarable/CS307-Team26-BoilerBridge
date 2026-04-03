@@ -50,7 +50,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -115,7 +115,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -190,13 +190,16 @@ export async function POST(
       );
     }
 
+    const memberIds = (Array.isArray(group?.membersList) ? group.membersList : []).map(
+      (m: { userId?: { toString(): string } }) => m.userId?.toString(),
+    ).filter(Boolean) as string[];
     const validPayers = new Set<string>([
-      ...(Array.isArray(group?.membersList) ? group.membersList : []),
-      group?.leaderID,
+      ...memberIds,
+      group?.leaderID?.toString(),
       ...userIds,
     ].filter(Boolean));
 
-    if (!validPayers.has(paidBy)) {
+    if (!validPayers.has(paidBy.trim())) {
       return NextResponse.json(
         { error: "paidBy must be a valid group member" },
         { status: 400 }
@@ -220,22 +223,25 @@ export async function POST(
     });
     
     try {
-      await TravelGroup.findByIdAndUpdate(groupId, {
-        $push: {
-          ledger: {
-            payerID: paidBy.trim(),
-            amount,
-            description: title.trim(),
-            debtors: Object.fromEntries(
-              participants.map((p: any) => [
-                p.userId,
-                amount / participants.length,
-              ]),
-            ),
-            isSettled: false,
+      await TravelGroup.findOneAndUpdate(
+        { groupID: groupId },
+        {
+          $push: {
+            ledger: {
+              payerID: paidBy.trim(),
+              amount,
+              description: title.trim(),
+              debtors: Object.fromEntries(
+                participants.map((p: any) => [
+                  p.userId,
+                  amount / participants.length,
+                ]),
+              ),
+              isSettled: false,
+            },
           },
         },
-      });
+      );
     } catch (err) {
       console.warn("Ledger sync failed:", err);
     }

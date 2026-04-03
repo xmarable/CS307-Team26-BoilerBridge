@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { getServerSession } from "next-auth";
@@ -9,6 +10,7 @@ import Trip from "@/models/Trip";
 import FriendRequest from "@/models/FriendRequest";
 import { redirect } from "next/navigation";
 import { SOSButton } from "@/components/SOSButton";
+import { Toaster } from "sonner";
 import { DashboardWarmer } from "@/components/DashboardWarmer";
 
 export default async function DashboardLayout({
@@ -82,6 +84,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <SOSButton />
+      <Toaster richColors position="top-center" />
     </div>
   );
 }
