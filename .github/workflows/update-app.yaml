@@ -55,14 +55,19 @@ jobs:
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
 
-      - name: Cleanup (The Commands That Worked)
+      - name: Cleanup
         run: |
-          # 1. list all tags that aren't latest and the new one, then delete them lol
-          # this is the line u ran in the terminal but safe for the new build
+          # 1. isolate only the first column (the tag) to fix 'invalid tag format'
           NEW_TAG="v${{ steps.vars.outputs.tag }}"
-          doctl registry repository list-tags boilerbridge --format Tag --no-header | grep -v '^latest$' | grep -v "$NEW_TAG" | xargs -I {} doctl registry repository delete-tag boilerbridge {} --force || true
 
-          # 2. trigger the GC with the flag that actually moved the needle lol
+          # awk '{print $1}' stops the '0 B' and 'UTC' junk from breaking the command, and grep -v excludes 'latest' and the new tag from deletion
+          TAGS_TO_DELETE=$(doctl registry repository list-tags boilerbridge --no-header | awk '{print $1}' | grep -v '^latest$' | grep -v "$NEW_TAG")
+
+          if [ ! -z "$TAGS_TO_DELETE" ]; then
+            echo "$TAGS_TO_DELETE" | xargs -I {} doctl registry repository delete-tag boilerbridge {} --force || true
+          fi
+
+          # 2. force GC to actually wipe the physical bytes
           doctl registry garbage-collection start boilerbridge-registry --include-untagged-manifests --force
 
       - name: Deploy to App Platform
