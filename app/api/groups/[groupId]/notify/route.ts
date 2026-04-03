@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import TravelGroup from "@/models/TravelGroup";
@@ -5,7 +6,7 @@ import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
-import sgMail from "@sendgrid/mail"
+import sgMail from "@sendgrid/mail";
 
 const MessageSchema = z.object({
   topic: z.string().min(1, "Topic cannot be empty"),
@@ -22,7 +23,9 @@ export async function POST(
 ) {
   const session = await getServerSession(authOptions);
 
-  const userId = (session?.user as any)?.userId as string | undefined;
+  const userId = (session?.user as { userId?: string })?.userId as
+    | string
+    | undefined;
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,7 +46,8 @@ export async function POST(
 
   if (
     !group.membersList.some(
-      (m: any) => m.userId.toString() === userId && m.role === "Leader",
+      (m: { userId: { toString(): string }; role: string }) =>
+        m.userId.toString() === userId && m.role === "Leader",
     )
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,14 +67,23 @@ export async function POST(
   const newNotification = {
     topic: topic,
     content: content,
-    sentAt: new Date()
+    sentAt: new Date(),
   };
 
-  const memberIds = group.membersList.map((m: any) => m.userId.toString()).filter((id: string) => id !== userId);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const newSMS = {
+    topic: topic,
+    content: content,
+    sentAt: new Date(),
+  };
+
+  const memberIds = group.membersList
+    .map((m: any) => m.userId.toString())
+    .filter((id: string) => id !== userId);
   const notifiableMembers = await User.find({
     userId: { $in: memberIds },
-    "settings.notifications.groupNotifications": true
-  })
+    "settings.notifications.groupNotifications": true,
+  });
 
   sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
   console.log(notifiableMembers);
@@ -85,11 +98,11 @@ export async function POST(
       from: "boilerbridge307@gmail.com",
       subject: `New Message from ${group.groupName}`,
       text: content,
-      html:`
+      html: `
             <h3>You have recieved a new message from ${user.username}</h3>
             <p>${content}</p>
-          `
-    }
+          `,
+    };
     //console.log(JSON.stringify(msg));
 
     try {
@@ -99,7 +112,8 @@ export async function POST(
       console.error("Sendgrid Error:", e);
     }
   }
-   
+
+  // group.smsLogs.push(newSMS as never);
   group.notifications.push(newNotification as any);
   await group.save();
 

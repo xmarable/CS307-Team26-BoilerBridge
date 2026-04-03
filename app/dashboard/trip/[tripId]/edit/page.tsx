@@ -146,7 +146,7 @@ export default function EditTripPage() {
         return;
       }
 
-      router.push("/alltrips");
+      router.push("/dashboard/alltrips");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -166,7 +166,7 @@ export default function EditTripPage() {
     return (
       <div className="max-w-xl mx-auto p-4 md:p-8">
         <p className="text-red-600 mb-4">{error}</p>
-        <Link href="/alltrips">
+        <Link href="/dashboard/alltrips">
           <Button variant="outline">Back to All Trips</Button>
         </Link>
       </div>
@@ -181,7 +181,7 @@ export default function EditTripPage() {
     <div className="max-w-xl mx-auto p-4 md:p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Edit Trip</h1>
-        <Link href="/alltrips">
+        <Link href="/dashboard/alltrips">
           <Button variant="ghost" size="sm">
             Cancel
           </Button>

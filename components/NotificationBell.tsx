@@ -41,13 +41,18 @@ type NotificationsPayload = {
   unreadCount?: number;
 };
 
+interface FriendRequest {
+  id: string;
+  senderName: string;
+}
+
 export function NotificationBell() {
   const {
-    data: requests,
+    data: friendRequests,
     mutate: mutateFriends,
     isValidating: friendsValidating,
-  } = useSWR("/api/friends/request", fetcher, {
-    refreshInterval: 10000,
+  } = useSWR<FriendRequest[]>("/api/friends/request", fetcher, {
+    refreshInterval: 5000,
   });
 
   const { data: groupInvites, mutate: mutateGroups } = useSWR<GroupInvite[]>(
@@ -70,10 +75,13 @@ export function NotificationBell() {
     requestId: string,
     action: "accept" | "decline",
   ) => {
-    if (!requests || !Array.isArray(requests)) return;
+    if (!friendRequests || !Array.isArray(friendRequests)) return;
 
-    const previousRequests = requests;
-    const updatedRequests = requests.filter(
+    const previousRequests = friendRequests;
+    const target = friendRequests.find((r) => r.id === requestId);
+    if (!target) return;
+
+    const updatedRequests = friendRequests.filter(
       (r: { id: string }) => r.id !== requestId,
     );
     mutateFriends(updatedRequests, false);
@@ -92,7 +100,8 @@ export function NotificationBell() {
       if (!res.ok) throw new Error();
       mutateFriends();
       globalMutate("/api/friends/manage");
-    } catch {
+    } catch (err) {
+      console.error("Friend action request failed:", err);
       mutateFriends(previousRequests);
     }
   };
@@ -135,7 +144,7 @@ export function NotificationBell() {
     }
   };
 
-  const requestList = Array.isArray(requests) ? requests : [];
+  const fList = Array.isArray(friendRequests) ? friendRequests : [];
   const gList = Array.isArray(groupInvites) ? groupInvites : [];
   const payload = notifPayload as NotificationsPayload | undefined;
   const inAppList: InAppNotification[] = Array.isArray(payload?.notifications)
@@ -143,12 +152,12 @@ export function NotificationBell() {
     : [];
   const unreadInApp = Number(payload?.unreadCount ?? 0);
 
-  const totalBadge = unreadInApp + requestList.length + gList.length;
+  const totalBadge = unreadInApp + fList.length + gList.length;
   const isValidating =
-    (friendsValidating && !requests) || (notifsValidating && !notifPayload);
-
-  const nothingToShow =
-    requestList.length === 0 && gList.length === 0 && inAppList.length === 0;
+    (friendsValidating && !friendRequests) ||
+    (notifsValidating && !notifPayload);
+  const isEmpty =
+    fList.length === 0 && gList.length === 0 && inAppList.length === 0;
 
   return (
     <DropdownMenu>
@@ -160,7 +169,7 @@ export function NotificationBell() {
         >
           <Bell
             size={20}
-            className={isValidating && !requests ? "animate-pulse" : ""}
+            className={isValidating && !friendRequests ? "animate-pulse" : ""}
           />
           {totalBadge > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center text-[10px] font-bold text-white bg-amber-600 rounded-full border-2 border-white">
@@ -185,13 +194,13 @@ export function NotificationBell() {
         <DropdownMenuSeparator className="bg-gray-100" />
 
         <div className="max-h-72 overflow-y-auto space-y-3">
-          {requestList.length > 0 && (
+          {fList.length > 0 && (
             <div>
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
                 Friend requests
               </p>
               <ul className="space-y-1">
-                {requestList.map((req: { id: string; senderName: string }) => (
+                {fList.map((req) => (
                   <li
                     key={req.id}
                     className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
@@ -235,11 +244,11 @@ export function NotificationBell() {
 
           {gList.length > 0 && (
             <div>
-              {requestList.length > 0 ? (
+              {fList.length > 0 ? (
                 <DropdownMenuSeparator className="bg-gray-100 my-2" />
               ) : null}
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
-                Group invites
+                Group invitations
               </p>
               <ul className="space-y-1">
                 {gList.map((invite) => (
@@ -267,7 +276,7 @@ export function NotificationBell() {
                           handleGroupAction(invite.groupID, "accept")
                         }
                         className="p-1.5 hover:bg-green-50 text-green-600 rounded-md transition-colors"
-                        aria-label="Accept group invite"
+                        aria-label="Accept group invitation"
                       >
                         <Check size={16} />
                       </button>
@@ -277,7 +286,7 @@ export function NotificationBell() {
                           handleGroupAction(invite.groupID, "decline")
                         }
                         className="p-1.5 hover:bg-red-50 text-red-600 rounded-md transition-colors"
-                        aria-label="Decline group invite"
+                        aria-label="Decline group invitation"
                       >
                         <X size={16} />
                       </button>
@@ -290,7 +299,7 @@ export function NotificationBell() {
 
           {inAppList.length > 0 && (
             <div>
-              {requestList.length > 0 || gList.length > 0 ? (
+              {fList.length > 0 || gList.length > 0 ? (
                 <DropdownMenuSeparator className="bg-gray-100 my-2" />
               ) : null}
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
@@ -307,7 +316,8 @@ export function NotificationBell() {
                           : "bg-amber-50/80 hover:bg-amber-50"
                       }`}
                       onClick={() => {
-                        if (!n.read) void markNotificationRead(n.notificationID);
+                        if (!n.read)
+                          void markNotificationRead(n.notificationID);
                       }}
                     >
                       <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
@@ -328,9 +338,9 @@ export function NotificationBell() {
             </div>
           )}
 
-          {nothingToShow && (
+          {isEmpty && (
             <div className="py-6 text-center text-sm text-gray-500">
-              {isValidating && !requests && !notifPayload
+              {isValidating && !friendRequests && !notifPayload
                 ? "Loading..."
                 : "No new notifications"}
             </div>

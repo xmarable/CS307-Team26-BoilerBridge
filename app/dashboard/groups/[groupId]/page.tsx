@@ -182,11 +182,11 @@ export default function GroupDashboard() {
           <p className="text-red-600 font-bold mb-6">
             {error || "Group not found"}
           </p>
-          <Link href="/dashboard">
+          <link href="/dashboard">
             <Button variant="outline" className="rounded-xl w-full">
               Back to Dashboard
             </Button>
-          </Link>
+          </link>
         </div>
       </div>
     );
@@ -204,10 +204,10 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-(--突破-7xl) mx-auto space-y-10">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
-          <Link href="/dashboard">
+          <link href="/dashboard">
             <Button
               variant="ghost"
               size="icon"
@@ -215,7 +215,7 @@ export default function GroupDashboard() {
             >
               <ChevronLeft size={28} className="text-gray-600" />
             </Button>
-          </Link>
+          </link>
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">
               {group.groupName}
@@ -268,12 +268,14 @@ export default function GroupDashboard() {
               icon={<AlignEndHorizontal size={22} />}
               label="Polls"
             />
-            {isLeader && <SidebarButton
-              active={activeSection === "notify"}
-              onClick={() => setActiveSection("notify")}
-              icon={<MessageSquare size={22} />}
-              label="Notify"
-            />}
+            {isLeader && (
+              <SidebarButton
+                active={activeSection === "notify"}
+                onClick={() => setActiveSection("notify")}
+                icon={<MessageSquare size={22} />}
+                label="Notify"
+              />
+            )}
             <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
@@ -305,13 +307,23 @@ export default function GroupDashboard() {
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section className="space-y-4 h-full flex flex-col">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
-                    <Calendar size={20} />
+                <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                      <Calendar size={20} />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                      Timeline
+                    </h2>
                   </div>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                    Timeline
-                  </h2>
+                  {groupId ? (
+                    <link
+                      href={`/dashboard/groups/${groupId}/trip`}
+                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+                    >
+                      Trip settings
+                    </link>
+                  ) : null}
                 </div>
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6 overflow-hidden flex-1">
                   <CalendarEventsPanel groupId={groupId!} />
@@ -576,7 +588,7 @@ export default function GroupDashboard() {
 
           {isLeader && activeSection === "notify" && (
             <div>
-              <GroupNotification 
+              <GroupNotification
                 activeGroup={{
                   groupID: group.groupID,
                   groupName: group.groupName,
