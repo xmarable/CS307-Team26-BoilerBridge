@@ -128,7 +128,7 @@ export function SignUp() {
                     id="email"
                     type="email"
                     {...register("email")}
-                    placeholder="xmarable@purdue.edu"
+                    placeholder="email@purdue.edu"
                     className="mt-1.5 text-black placeholder:text-gray-400 border-gray-300"
                   />
                   {errors.email && (

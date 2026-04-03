@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -21,6 +22,8 @@ import {
   UserPlus,
   Search,
   X,
+  Image,
+  AlignEndHorizontal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,26 +31,30 @@ import { Input } from "@/components/ui/input";
 import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
+import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
+import SplitCostsPanel from "@/components/group/SplitCostsPanel";
+import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+
+type GroupSummary = {
+  groupID: string;
+  groupName: string;
+  leaderID: string;
+  members: string[];
+};
 
 type GroupState = {
   _id: string;
-  groupID?: string;
-  groupName?: string;
+  groupID: string;
+  groupName: string;
   description?: string;
   leaderID?: string;
-  membersList?: { userId: string; role: string }[];
+  membersList: { userId: string; role: string }[];
   pendingRequests?: { email: string; sentAt: string }[];
   isLeader?: boolean;
-  currentUserId?: string;
+  currentUserId: string;
   budget?: { used: number; total: number };
 };
 
@@ -67,6 +74,10 @@ export default function GroupDashboard() {
   const [loading, setLoading] = useState(!!groupId);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
+
+  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits" | any>(
+    "ledger",
+  );
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -248,10 +259,34 @@ export default function GroupDashboard() {
               label="Itinerary"
             />
             <SidebarButton
+              active={activeSection === "polls"}
+              onClick={() => setActiveSection("polls")}
+              icon={<AlignEndHorizontal size={22} />}
+              label="Polls"
+            />
+            <SidebarButton
+              active={activeSection === "messages"}
+              onClick={() => setActiveSection("messages")}
+              icon={<MessageSquare size={22} />}
+              label="Messages"
+            />
+            <SidebarButton
+              active={activeSection === "photos"}
+              onClick={() => setActiveSection("photos")}
+              icon={<Image size={22} />}
+              label="Photos"
+            />
+            <SidebarButton
               active={activeSection === "members"}
               onClick={() => setActiveSection("members")}
               icon={<Users size={22} />}
               label="Members"
+            />
+            <SidebarButton
+              active={activeSection === "expenses"}
+              onClick={() => setActiveSection("expenses")}
+              icon={<DollarSign size={22} />}
+              label="Expenses"
             />
           </div>
         </aside>
@@ -295,7 +330,7 @@ export default function GroupDashboard() {
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
-                  onUpdate={fetchGroup} // added to refresh UI after member updates
+                  onUpdate={fetchGroup}
                 />
               </div>
 
@@ -368,7 +403,7 @@ export default function GroupDashboard() {
                       <h4 className="font-bold text-sm uppercase tracking-widest text-white/60">
                         Quick invite friends
                       </h4>
-                      {friends.length > 5 && (
+                      {friends.length > 1 && (
                         <div className="relative w-full md:w-64">
                           <Search
                             className="absolute left-3 top-2.5 text-white/40"
@@ -399,7 +434,10 @@ export default function GroupDashboard() {
                           const alreadyIn = group.membersList?.some(
                             (m) => m.userId === friend.userId,
                           );
-                          if (alreadyIn) return null;
+                          const alreadyPending = group.pendingRequests?.some(
+                            (p) => p.email === friend.email,
+                          );
+                          if (alreadyIn || alreadyPending) return null;
                           return (
                             <button
                               key={friend.userId}
@@ -432,6 +470,78 @@ export default function GroupDashboard() {
                 {group.description ||
                   "Every great trip starts with a plan. Welcome to your group's command center!"}
               </p>
+            </div>
+          )}
+
+          {activeSection === "messages" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+              <GroupMessagesPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+              />
+            </div>
+          )}
+
+          {activeSection === "photos" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+              <GroupPhotosPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="overflow-y-auto">
+              <GroupPollsPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+          {activeSection === "expenses" && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex gap-3 px-1">
+                {(["ledger", "splits"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setExpensesTab(tab)}
+                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+                      expensesTab === tab
+                        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                        : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tab === "ledger" ? "Ledger" : "Splits"}
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+                {expensesTab === "ledger" ? (
+                  <SharedCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                ) : (
+                  <SplitCostsPanel
+                    groupId={groupId!}
+                    currentUserId={group.currentUserId}
+                    userRole={userRole}
+                  />
+                )}
+              </div>
             </div>
           )}
         </main>

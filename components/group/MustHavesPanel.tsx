@@ -1,3 +1,4 @@
+ 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -27,6 +28,7 @@ import {
   Trash2,
   Edit3,
   Loader2,
+  Lock,
 } from "lucide-react";
 
 type MustHave = {
@@ -48,9 +50,10 @@ type MustHave = {
 
 type Props = {
   groupId: string;
+  isViewer?: boolean;
 };
 
-export default function MustHavesPanel({ groupId }: Props) {
+export default function MustHavesPanel({ groupId, isViewer = false }: Props) {
   const [items, setItems] = useState<MustHave[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -107,6 +110,7 @@ export default function MustHavesPanel({ groupId }: Props) {
   }, [groupId, queryString]);
 
   async function handleCreate() {
+    if (isViewer) return;
     try {
       setCreating(true);
       setErr(null);
@@ -139,7 +143,24 @@ export default function MustHavesPanel({ groupId }: Props) {
     }
   }
 
+  async function handleQuickApprove(id: string) {
+    if (isViewer) return;
+    try {
+      setErr(null);
+      const res = await fetch(`/api/groups/${groupId}/must-haves/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (!res.ok) throw new Error("Failed to approve item");
+      await fetchMustHaves();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to approve item");
+    }
+  }
+
   function openEdit(item: MustHave) {
+    if (isViewer) return;
     setEditItem(item);
     setEditNotes(item.notes ?? "");
     setEditPriority(String(item.priority ?? 3));
@@ -148,7 +169,7 @@ export default function MustHavesPanel({ groupId }: Props) {
   }
 
   async function saveEdit() {
-    if (!editItem) return;
+    if (!editItem || isViewer) return;
     try {
       setSavingEdit(true);
       setErr(null);
@@ -180,6 +201,7 @@ export default function MustHavesPanel({ groupId }: Props) {
   }
 
   async function handleDelete(itemId: string) {
+    if (isViewer) return;
     try {
       setErr(null);
       const res = await fetch(`/api/groups/${groupId}/must-haves/${itemId}`, {
@@ -241,7 +263,7 @@ export default function MustHavesPanel({ groupId }: Props) {
             <Input
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              placeholder="Filter category..."
+              placeholder="Filter by category..."
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -249,103 +271,111 @@ export default function MustHavesPanel({ groupId }: Props) {
       </div>
 
       {/* Create Section */}
-      <div className="bg-pink-50/50 rounded-[2.5rem] p-8 border border-pink-100/50">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-pink-500 rounded-2xl text-white shadow-lg shadow-pink-200">
-            <Plus size={24} />
-          </div>
-          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
-            New Must-Have
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-1.5">
-            <Label className="text-gray-700 font-bold ml-1">Name *</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Place or activity name"
-              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
-            />
+      {!isViewer ? (
+        <div className="bg-pink-50/50 rounded-[2.5rem] p-8 border border-pink-100/50">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-pink-500 rounded-2xl text-white shadow-lg shadow-pink-200">
+              <Plus size={24} />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+              New Must-Have Item
+            </h3>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-gray-700 font-bold ml-1">Category</Label>
-            <Input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Food, museum, hike..."
-              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
-            />
-          </div>
-
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-gray-700 font-bold ml-1">Address</Label>
-            <div className="relative">
-              <MapPin
-                className="absolute left-4 top-4 text-gray-400"
-                size={20}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <Label className="text-gray-700 font-bold ml-1">Name *</Label>
               <Input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="123 Main St..."
-                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 pl-12 shadow-sm"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Place or activity name"
+                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
               />
             </div>
-          </div>
 
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-gray-700 font-bold ml-1">Notes</Label>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Why is this a must-have?"
-              className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <Label className="text-gray-700 font-bold ml-1">Category</Label>
+              <Input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Food, museum, hike..."
+                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-gray-700 font-bold ml-1">
-              Priority (1-5)
-            </Label>
-            <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                <SelectItem value="1">1 (Low)</SelectItem>
-                <SelectItem value="2">2</SelectItem>
-                <SelectItem value="3">3 (Normal)</SelectItem>
-                <SelectItem value="4">4</SelectItem>
-                <SelectItem value="5">5 (High)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-gray-700 font-bold ml-1">Address</Label>
+              <div className="relative">
+                <MapPin
+                  className="absolute left-4 top-4 text-gray-400"
+                  size={20}
+                />
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="123 Main St..."
+                  className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 pl-12 shadow-sm"
+                />
+              </div>
+            </div>
 
-          <div className="flex items-end">
-            <Button
-              onClick={handleCreate}
-              disabled={creating || !name.trim()}
-              className="w-full h-14 bg-linear-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black rounded-2xl shadow-xl shadow-pink-200 transition-all active:scale-95"
-            >
-              {creating ? "Adding…" : "Add Must-Have"}
-            </Button>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label className="text-gray-700 font-bold ml-1">Notes</Label>
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Describe why this is essential"
+                className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-gray-700 font-bold ml-1">
+                Priority (1-5)
+              </Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger className="rounded-2xl border-gray-200 h-14 bg-white text-gray-900 shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="1">1 (Low)</SelectItem>
+                  <SelectItem value="2">2</SelectItem>
+                  <SelectItem value="3">3 (Normal)</SelectItem>
+                  <SelectItem value="4">4</SelectItem>
+                  <SelectItem value="5">5 (High)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                onClick={handleCreate}
+                disabled={creating || !name.trim()}
+                className="w-full h-14 bg-pink-500 hover:bg-pink-600 text-white font-black rounded-2xl shadow-xl shadow-pink-200 transition-all active:scale-95 uppercase tracking-widest"
+              >
+                {creating ? "Adding..." : "Add Must-Have"}
+              </Button>
+            </div>
           </div>
+          {err && (
+            <p className="mt-4 text-sm text-red-600 font-bold text-center">
+              {err}
+            </p>
+          )}
         </div>
-        {err && (
-          <p className="mt-4 text-sm text-red-600 font-bold text-center">
-            {err}
+      ) : (
+        <div className="bg-pink-50 p-6 rounded-[2.5rem] border border-dashed border-pink-200 text-center">
+          <p className="text-pink-400 font-bold flex items-center justify-center gap-2">
+            <Lock size={16} /> Read-Only Mode
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Items List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
           <h3 className="text-lg font-black text-gray-900 tracking-tight">
-            Wishlist
+            Must-Have Wishlist
           </h3>
           <Badge className="bg-pink-100 text-pink-700 border-none px-3 py-1 rounded-full font-bold">
             {items.length} Items
@@ -359,7 +389,9 @@ export default function MustHavesPanel({ groupId }: Props) {
         ) : items.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
             <Heart className="mx-auto text-gray-300 mb-2" size={40} />
-            <p className="text-gray-400 font-bold">No must-haves saved yet.</p>
+            <p className="text-gray-400 font-bold">
+              No items found in the wishlist.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -411,36 +443,50 @@ export default function MustHavesPanel({ groupId }: Props) {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                  <Badge
-                    className={`font-bold capitalize ${
-                      it.status === "approved"
-                        ? "bg-green-100 text-green-700"
-                        : it.status === "rejected"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-amber-100 text-amber-700"
-                    } border-none`}
-                  >
-                    {it.status}
-                  </Badge>
-
-                  <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEdit(it)}
-                      className="rounded-xl hover:bg-pink-50 text-gray-400 hover:text-pink-600"
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={`font-bold capitalize ${
+                        it.status === "approved"
+                          ? "bg-green-100 text-green-700"
+                          : it.status === "rejected"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                      } border-none`}
                     >
-                      <Edit3 size={16} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(it._id)}
-                      className="rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+                      {it.status}
+                    </Badge>
+                    {it.status === "proposed" && !isViewer && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleQuickApprove(it._id)}
+                        className="h-7 px-2 rounded-lg text-green-600 hover:bg-green-50 font-black text-[10px] uppercase tracking-tighter"
+                      >
+                        Approve
+                      </Button>
+                    )}
                   </div>
+
+                  {!isViewer && (
+                    <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(it)}
+                        className="rounded-xl hover:bg-pink-50 text-gray-400 hover:text-pink-600"
+                      >
+                        <Edit3 size={16} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(it._id)}
+                        className="rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -453,7 +499,7 @@ export default function MustHavesPanel({ groupId }: Props) {
         <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight">
-              Modify Must-Have
+              Update Must-Have Details
             </DialogTitle>
           </DialogHeader>
 
@@ -515,9 +561,9 @@ export default function MustHavesPanel({ groupId }: Props) {
             <Button
               onClick={saveEdit}
               disabled={savingEdit}
-              className="rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-black px-6 shadow-lg shadow-pink-100"
+              className="rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-black px-6 shadow-lg shadow-pink-100 uppercase"
             >
-              {savingEdit ? "Saving…" : "Update Item"}
+              {savingEdit ? "Saving..." : "Update Item"}
             </Button>
           </DialogFooter>
         </DialogContent>

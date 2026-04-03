@@ -1,5 +1,15 @@
 import mongoose from "mongoose";
 
+const ActivitySchema = new mongoose.Schema({
+  activityId: { type: String, required: true },
+  name: { type: String, required: true },
+  startTime: { type: Date, required: true },
+  endTime: { type: Date, required: true },
+  isOutdoor: { type: Boolean, default: false },
+  category: { type: String },
+  location: { type: String },
+});
+
 const TripSchema = new mongoose.Schema(
   {
     groupID: {
@@ -47,6 +57,9 @@ const TripSchema = new mongoose.Schema(
       default: false,
     },
 
+    primaryItinerary: [ActivitySchema],
+    rainyDayItinerary: [ActivitySchema],
+
     /** Activity/location names or IDs to exclude from itinerary recommendations (US14) */
     avoidActivities: {
       type: [String],
@@ -56,13 +69,13 @@ const TripSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    /** Optional budget range for suggestions (US14); if set, recommendations respect this range */
+    /** Optional budget range for suggestions (US14) */
     budgetMin: { type: Number, default: undefined },
     budgetMax: { type: Number, default: undefined },
   },
+
   { timestamps: true },
 );
 
 const Trip = mongoose.models.Trip || mongoose.model("Trip", TripSchema);
-
 export default Trip;

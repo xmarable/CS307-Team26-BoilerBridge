@@ -5,9 +5,41 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
+import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+
+const createInitialItinerary = (fromDate: Date, toDate: Date) => {
+  const MOCK_ACTIVITIES = [
+    { name: "Morning Park Walk", category: "Nature", isOutdoor: true },
+    { name: "Downtown Sightseeing", category: "Tourism", isOutdoor: true },
+    { name: "Visit Local Museum", category: "Culture", isOutdoor: false },
+    { name: "Beach Hangout", category: "Leisure", isOutdoor: true },
+  ];
+
+  const days =
+    Math.ceil(
+      (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24),
+    ) || 1;
+
+  const primary = Array.from({ length: days }).map((_, i) => {
+    const activity = MOCK_ACTIVITIES[i % MOCK_ACTIVITIES.length];
+    const date = new Date(fromDate);
+    date.setDate(date.getDate() + i);
+
+    return {
+      ...activity,
+      activityId: `mock-${i}`,
+      startTime: new Date(date.setHours(10, 0)),
+      endTime: new Date(date.setHours(12, 0)),
+    };
+  });
+
+  const rainyDay = generateRainyDayPlan(primary);
+  return { primary, rainyDay };
+};
 
 const tripSchema = z.object({
-  groupID: z.string().uuid(),
+  groupId: z.string().uuid().optional(),
+  groupID: z.string().uuid().optional(),
   fromCity: z.string().min(1),
   toCity: z.string().min(1),
   fromDate: z.coerce.date(),
@@ -33,8 +65,6 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-
-    // Validate using zod
     const result = tripSchema.safeParse(body);
 
     if (!result.success) {
@@ -44,8 +74,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const groupID = result.data.groupID || result.data.groupId;
+
+    if (!groupID) {
+      return NextResponse.json(
+        { error: "Group ID is required" },
+        { status: 400 },
+      );
+    }
+
     const {
-      groupID,
       fromCity,
       toCity,
       fromDate,
@@ -59,7 +97,6 @@ export async function POST(req: NextRequest) {
       budgetMax,
     } = result.data;
 
-    // AC Check: Block request if the user is a 'Viewer'
     const permissionResult = (await getMemberPermissions(
       groupID,
       userId,
@@ -79,6 +116,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { primary, rainyDay } = createInitialItinerary(
+      new Date(fromDate),
+      new Date(toDate),
+    );
+
     const trip = await Trip.create({
       userId,
       groupID,
@@ -89,6 +131,8 @@ export async function POST(req: NextRequest) {
       mode,
       budget: Number(budget),
       tripConfirmed: tripConfirmed ?? false,
+      primaryItinerary: primary,
+      rainyDayItinerary: rainyDay,
       ...(avoidActivities != null && { avoidActivities }),
       ...(avoidLocations != null && { avoidLocations }),
       ...(budgetMin != null && { budgetMin }),
@@ -108,6 +152,8 @@ export async function POST(req: NextRequest) {
         mode: t.mode,
         budget: t.budget,
         tripConfirmed: t.tripConfirmed,
+        primaryItinerary: t.primaryItinerary,
+        rainyDayItinerary: t.rainyDayItinerary,
         avoidActivities: t.avoidActivities ?? [],
         avoidLocations: t.avoidLocations ?? [],
         budgetMin: t.budgetMin,
@@ -135,7 +181,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Query using the userId string
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
     const payload = trips.map((t: Record<string, unknown>) => ({
@@ -149,6 +194,8 @@ export async function GET() {
       mode: t.mode,
       budget: t.budget,
       tripConfirmed: t.tripConfirmed,
+      primaryItinerary: t.primaryItinerary,
+      rainyDayItinerary: t.rainyDayItinerary,
       avoidActivities: t.avoidActivities ?? [],
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,

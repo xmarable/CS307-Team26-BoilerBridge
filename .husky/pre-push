@@ -1,1 +1,16 @@
-npm test
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo "${CYAN}--- checking ur code ---${NC}"
+echo "checking build and tests before pushing..."
+
+# logic: run the build first since it's most likely to fail
+if npm run build && npm test; then
+    echo "${GREEN}--- all clear! pushing to github, if build fails, try again. sometimes it just fails for no reason ---${NC}"
+    exit 0
+else
+    echo "${RED}--- build failed check the problems tab fix all errors before pushing again ---${NC}"
+    exit 1
+fi

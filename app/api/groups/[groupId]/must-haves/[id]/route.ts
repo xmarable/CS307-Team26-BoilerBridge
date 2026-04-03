@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -41,7 +41,6 @@ export async function PUT(
 
     const { groupId, id } = await params;
 
-    // We no longer use mongoose.Types.ObjectId.isValid because IDs are UUID strings
     if (!groupId || !id) {
       return NextResponse.json(
         { error: "Invalid ID parameters" },
@@ -51,7 +50,9 @@ export async function PUT(
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    const group: any = await TravelGroup.findOne({
+      groupID: groupId as any,
+    }).lean();
     if (!group)
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
@@ -59,15 +60,19 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const item: any = await MustHave.findOne({ id: id, groupID: groupId });
+    /* cast to any to fix the UUID string assignment error */
+    const item: any = await MustHave.findOne({
+      _id: id as any,
+      groupId: groupId as any,
+    });
     if (!item)
       return NextResponse.json(
         { error: "Must-have not found" },
         { status: 404 },
       );
 
-    const canEdit =
-      item.addedBy?.toString() === userId || isLeader(group, userId);
+    const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
+    const canEdit = isCreator || isLeader(group, userId);
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -122,7 +127,9 @@ export async function DELETE(
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
+    const group: any = await TravelGroup.findOne({
+      groupID: groupId as any,
+    }).lean();
     if (!group)
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
@@ -130,9 +137,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    /* cast to any to fix the UUID string assignment error */
     const item: any = await MustHave.findOne({
-      id: id,
-      groupID: groupId,
+      _id: id as any,
+      groupId: groupId as any,
     }).lean();
     if (!item)
       return NextResponse.json(
@@ -140,13 +148,13 @@ export async function DELETE(
         { status: 404 },
       );
 
-    const canDelete =
-      item.addedBy?.toString() === userId || isLeader(group, userId);
+    const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
+    const canDelete = isCreator || isLeader(group, userId);
     if (!canDelete) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await MustHave.deleteOne({ id: id, groupID: groupId });
+    await MustHave.deleteOne({ _id: id as any, groupId: groupId as any });
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {

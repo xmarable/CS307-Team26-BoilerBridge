@@ -1,4 +1,5 @@
-import mongoose from "mongoose";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import mongoose, { mongo } from "mongoose";
 import { randomUUID } from "crypto";
 
 const expenseSchema = new mongoose.Schema(
@@ -76,6 +77,42 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const SMSSchema = new mongoose.Schema({
+  smsID: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  topic: {
+    type: String,
+    required: true,
+  },
+  sentAt: {
+    type: Date,
+    required: true,
+    defualt: Date.now,
+  },
+});
+
+const photoSchema = new mongoose.Schema({
+  photoId: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  image: {
+    type: String,
+    default: "",
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  uploaderID: {
+    type: mongoose.Types.UUID,
+    ref: "User",
+    required: true,
+  },
+});
+
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
   {
@@ -84,6 +121,48 @@ const pendingRequestSchema = new mongoose.Schema(
   },
   { _id: false },
 );
+
+const pollChoiceSchema = new mongoose.Schema(
+  {
+    text: {
+      type: String,
+      required: true,
+    },
+    count: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
+const pollSchema = new mongoose.Schema({
+  pollId: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  createdBy: {
+    type: mongoose.Types.UUID,
+    required: true,
+  },
+  question: {
+    type: String,
+    required: true
+  },
+  choices: {
+    type: [pollChoiceSchema],
+    default: [],
+    required: true,
+  },
+  endsAt: {
+    type: Date,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 const travelGroupSchema = new mongoose.Schema(
   {
@@ -109,8 +188,20 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
+    smsLogs: {
+      type: [SMSSchema],
+      default: [],
+    },
     chatLogs: {
       type: [messageSchema],
+      default: [],
+    },
+    photos: {
+      type: [photoSchema],
+      default: [],
+    },
+    polls: {
+      type: [pollSchema],
       default: [],
     },
   },

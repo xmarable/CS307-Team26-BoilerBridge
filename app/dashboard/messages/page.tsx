@@ -1,4 +1,4 @@
-import { Messages } from "@/components/group/Messages";
+import { Messages } from "@/components/messaging/Messages";
 import { authOptions } from "@/lib/auth";
 import { getUserGroups } from "@/lib/user";
 import { getServerSession } from "next-auth";
@@ -13,6 +13,7 @@ export default async function MessagesPage() {
     return null;
   }
 
+   
   const userId = (session?.user as any)?.userId as string;
   const groups = await getUserGroups();
 

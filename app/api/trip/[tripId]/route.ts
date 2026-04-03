@@ -4,6 +4,7 @@ import Trip from "@/models/Trip";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
+import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
 
 export async function GET(
   _req: NextRequest,
@@ -49,6 +50,8 @@ export async function GET(
       mode: t.mode,
       budget: t.budget,
       tripConfirmed: t.tripConfirmed,
+      primaryItinerary: t.primaryItinerary,
+      rainyDayItinerary: t.rainyDayItinerary,
       avoidActivities: t.avoidActivities ?? [],
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,
@@ -63,7 +66,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  context: { params: Promise<{ tripId: string }> }
+  context: { params: Promise<{ tripId: string }> },
 ) {
   try {
     const { tripId } = await context.params;
@@ -82,23 +85,35 @@ export async function PATCH(
     }
 
     // AC Logic: Verify permissions using the groupID linked to the trip
-    // Type casting to 'any' here solves the union property access issue while maintaining logic
-    const permissionResult = await getMemberPermissions(trip.groupID, userId) as any;
-    
+    const permissionResult = (await getMemberPermissions(
+      trip.groupID,
+      userId,
+    )) as any;
+
     if (permissionResult.error) {
-      return NextResponse.json({ error: permissionResult.error }, { status: permissionResult.status });
+      return NextResponse.json(
+        { error: permissionResult.error },
+        { status: permissionResult.status },
+      );
     }
 
     // AC: Given a member is a 'Viewer', When they attempt to edit the itinerary, Then the API blocks the request.
     if (!permissionResult.canEdit) {
       return NextResponse.json(
         { error: "Forbidden: Viewers cannot edit group itineraries" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const body = await req.json();
-    const updatedTrip = await Trip.findByIdAndUpdate(tripId, body, { new: true });
+
+    if (body.primaryItinerary) {
+      body.rainyDayItinerary = generateRainyDayPlan(body.primaryItinerary);
+    }
+
+    const updatedTrip = await Trip.findByIdAndUpdate(tripId, body, {
+      new: true,
+    });
 
     return NextResponse.json(updatedTrip, { status: 200 });
   } catch (err: any) {
@@ -109,7 +124,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  context: { params: Promise<{ tripId: string }> }
+  context: { params: Promise<{ tripId: string }> },
 ) {
   try {
     const { tripId } = await context.params;
@@ -127,14 +142,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Trip not found" }, { status: 404 });
     }
 
-    const permissionResult = await getMemberPermissions(trip.groupID, userId) as any;
-    
+    const permissionResult = (await getMemberPermissions(
+      trip.groupID,
+      userId,
+    )) as any;
+
     if (permissionResult.error) {
-      return NextResponse.json({ error: permissionResult.error }, { status: permissionResult.status });
+      return NextResponse.json(
+        { error: permissionResult.error },
+        { status: permissionResult.status },
+      );
     }
 
     if (!permissionResult.canEdit) {
-      return NextResponse.json({ error: "Viewers cannot delete items" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Viewers cannot delete items" },
+        { status: 403 },
+      );
     }
 
     await Trip.findByIdAndDelete(tripId);

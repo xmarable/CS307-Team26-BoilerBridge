@@ -10,11 +10,11 @@ const MessageSchema = z.object({
     content: z.string().trim().min(1, "Message cannot be empty").max(2000, "Message too long")
 });
 
+ 
 async function verifyUser(params: Promise<any>) {
     // Verify user logged in
     const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.userId as string | undefined;
-    const id = (session?.user as any)?.id as string | undefined;
+    const userId = (session?.user)?.userId as string | undefined;
     if (!userId) {
         return null;
     }
@@ -36,8 +36,8 @@ async function verifyUser(params: Promise<any>) {
     }
 
     // Verify user in member list
-    const members = group?.membersList ?? [];
-    if (!members.includes(id)) {
+     
+    if (!group.membersList.some((m: any) => m.userId.toString() === userId)) {
         return null;
     }
 
@@ -68,13 +68,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
         content: message.data.content
     };
 
+     
     info.group.chatLogs.push(newMessage as any);
     await info.group.save();
 
     return NextResponse.json({ message: newMessage }, { status: 201 });
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: String}> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ groupId: string}> }) {
     // Verify user logged in
     const info = await verifyUser(params);
     
@@ -89,6 +90,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     const logs = info.group.chatLogs ?? [];
 
     // Make sure chat logs are sorted in ascending order
+     
     logs?.sort((ma: any, mb: any) => {
         const ta = new Date(ma.timestamp).getTime();
         const tb = new Date(mb.timestamp).getTime();
@@ -100,6 +102,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grou
     if (before) {
         const beforeTime = new Date(before).getTime();
 
+         
         e_Index = logs.findIndex((message: any) => new Date(message.timestamp).getTime() >= beforeTime);
 
         if (e_Index === -1) {

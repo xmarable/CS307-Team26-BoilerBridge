@@ -153,7 +153,7 @@ export function Dashboard({ initialData }: DashboardProps) {
             <Link key={trip.groupID} href={`/dashboard/trips/${trip.groupID}`}>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all group">
                 <div className="h-44 overflow-hidden relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img
                     src={trip.image}
                     alt={trip.name}
