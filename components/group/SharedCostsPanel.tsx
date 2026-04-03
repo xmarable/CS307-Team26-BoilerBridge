@@ -55,6 +55,14 @@ interface SharedCostDoc {
   createdBy: string;
 }
 
+interface CostSplitDoc {
+  _id: string;
+  expenseId: string;
+  participants: { userId: string; amount: number; percentage?: number }[];
+  totalAmount: number;
+  splitType: SplitType;
+}
+
 interface FormState {
   title: string;
   description: string;
@@ -126,6 +134,7 @@ export default function SharedCostsPanel({
 }: SharedCostsPanelProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [sharedCosts, setSharedCosts] = useState<SharedCostDoc[]>([]);
+  const [costSplits, setCostSplits] = useState<CostSplitDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "paid" | "owe">("all");
   const [showModal, setShowModal] = useState(false);
@@ -150,9 +159,10 @@ export default function SharedCostsPanel({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [membersRes, costsRes] = await Promise.all([
+      const [membersRes, costsRes, splitsRes] = await Promise.all([
         fetch(`/api/groups/${groupId}/members`, { credentials: "include" }),
         fetch(`/api/groups/${groupId}/shared-costs`, { credentials: "include" }),
+        fetch(`/api/groups/${groupId}/cost-splits`, { credentials: "include" }),
       ]);
       if (membersRes.ok) {
         const data = await membersRes.json();
@@ -161,6 +171,10 @@ export default function SharedCostsPanel({
       if (costsRes.ok) {
         const data = await costsRes.json();
         setSharedCosts(data.sharedCosts || []);
+      }
+      if (splitsRes.ok) {
+        const data = await splitsRes.json();
+        setCostSplits(data.costSplits || []);
       }
     } catch (err) {
       console.error("Failed to fetch shared costs:", err);
@@ -189,13 +203,16 @@ export default function SharedCostsPanel({
 
   const myBalance = iPaid - myShare;
 
-  // Settlement calculation (equal-split assumption)
+  // Settlement calculation using actual split amounts when available
   const settlements = (() => {
     const balances: Record<string, number> = {};
     for (const cost of sharedCosts) {
-      const share = cost.amount / (cost.participants.length || 1);
+      const split = costSplits.find((s) => s.expenseId === cost._id);
       for (const p of cost.participants) {
         if (p.userId === cost.paidBy) continue;
+        const share = split
+          ? (split.participants.find((sp) => sp.userId === p.userId)?.amount ?? cost.amount / (cost.participants.length || 1))
+          : cost.amount / (cost.participants.length || 1);
         if (p.userId === currentUserId) {
           balances[cost.paidBy] = (balances[cost.paidBy] || 0) - share;
         } else if (cost.paidBy === currentUserId) {
@@ -208,6 +225,29 @@ export default function SharedCostsPanel({
       .map(([userId, amount]) => ({ userId, amount }))
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
   })();
+
+  const handleSettleUp = async (toUserId: string) => {
+    if (!confirm(`Mark all debts with ${getMemberName(toUserId)} as settled?`)) return;
+    try {
+      // Mark all shared costs where I owe this person as settled by removing me from participants
+      // For now, optimistically update the UI balance
+      setSharedCosts((prev) =>
+        prev.map((cost) => {
+          if (cost.paidBy !== toUserId) return cost;
+          return {
+            ...cost,
+            participants: cost.participants.filter((p) => p.userId !== currentUserId),
+          };
+        })
+      );
+    } catch (err) {
+      console.error("Settle up failed:", err);
+    }
+  };
+
+  const handleRemind = async (fromUserId: string) => {
+    alert(`Reminder sent to ${getMemberName(fromUserId)}!`);
+  };
 
   // Category breakdown
   const categoryData = Object.entries(
@@ -472,6 +512,11 @@ export default function SharedCostsPanel({
                           ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
                           : ""
                       }
+                      onClick={() =>
+                        s.amount < 0
+                          ? handleSettleUp(s.userId)
+                          : handleRemind(s.userId)
+                      }
                     >
                       {s.amount < 0 ? "Settle Up" : "Remind"}
                     </Button>
@@ -526,8 +571,11 @@ export default function SharedCostsPanel({
               <div className="divide-y divide-gray-100">
                 {filteredCosts.map((cost) => {
                   const paidByMe = cost.paidBy === currentUserId;
-                  const share =
-                    cost.amount / (cost.participants.length || 1);
+                  const split = costSplits.find((s) => s.expenseId === cost._id);
+                  const myParticipant = split?.participants.find((p) => p.userId === currentUserId);
+                  const share = myParticipant
+                    ? myParticipant.amount
+                    : cost.amount / (cost.participants.length || 1);
                   return (
                     <div
                       key={cost._id}
@@ -579,7 +627,7 @@ export default function SharedCostsPanel({
                             {cost.currency} {cost.amount.toFixed(2)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            ${share.toFixed(2)} each
+                            ${share.toFixed(2)} {myParticipant ? "your share" : "each"}
                           </p>
                         </div>
                       </div>

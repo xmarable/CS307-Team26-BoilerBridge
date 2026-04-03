@@ -590,15 +590,17 @@ export default function SplitCostsPanel({
                       <p className="text-2xl font-black text-gray-900">
                         {expense.currency} {expense.amount.toFixed(2)}
                       </p>
-                      {split && (
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          $
-                          {(
-                            split.totalAmount / split.participants.length
-                          ).toFixed(2)}
-                          /person
-                        </p>
-                      )}
+                      {split && (() => {
+                        const myPart = split.participants.find((p) => p.userId === currentUserId);
+                        const display = myPart
+                          ? myPart.amount
+                          : split.totalAmount / split.participants.length;
+                        return (
+                          <p className="text-sm text-gray-500 mt-0.5">
+                            ${display.toFixed(2)}{myPart ? " your share" : "/person"}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
 
