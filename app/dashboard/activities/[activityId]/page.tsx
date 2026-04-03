@@ -2,11 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { ActivitySummaryCard } from "@/components/ActivitySummaryCard";
 import { ActivityReviews } from "@/components/ActivityReviews";
+import { ActivityDetailContent } from "@/components/ActivityDetailContent";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 
@@ -15,24 +16,12 @@ export default function ActivityPage() {
   const router = useRouter();
   const params = useParams();
   const activityId = params?.activityId as string | undefined;
-  const [name, setName] = useState<string>("Activity");
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/signin");
-      return;
     }
   }, [status, router]);
-
-  useEffect(() => {
-    if (!activityId) return;
-    fetch(`/api/activities/${activityId}/reviews`, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.name) setName(data.name);
-      })
-      .catch(() => {});
-  }, [activityId]);
 
   if (status === "loading" || !session) {
     return (
@@ -59,18 +48,17 @@ export default function ActivityPage() {
             </Button>
           </Link>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">{name}</h1>
-        <p className="text-sm text-gray-500 mb-6">Summary and reviews</p>
-        <div className="space-y-6">
+        <div className="space-y-8">
+          <ActivityDetailContent activityId={activityId} />
           <ActivitySummaryCard activityId={activityId} />
           <ActivityReviews
-          activityId={activityId}
-          currentUserDisplayName={
-            (session?.user as { name?: string })?.name ||
-            (session?.user as { username?: string })?.username ||
-            null
-          }
-        />
+            activityId={activityId}
+            currentUserDisplayName={
+              (session?.user as { name?: string })?.name ||
+              (session?.user as { username?: string })?.username ||
+              null
+            }
+          />
         </div>
       </main>
     </div>
