@@ -122,8 +122,22 @@ const pendingRequestSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const pollChoiceSchema = new mongoose.Schema(
+  {
+    text: {
+      type: String,
+      required: true,
+    },
+    count: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
 const pollSchema = new mongoose.Schema({
-  pollID: {
+  pollId: {
     type: mongoose.Types.UUID,
     default: () => randomUUID(),
   },
@@ -131,8 +145,12 @@ const pollSchema = new mongoose.Schema({
     type: mongoose.Types.UUID,
     required: true,
   },
+  question: {
+    type: String,
+    required: true
+  },
   choices: {
-    type: [String],
+    type: [pollChoiceSchema],
     default: [],
     required: true,
   },
@@ -180,6 +198,10 @@ const travelGroupSchema = new mongoose.Schema(
     },
     photos: {
       type: [photoSchema],
+      default: [],
+    },
+    polls: {
+      type: [pollSchema],
       default: [],
     },
   },

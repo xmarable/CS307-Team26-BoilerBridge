@@ -74,9 +74,7 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
                 const res = await fetch(`/api/groups/${activeGroup.groupID}/photos`);
                 const data = await res.json();
 
-                if (!res.ok) {
-                    return;
-                }
+                if (!res.ok) return;
 
                 setPhotos(data.images ?? []);
             } catch (error) {
@@ -88,6 +86,25 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
 
         fetchPhotos();
     }, [activeGroup?.groupID]);
+
+    const handleDelete = async (imageId: string) => {
+        if (!activeGroup?.groupID) return;
+
+        try {
+            const res = await fetch(`/api/groups/${activeGroup.groupID}/photos`, {
+                method: "DELETE",
+                body: JSON.stringify({ imageId: imageId })
+            });
+
+            if (!res.ok) {
+                return;
+            }
+
+            setPhotos((prev) => prev.filter((photo) => photo.photoId !== imageId));
+        } catch (e) {
+
+        }
+    }
 
     return (
         <div className="flex flex-col min-w-0 min-h-0 h-full">
@@ -144,7 +161,7 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
                                     </div>
                                     { (userId === p.uploaderID || isLeader) &&
                                         <div className="px-3 py-2 text-xs text-gray-500">
-                                            <button onClick={() => console.log(`Trash pressed ${p.photoId}`)}>
+                                            <button onClick={() => handleDelete(p.photoId)}>
                                                 <Trash2 size={10} />
                                             </button>
                                         </div>

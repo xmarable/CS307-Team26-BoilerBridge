@@ -499,13 +499,14 @@ export default function GroupDashboard() {
           )}
 
           {activeSection === "polls" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+            <div className="overflow-y-auto">
               <GroupPollsPanel
                 activeGroup={{
                   groupID: group.groupID,
                   groupName: group.groupName,
                 }}
                 userId={group.currentUserId}
+                isLeader={isLeader}
               />
             </div>
           )}
