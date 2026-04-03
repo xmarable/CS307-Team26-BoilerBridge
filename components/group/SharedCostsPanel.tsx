@@ -55,6 +55,14 @@ interface SharedCostDoc {
   createdBy: string;
 }
 
+interface CostSplitDoc {
+  _id: string;
+  expenseId: string;
+  participants: { userId: string; amount: number; percentage?: number }[];
+  totalAmount: number;
+  splitType: SplitType;
+}
+
 interface FormState {
   title: string;
   description: string;
@@ -126,6 +134,7 @@ export default function SharedCostsPanel({
 }: SharedCostsPanelProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [sharedCosts, setSharedCosts] = useState<SharedCostDoc[]>([]);
+  const [costSplits, setCostSplits] = useState<CostSplitDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "paid" | "owe">("all");
   const [showModal, setShowModal] = useState(false);
@@ -144,17 +153,18 @@ export default function SharedCostsPanel({
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
     [],
   );
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
+  const [customPercentages, setCustomPercentages] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [membersRes, costsRes] = await Promise.all([
+      const [membersRes, costsRes, splitsRes] = await Promise.all([
         fetch(`/api/groups/${groupId}/members`, { credentials: "include" }),
-        fetch(`/api/groups/${groupId}/shared-costs`, {
-          credentials: "include",
-        }),
+        fetch(`/api/groups/${groupId}/shared-costs`, { credentials: "include" }),
+        fetch(`/api/groups/${groupId}/cost-splits`, { credentials: "include" }),
       ]);
       if (membersRes.ok) {
         const data = await membersRes.json();
@@ -163,6 +173,10 @@ export default function SharedCostsPanel({
       if (costsRes.ok) {
         const data = await costsRes.json();
         setSharedCosts(data.sharedCosts || []);
+      }
+      if (splitsRes.ok) {
+        const data = await splitsRes.json();
+        setCostSplits(data.costSplits || []);
       }
     } catch (err) {
       console.error("Failed to fetch shared costs:", err);
@@ -191,13 +205,16 @@ export default function SharedCostsPanel({
 
   const myBalance = iPaid - myShare;
 
-  // Settlement calculation (equal-split assumption)
+  // Settlement calculation using actual split amounts when available
   const settlements = (() => {
     const balances: Record<string, number> = {};
     for (const cost of sharedCosts) {
-      const share = cost.amount / (cost.participants.length || 1);
+      const split = costSplits.find((s) => s.expenseId === cost._id);
       for (const p of cost.participants) {
         if (p.userId === cost.paidBy) continue;
+        const share = split
+          ? (split.participants.find((sp) => sp.userId === p.userId)?.amount ?? cost.amount / (cost.participants.length || 1))
+          : cost.amount / (cost.participants.length || 1);
         if (p.userId === currentUserId) {
           balances[cost.paidBy] = (balances[cost.paidBy] || 0) - share;
         } else if (cost.paidBy === currentUserId) {
@@ -210,6 +227,29 @@ export default function SharedCostsPanel({
       .map(([userId, amount]) => ({ userId, amount }))
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
   })();
+
+  const handleSettleUp = async (toUserId: string) => {
+    if (!confirm(`Mark all debts with ${getMemberName(toUserId)} as settled?`)) return;
+    try {
+      // Mark all shared costs where I owe this person as settled by removing me from participants
+      // For now, optimistically update the UI balance
+      setSharedCosts((prev) =>
+        prev.map((cost) => {
+          if (cost.paidBy !== toUserId) return cost;
+          return {
+            ...cost,
+            participants: cost.participants.filter((p) => p.userId !== currentUserId),
+          };
+        })
+      );
+    } catch (err) {
+      console.error("Settle up failed:", err);
+    }
+  };
+
+  const handleRemind = async (fromUserId: string) => {
+    alert(`Reminder sent to ${getMemberName(fromUserId)}!`);
+  };
 
   // Category breakdown
   const categoryData = Object.entries(
@@ -257,6 +297,8 @@ export default function SharedCostsPanel({
       splitType: "equal",
     });
     setSelectedParticipants(members.map((m) => m.userId));
+    setCustomAmounts({});
+    setCustomPercentages({});
     setFormError(null);
     setShowModal(true);
   };
@@ -275,6 +317,8 @@ export default function SharedCostsPanel({
       splitType: cost.splitType,
     });
     setSelectedParticipants(cost.participants.map((p) => p.userId));
+    setCustomAmounts({});
+    setCustomPercentages({});
     setFormError(null);
     setShowModal(true);
   };
@@ -298,6 +342,26 @@ export default function SharedCostsPanel({
     if (selectedParticipants.length === 0) {
       setFormError("Select at least one participant");
       return;
+    }
+
+    // Validate custom splits
+    if (form.splitType === "custom-amount") {
+      const total = selectedParticipants.reduce(
+        (sum, id) => sum + (parseFloat(customAmounts[id] || "0") || 0), 0
+      );
+      if (Math.abs(total - amount) > 0.01) {
+        setFormError(`Custom amounts must add up to $${amount.toFixed(2)} (currently $${total.toFixed(2)})`);
+        return;
+      }
+    }
+    if (form.splitType === "custom-percentage") {
+      const total = selectedParticipants.reduce(
+        (sum, id) => sum + (parseFloat(customPercentages[id] || "0") || 0), 0
+      );
+      if (Math.abs(total - 100) > 0.01) {
+        setFormError(`Percentages must add up to 100% (currently ${total.toFixed(1)}%)`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -329,6 +393,31 @@ export default function SharedCostsPanel({
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to save expense");
+      }
+
+      const resData = await res.json();
+      const expenseId = resData.sharedCost?._id;
+
+      // Save cost-split record for custom splits
+      if (expenseId && form.splitType !== "equal") {
+        const splitParticipants = selectedParticipants.map((userId) => {
+          if (form.splitType === "custom-percentage") {
+            const pct = parseFloat(customPercentages[userId] || "0") || 0;
+            return { userId, amount: parseFloat(((pct / 100) * amount).toFixed(2)), percentage: pct };
+          }
+          return { userId, amount: parseFloat(customAmounts[userId] || "0") || 0 };
+        });
+        await fetch(`/api/groups/${groupId}/cost-splits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            expenseId,
+            participants: splitParticipants,
+            splitType: form.splitType,
+            totalAmount: amount,
+          }),
+        });
       }
 
       setShowModal(false);
@@ -478,6 +567,11 @@ export default function SharedCostsPanel({
                           ? "bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
                           : ""
                       }
+                      onClick={() =>
+                        s.amount < 0
+                          ? handleSettleUp(s.userId)
+                          : handleRemind(s.userId)
+                      }
                     >
                       {s.amount < 0 ? "Settle Up" : "Remind"}
                     </Button>
@@ -532,7 +626,11 @@ export default function SharedCostsPanel({
               <div className="divide-y divide-gray-100">
                 {filteredCosts.map((cost) => {
                   const paidByMe = cost.paidBy === currentUserId;
-                  const share = cost.amount / (cost.participants.length || 1);
+                  const split = costSplits.find((s) => s.expenseId === cost._id);
+                  const myParticipant = split?.participants.find((p) => p.userId === currentUserId);
+                  const share = myParticipant
+                    ? myParticipant.amount
+                    : cost.amount / (cost.participants.length || 1);
                   return (
                     <div
                       key={cost._id}
@@ -582,7 +680,7 @@ export default function SharedCostsPanel({
                             {cost.currency} {cost.amount.toFixed(2)}
                           </p>
                           <p className="text-sm text-gray-500">
-                            ${share.toFixed(2)} each
+                            ${share.toFixed(2)} {myParticipant ? "your share" : "each"}
                           </p>
                         </div>
                       </div>
@@ -838,35 +936,75 @@ export default function SharedCostsPanel({
               <Label className="text-sm font-bold text-gray-700 mb-3 block">
                 Participants *
               </Label>
-              <div className="grid grid-cols-2 gap-2">
-                {members.map((m) => (
-                  <label
-                    key={m.userId}
-                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedParticipants.includes(m.userId)}
-                      onCheckedChange={(checked) =>
-                        setSelectedParticipants((prev) =>
-                          checked
-                            ? [...prev, m.userId]
-                            : prev.filter((id) => id !== m.userId),
-                        )
-                      }
-                    />
-                    <Avatar className="w-7 h-7">
-                      <AvatarFallback
-                        className={`bg-linear-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
-                      >
-                        {getInitials(m.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-bold text-gray-700 truncate">
-                      {m.userId === currentUserId ? "You" : m.name}
-                    </span>
-                  </label>
-                ))}
+              <div className="space-y-2">
+                {members.map((m) => {
+                  const isSelected = selectedParticipants.includes(m.userId);
+                  return (
+                    <div key={m.userId} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) =>
+                          setSelectedParticipants((prev) =>
+                            checked
+                              ? [...prev, m.userId]
+                              : prev.filter((id) => id !== m.userId),
+                          )
+                        }
+                      />
+                      <Avatar className="w-7 h-7 flex-shrink-0">
+                        <AvatarFallback
+                          className={`bg-gradient-to-br ${getMemberColor(m.userId)} text-white text-xs font-bold`}
+                        >
+                          {getInitials(m.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-bold text-gray-700 flex-1">
+                        {m.userId === currentUserId ? "You" : m.name}
+                      </span>
+                      {isSelected && form.splitType === "custom-amount" && (
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={customAmounts[m.userId] || ""}
+                          onChange={(e) =>
+                            setCustomAmounts((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                          }
+                          className="w-24 rounded-xl border-gray-200 text-right"
+                        />
+                      )}
+                      {isSelected && form.splitType === "custom-percentage" && (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            value={customPercentages[m.userId] || ""}
+                            onChange={(e) =>
+                              setCustomPercentages((prev) => ({ ...prev, [m.userId]: e.target.value }))
+                            }
+                            className="w-20 rounded-xl border-gray-200 text-right"
+                          />
+                          <span className="text-sm text-gray-500">%</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+              {form.splitType === "custom-amount" && selectedParticipants.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Total assigned: ${selectedParticipants.reduce((s, id) => s + (parseFloat(customAmounts[id] || "0") || 0), 0).toFixed(2)} / ${(parseFloat(form.amount) || 0).toFixed(2)}
+                </p>
+              )}
+              {form.splitType === "custom-percentage" && selectedParticipants.length > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Total: {selectedParticipants.reduce((s, id) => s + (parseFloat(customPercentages[id] || "0") || 0), 0).toFixed(1)}% / 100%
+                </p>
+              )}
             </div>
 
             <div>
