@@ -5,8 +5,10 @@ import User from "@/models/User";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
+import sgMail from "@sendgrid/mail"
 
 const MessageSchema = z.object({
+  topic: z.string().min(1, "Topic cannot be empty"),
   content: z
     .string()
     .trim()
@@ -56,14 +58,52 @@ export async function POST(
     );
   }
 
-  const newSMS = {
-    topic: "yes",
+  const { topic, content } = message.data;
+
+  const newNotification = {
+    topic: topic,
+    content: content,
+    sentAt: new Date()
   };
 
-  group.smsLogs.push(newSMS as any);
+  const memberIds = group.membersList.map((m: any) => m.userId.toString()).filter((id: string) => id !== userId);
+  const notifiableMembers = await User.find({
+    userId: { $in: memberIds },
+    "settings.notifications.groupNotifications": true
+  })
+
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
+  console.log(notifiableMembers);
+
+  for (const member of notifiableMembers) {
+    console.log("member:", member);
+    console.log("member.email:", member.email);
+
+    const email = member.email;
+    const msg = {
+      to: email,
+      from: "boilerbridge307@gmail.com",
+      subject: `New Message from ${group.groupName}`,
+      text: content,
+      html:`
+            <h3>You have recieved a new message from ${user.username}</h3>
+            <p>${content}</p>
+          `
+    }
+    //console.log(JSON.stringify(msg));
+
+    try {
+      await sgMail.send(msg);
+      console.log(`Email notif sent to ${email}`);
+    } catch (e) {
+      console.error("Sendgrid Error:", e);
+    }
+  }
+   
+  group.notifications.push(newNotification as any);
   await group.save();
 
   // TODO send sms' with twilio
 
-  return NextResponse.json({ message: "Success" }, { status: 201 });
+  return NextResponse.json({ notification: newNotification }, { status: 201 });
 }

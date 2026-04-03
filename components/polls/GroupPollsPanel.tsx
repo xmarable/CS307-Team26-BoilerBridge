@@ -11,6 +11,7 @@ type GroupSummary = {
 type PollChoice = {
   text: string;
   count: number;
+  voters?: string[];
 }
 
 type PollSummary = {
@@ -31,10 +32,22 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
   const [newChoices, setNewChoices] = useState(["", ""]);
 
   const handleChoiceSelect = (pollId: string, choiceIndex: number) => {
-    setSelectedChoices((prev) => ({
-      ...prev,
-      [pollId]: prev[pollId] === choiceIndex ? null : choiceIndex,
-    }));
+    setSelectedChoices((prev) => {
+      const poll = polls.find((p) => p.pollId === pollId);
+      if (!poll) return prev;
+
+      const votedIndex = getUserVote(poll);
+
+      const currentSelected =
+        Object.prototype.hasOwnProperty.call(prev, pollId)
+          ? prev[pollId]
+          : votedIndex;
+
+      return {
+        ...prev,
+        [pollId]: currentSelected === choiceIndex ? null : choiceIndex,
+      };
+    });
   };
 
   const handleAddChoice = () => {
@@ -83,7 +96,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to create poll");
+        alert(data.error?.[0].message || "Failed to create poll");
         return;
       }
 
@@ -101,11 +114,11 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
   const handleVoteSubmit = async (pollId: string) => {
     if (!activeGroup?.groupID) return;
 
-    const selected = selectedChoices[pollId];
-    if (selected == null) {
-      alert("Please select a choice first.");
-      return;
-    }
+    const poll = polls.find((p) => p.pollId === pollId);
+    if (!poll) return;
+
+    const votedIndex = getUserVote(poll);
+    const selected = Object.prototype.hasOwnProperty.call(selectedChoices, pollId) ? selectedChoices[pollId] : votedIndex;
 
     try {
       const res = await fetch(`/api/groups/${activeGroup.groupID}/polls/vote`, {
@@ -130,11 +143,11 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
         );
       }
 
-      // Optional: clear local selection after submit
-      setSelectedChoices((prev) => ({
-        ...prev,
-        [pollId]: null,
-      }));
+      setSelectedChoices((prev) => {
+        const updated = { ...prev };
+        delete updated[pollId];
+        return updated;
+      });
     } catch (e) {
       alert("Failed to submit vote");
     }
@@ -153,6 +166,10 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
     } catch (e) {
 
     }
+  };
+
+  const getUserVote = (poll: PollSummary) => {
+    return poll.choices.findIndex((choice) => (choice.voters ?? []).includes(userId));
   }
 
   useEffect(() => {
@@ -244,7 +261,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
                       disabled={newChoices.length <= 2}
                       className="h-11 w-11 rounded-2xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                     >
-                      ×
+                      x
                     </button>
                   </div>
                 ))}
@@ -302,7 +319,8 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
             {polls.map((p) => {
               const ends = new Date(p.endsAt);
               const isExpired = ends.getTime() < Date.now();
-              const selected = selectedChoices[p.pollId];
+              const votedIndex = getUserVote(p);
+              const selected = Object.prototype.hasOwnProperty.call(selectedChoices, p.pollId) ? selectedChoices[p.pollId] : votedIndex;
 
               return (
                 <div
@@ -379,10 +397,15 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
                         <button
                           type="button"
                           onClick={() => handleVoteSubmit(p.pollId)}
-                          disabled={selected == null}
                           className="px-4 py-2 rounded-xl bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Vote
+                          {
+                            selected === null && votedIndex !== -1
+                              ? "Remove Vote"
+                              : votedIndex !== -1
+                                ? "Update Vote"
+                                : "Vote"
+                          }
                         </button>
                       )}
 

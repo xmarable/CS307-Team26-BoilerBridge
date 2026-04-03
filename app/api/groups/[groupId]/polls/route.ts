@@ -10,8 +10,8 @@ import z from "zod";
 const PollSchema = z.object({
     question: z.string().min(1),
     choices: z.array(z.string()).min(2),
-    endsAt: z.coerce.date().refine((d) => d.getTime() >= Date.now() + 10 * 60 * 1000, {
-        message: "Date must be at least 10 min in the future"
+    endsAt: z.coerce.date().refine((d) => d.getTime() >= Date.now() + 2 * 60 * 1000, {
+        message: "Date must be at least 2 min in the future"
     })
 });
 
@@ -63,8 +63,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
     const body = await req.json();
     const poll = PollSchema.safeParse(body);
     if (!poll.success) {
+        console.log(poll.error);
         return NextResponse.json(
-            { error: "Invalid Poll", details: poll.error?.flatten() },
+            { error: poll.error.issues, details: poll.error },
             { status: 400 }
         )
     }

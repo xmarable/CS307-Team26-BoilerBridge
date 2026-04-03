@@ -8,7 +8,7 @@ import z from "zod";
 
 const VoteSchema = z.object({
     pollId: z.uuid(),
-    choiceIndex: z.number().int().min(0),
+    choiceIndex: z.number().int().min(0).nullable(),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,13 +75,48 @@ export async function POST(
         return NextResponse.json({ error: "Poll has ended" }, { status: 400 });
     }
 
+    const currentChoice = poll.choices.findIndex((choice: any) => (choice.voters ?? []).some((voterId: any) => voterId.toString() === info.userId));
+
+    if (choiceIndex === null) {
+        if (currentChoice === -1) {
+            return NextResponse.json({ error: "No vote to remove" }, { status: 400 });
+        }
+
+        poll.choices[currentChoice].voters =
+            (poll.choices[currentChoice].voters ?? []).filter(
+                (voterId: any) => voterId.toString() !== info.userId
+        );
+
+        poll.choices[currentChoice].count = poll.choices[currentChoice].voters.length;
+
+        await info.group.save();
+        return NextResponse.json({ poll, removed: true }, { status: 200 });
+    }
+
     if (!poll.choices || choiceIndex >= poll.choices.length) {
         return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
     }
 
-    poll.choices[choiceIndex].count += 1;
+    if (currentChoice === choiceIndex) {
+        poll.choices[choiceIndex].voters = poll.choices[choiceIndex].voters.filter(
+            (voter: any) => voter.toString() !== info.userId
+        );
+        poll.choices[choiceIndex].count = Math.max(0, poll.choices[choiceIndex].voters.length);
+        await info.group.save();
+        return NextResponse.json({ poll: poll, removed: true }, { status: 200 });
+    }
+
+    if (currentChoice !== -1) {
+        poll.choices[currentChoice].voters = poll.choices[currentChoice].voters.filter(
+            (voter: any) => voter.toString() !== info.userId
+        );
+        poll.choices[currentChoice].count = poll.choices[currentChoice].voters.length;
+    }
+
+    poll.choices[choiceIndex].voters.push(info.userId);
+    poll.choices[choiceIndex].count = poll.choices[choiceIndex].voters.length;
 
     await info.group.save();
 
-    return NextResponse.json({ poll }, { status: 200 });
+    return NextResponse.json({ poll, removed: false }, { status: 200 });
 }
