@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import User from "@/models/User";
 import VerificationCode from "@/models/VerificationCode";
 import dbConnect from "@/lib/dbConnect";
-import sgMail from "@sendgrid/mail"
+import sgMail from "@sendgrid/mail";
 
 export async function POST(req: NextRequest) {
   await dbConnect();
@@ -29,32 +30,35 @@ export async function POST(req: NextRequest) {
     ).toString();
 
     await VerificationCode.findOneAndUpdate(
-      { userId: session.user.userId },
+      { userId: (session.user as any).userId },
       { email, code: verificationOtp, createdAt: new Date() },
       { upsert: true, new: true },
     );
 
-    // Replace with your actual mailer utility
-    console.log(`Sending code ${verificationOtp} to ${email}`);
     sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
 
     const msg = {
       to: email,
       from: "boilerbridge307@gmail.com",
       subject: "BoilerBridge Student Verification",
-      test: `Verirification Code: ${code}`,
+      text: `Your verification code is: ${verificationOtp}`,
       html: `
-            <p>User this code to verify your student status:</p>
-            <p>${code}</p>
-            <p>if u didn't request this u can just ignore it lol</p>
-        `
-    }
+            <div style="font-family: sans-serif; line-height: 1.5;">
+              <p>Please use the following code to verify your student status:</p>
+              <h2 style="color: #f59e0b;">${verificationOtp}</h2>
+              <p>If you did not request this verification, please disregard this email.</p>
+            </div>
+        `,
+    };
 
     try {
       await sgMail.send(msg);
-      console.log("Email Sent");
     } catch (e) {
-      console.error("Sendgrid Error:", e);
+      console.error("SendGrid Error:", e);
+      return NextResponse.json(
+        { error: "Failed to send email" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ message: "Code sent" });
@@ -62,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   if (action === "confirm") {
     const record = await VerificationCode.findOne({
-      userId: session.user.userId,
+      userId: (session.user as any).userId,
       code,
     });
 
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedUser = await User.findOneAndUpdate(
-      { userId: session.user.userId },
+      { userId: (session.user as any).userId },
       {
         $set: {
           "settings.security.isStudentVerified": true,
@@ -83,6 +87,10 @@ export async function POST(req: NextRequest) {
       },
       { new: true },
     );
+
+    if (!updatedUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     await VerificationCode.deleteOne({ _id: record._id });
 

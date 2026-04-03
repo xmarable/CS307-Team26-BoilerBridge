@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ import {
   Search,
   X,
   Image,
-  AlignEndHorizontal
+  AlignEndHorizontal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,18 +34,16 @@ import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
 import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
+import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 
-
-
-
 type GroupSummary = {
-    groupID: string;
-    groupName: string;
-    leaderID: string;
-    members: string[];
-}
+  groupID: string;
+  groupName: string;
+  leaderID: string;
+  members: string[];
+};
 
 type GroupState = {
   _id: string;
@@ -76,8 +75,9 @@ export default function GroupDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("itinerary");
 
-  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits">("ledger");
-
+  const [expensesTab, setExpensesTab] = useState<"ledger" | "splits" | any>(
+    "ledger",
+  );
 
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
@@ -267,7 +267,7 @@ export default function GroupDashboard() {
             <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
-              icon={<MessageSquare size={22}/>}
+              icon={<MessageSquare size={22} />}
               label="Messages"
             />
             <SidebarButton
@@ -330,7 +330,7 @@ export default function GroupDashboard() {
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
-                  onUpdate={fetchGroup} // added to refresh UI after member updates
+                  onUpdate={fetchGroup}
                 />
               </div>
 
@@ -434,7 +434,10 @@ export default function GroupDashboard() {
                           const alreadyIn = group.membersList?.some(
                             (m) => m.userId === friend.userId,
                           );
-                          if (alreadyIn) return null;
+                          const alreadyPending = group.pendingRequests?.some(
+                            (p) => p.email === friend.email,
+                          );
+                          if (alreadyIn || alreadyPending) return null;
                           return (
                             <button
                               key={friend.userId}
@@ -472,26 +475,38 @@ export default function GroupDashboard() {
 
           {activeSection === "messages" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-            <GroupMessagesPanel 
-              activeGroup={{
-                groupID: group.groupID,
-                groupName: group.groupName
-              }}
-              userId={group.currentUserId}
-            />
+              <GroupMessagesPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+              />
             </div>
           )}
 
           {activeSection === "photos" && (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-            <GroupPhotosPanel 
-              activeGroup={{
-                groupID: group.groupID,
-                groupName: group.groupName,
-              }}
-              userId={group.currentUserId}
-              isLeader={isLeader}
-            />
+              <GroupPhotosPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+                isLeader={isLeader}
+              />
+            </div>
+          )}
+
+          {activeSection === "polls" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+              <GroupPollsPanel
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+                userId={group.currentUserId}
+              />
             </div>
           )}
           {activeSection === "expenses" && (
@@ -503,7 +518,7 @@ export default function GroupDashboard() {
                     onClick={() => setExpensesTab(tab)}
                     className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
                       expensesTab === tab
-                        ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
                         : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
                     }`}
                   >
@@ -528,7 +543,6 @@ export default function GroupDashboard() {
               </div>
             </div>
           )}
-
         </main>
       </div>
     </div>

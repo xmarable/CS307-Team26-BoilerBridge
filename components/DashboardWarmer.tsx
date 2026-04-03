@@ -6,13 +6,14 @@ export function DashboardWarmer() {
   useEffect(() => {
     const routes = [
       "/dashboard/activities",
-      "/dashboard/friends",
-      "/dashboard/groups",
-      "/dashboard/profile",
-      "/dashboard/expenses",
       "/dashboard/alltrips",
       "/dashboard/discover",
+      "/dashboard/expenses",
+      "/dashboard/friends",
+      "/dashboard/groups",
       "/dashboard/messages",
+      "/dashboard/profile",
+      "/dashboard/trip",
     ];
 
     // dummy fetch to force the dev compiler to wake up
