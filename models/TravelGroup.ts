@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 import { randomUUID } from "crypto";
 
 const expenseSchema = new mongoose.Schema(
@@ -77,7 +76,7 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const SMSSchema = new mongoose.Schema({
+const NotificationSchema = new mongoose.Schema({
   smsID: {
     type: mongoose.Types.UUID,
     default: () => randomUUID(),
@@ -166,6 +165,10 @@ const pollChoiceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    voters: {
+      type: [mongoose.Types.UUID],
+      default: [],
+    }
   },
   { _id: false }
 );
@@ -222,8 +225,8 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
-    smsLogs: {
-      type: [SMSSchema],
+    notifications: {
+      type: [NotificationSchema],
       default: [],
     },
     chatLogs: {

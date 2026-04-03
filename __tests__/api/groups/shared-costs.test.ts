@@ -67,7 +67,8 @@ beforeAll(async () => {
       { userId: memberId, role: "Viewer" },
     ],
   });
-  groupId = group.groupID.toString();
+  // Routes use TravelGroup.groupID (UUID), not Mongo _id
+  groupId = String(group.groupID);
 
   const collectionRoute =
     await import("@/app/api/groups/[groupId]/shared-costs/route");

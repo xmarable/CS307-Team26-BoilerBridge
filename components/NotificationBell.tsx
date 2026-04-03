@@ -19,12 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-interface FriendRequest {
-  id: string;
-  requesterId: string;
-  senderName: string;
-}
-
 interface GroupInvite {
   groupID: string;
   groupName: string;
@@ -46,6 +40,11 @@ type NotificationsPayload = {
   notifications?: InAppNotification[];
   unreadCount?: number;
 };
+
+interface FriendRequest {
+  id: string;
+  senderName: string;
+}
 
 export function NotificationBell() {
   const {
@@ -77,28 +76,33 @@ export function NotificationBell() {
     action: "accept" | "decline",
   ) => {
     if (!friendRequests || !Array.isArray(friendRequests)) return;
+
+    const previousRequests = friendRequests;
     const target = friendRequests.find((r) => r.id === requestId);
     if (!target) return;
 
+    const updatedRequests = friendRequests.filter(
+      (r: { id: string }) => r.id !== requestId,
+    );
+    mutateFriends(updatedRequests, false);
+
     const endpoint =
       action === "accept" ? "/api/friends/accept" : "/api/friends/request";
-    const method = action === "accept" ? "POST" : "DELETE";
+    const method = action === "accept" ? "PATCH" : "DELETE";
 
     try {
       const res = await fetch(endpoint, {
         method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requestId: target.id,
-          senderId: target.requesterId,
-        }),
+        body: JSON.stringify({ requestId }),
       });
-      if (res.ok) {
-        mutateFriends();
-        globalMutate("/api/friends/manage");
-      }
+
+      if (!res.ok) throw new Error();
+      mutateFriends();
+      globalMutate("/api/friends/manage");
     } catch (err) {
       console.error("Friend action request failed:", err);
+      mutateFriends(previousRequests);
     }
   };
 
@@ -253,7 +257,7 @@ export function NotificationBell() {
                     className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
                         <Users size={16} />
                       </div>
                       <div className="flex flex-col min-w-0">
@@ -312,7 +316,8 @@ export function NotificationBell() {
                           : "bg-amber-50/80 hover:bg-amber-50"
                       }`}
                       onClick={() => {
-                        if (!n.read) void markNotificationRead(n.notificationID);
+                        if (!n.read)
+                          void markNotificationRead(n.notificationID);
                       }}
                     >
                       <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
