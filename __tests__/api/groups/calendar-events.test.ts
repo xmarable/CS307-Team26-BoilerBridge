@@ -1,7 +1,17 @@
-process.env.MONGODB_URI = process.env.TEST_MONGODB_URI; // Use the test database for these tests
-
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
+
+// types
+let GET: any, POST: any, PUT: any, DELETE: any;
+let User: any,
+  TravelGroup: any,
+  CalendarEvent: any,
+  dbConnect: any,
+  bcrypt: any;
+let mockGetServerSession: jest.MockedFunction<any>;
+
+// Use the UUID groupID field (what the routes use to find groups), not MongoDB _id
+let groupUUID: string, leaderId: string, memberId: string, outsiderId: string;
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -11,42 +21,22 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
-const nextAuth = await import("next-auth");
-const { default: bcrypt } = await import("bcryptjs");
-const { default: dbConnect } = await import("@/lib/dbConnect");
-const { default: User } = await import("@/models/User");
-const { default: TravelGroup } = await import("@/models/TravelGroup");
-const { default: CalendarEvent } = await import("@/models/CalendarEvent");
-
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
-let GET: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let POST: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string }> },
-) => Promise<Response>;
-let PUT: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string; eventId: string }> },
-) => Promise<Response>;
-let DELETE: (
-  req: Request,
-  ctx: { params: Promise<{ groupId: string; eventId: string }> },
-) => Promise<Response>;
-
-// Use the UUID groupID field (what the routes use to find groups), not MongoDB _id
-let groupUUID: string;
-let leaderId: string;
-let memberId: string;
-let outsiderId: string;
-
 beforeAll(async () => {
+  // 1. wipe cache
+  jest.resetModules();
+
+  const nextAuth = await import("next-auth");
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  ({ default: bcrypt } = await import("bcryptjs"));
+  ({ default: dbConnect } = await import("@/lib/dbConnect"));
+  ({ default: User } = await import("@/models/User"));
+  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+  ({ default: CalendarEvent } = await import("@/models/CalendarEvent"));
+
+  // 2. connect
   await dbConnect();
+
   await CalendarEvent.deleteMany({});
   await TravelGroup.deleteMany({});
   await User.deleteMany({});
@@ -90,27 +80,29 @@ beforeAll(async () => {
 
   const collectionRoute =
     await import("@/app/api/groups/[groupId]/calendar/events/route");
-  GET = collectionRoute.GET as any;
-  POST = collectionRoute.POST as any;
+  GET = collectionRoute.GET;
+  POST = collectionRoute.POST;
 
   const itemRoute =
     await import("@/app/api/groups/[groupId]/calendar/events/[eventId]/route");
-  PUT = itemRoute.PUT as any;
-  DELETE = itemRoute.DELETE as any;
+  PUT = itemRoute.PUT;
+  DELETE = itemRoute.DELETE;
 });
 
 afterAll(async () => {
-  await CalendarEvent.deleteMany({});
-  await TravelGroup.deleteMany({});
-  await User.deleteMany({});
+  if (CalendarEvent && TravelGroup && User) {
+    await CalendarEvent.deleteMany({});
+    await TravelGroup.deleteMany({});
+    await User.deleteMany({});
+  }
 
   if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+
   if ((global as any).mongoose) {
     (global as any).mongoose.conn = null;
     (global as any).mongoose.promise = null;
   }
 
-  jest.resetModules();
   jest.clearAllMocks();
 });
 
