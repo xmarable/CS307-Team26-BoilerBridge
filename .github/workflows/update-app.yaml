@@ -34,22 +34,19 @@ jobs:
           username: "xmarable2@gmail.com"
           password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Create tag
+      - name: Create clean tag
         id: vars
         run: echo "tag=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
 
-      - name: Pre-build cleanup (Safety Flush)
+      - name: Pre-build cleanup (Manual Prune)
         run: |
-          # find all tags that aren't 'latest'
-          TAGS_TO_DELETE=$(doctl registry repository list-tags boilerbridge --format Tag --no-header | grep -v '^latest$')
+          # grab all digests that arent 'latest'
+          DIGESTS_TO_DELETE=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -v 'latest' | awk '{print $1}')
 
-          # if tags exist, delete them to free up build space
-          if [ ! -z "$TAGS_TO_DELETE" ]; then
-            doctl registry repository delete-manifest boilerbridge $TAGS_TO_DELETE --force || true
+          if [ ! -z "$DIGESTS_TO_DELETE" ]; then
+            # delete whatever isn't locked or referenced
+            doctl registry repository delete-manifest boilerbridge $DIGESTS_TO_DELETE || true
           fi
-
-          # nuke all untagged blobs
-          doctl registry repository delete-unmanifested boilerbridge --force || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -68,10 +65,11 @@ jobs:
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
 
-      - name: Post-push cleanup (Final Prune)
+      - name: Post-push cleanup (Garbage Collection)
         run: |
-          # the 'old latest' became untagged the moment we pushed the new one, nuke it
-          doctl registry repository delete-unmanifested boilerbridge --force || true
+          # now that the push is done, we can safely trigger the big clean
+          # this nukes all the 'none' blobs and the old latest
+          doctl registry garbage-collection start boilerbridge-registry --force
 
       - name: Deploy to App Platform
         id: deploy
