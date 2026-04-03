@@ -38,16 +38,6 @@ jobs:
         id: vars
         run: echo "tag=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
 
-      - name: Pre-build cleanup (Manual Prune)
-        run: |
-          # grab all digests that arent 'latest'
-          DIGESTS_TO_DELETE=$(doctl registry repository list-manifests boilerbridge --format Digest,Tags --no-header | grep -v 'latest' | awk '{print $1}')
-
-          if [ ! -z "$DIGESTS_TO_DELETE" ]; then
-            # delete whatever isn't locked or referenced
-            doctl registry repository delete-manifest boilerbridge $DIGESTS_TO_DELETE || true
-          fi
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -65,11 +55,15 @@ jobs:
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
 
-      - name: Post-push cleanup (Garbage Collection)
+      - name: Cleanup (The Commands That Worked)
         run: |
-          # now that the push is done, we can safely trigger the big clean
-          # this nukes all the 'none' blobs and the old latest
-          doctl registry garbage-collection start boilerbridge-registry --force
+          # 1. list all tags that aren't latest and the new one, then delete them lol
+          # this is the line u ran in the terminal but safe for the new build
+          NEW_TAG="v${{ steps.vars.outputs.tag }}"
+          doctl registry repository list-tags boilerbridge --format Tag --no-header | grep -v '^latest$' | grep -v "$NEW_TAG" | xargs -I {} doctl registry repository delete-tag boilerbridge {} --force || true
+
+          # 2. trigger the GC with the flag that actually moved the needle lol
+          doctl registry garbage-collection start boilerbridge-registry --include-untagged-manifests --force
 
       - name: Deploy to App Platform
         id: deploy
