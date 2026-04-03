@@ -14,7 +14,7 @@ export async function PATCH(req: Request) {
 
   try {
     const client = await clientPromise;
-    const db = client.db();
+    const db = client.db("BoilerBridge");
     const body = await req.json();
     const { name, username, school, location, profileImage } = body;
 

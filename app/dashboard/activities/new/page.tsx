@@ -1,20 +1,17 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ExternalLink, MapPin, Plus } from "lucide-react";
+import { ChevronLeft, MapPin, Info, Plus } from "lucide-react";
 
-function AddActivityPageInner() {
+export default function AddActivityPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const prefName = searchParams.get("name") ?? "";
-  const prefAddress = searchParams.get("address") ?? "";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,14 +27,14 @@ function AddActivityPageInner() {
     setLoading(true);
 
     try {
+      // Keep your existing formData logic and comments intact
       const formData = new FormData(e.currentTarget);
       const name = String(formData.get("name") || "").trim();
       const address = String(formData.get("address") || "").trim() || undefined;
-      const bookingUrl =
-        String(formData.get("bookingUrl") || "").trim() || undefined;
+      const placeId = String(formData.get("placeId") || "").trim() || undefined;
 
       if (!name) {
-        setError("Describe what you want to do.");
+        setError("Name is required.");
         setLoading(false);
         return;
       }
@@ -45,12 +42,8 @@ function AddActivityPageInner() {
       const res = await fetch("/api/activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          address,
-          bookingUrl,
-        }),
-        credentials: "include",
+        body: JSON.stringify({ name, address, placeId }),
+        credentials: "include", // makes cookie/session behavior explicit
       });
 
       const data = await res.json().catch(() => ({}));
@@ -68,7 +61,7 @@ function AddActivityPageInner() {
 
       const activityId = data?.activity?._id;
       if (activityId) {
-        router.push(`/dashboard/activities/${activityId}`);
+        router.push(`/activities/${activityId}`);
       } else {
         setError("Activity created but could not redirect.");
       }
@@ -92,6 +85,7 @@ function AddActivityPageInner() {
 
   return (
     <div className="p-6 lg:p-10 max-w-3xl mx-auto">
+      {/* Navigation & Header */}
       <div className="mb-8">
         <Link
           href="/dashboard"
@@ -105,12 +99,11 @@ function AddActivityPageInner() {
           Add Activity
         </h1>
         <p className="text-gray-500 mt-2">
-          Say it in plain language — we resolve place details with Google Places on
-          the server when your API key is configured. Booking defaults to area hotels
-          on Expedia unless you paste a specific link.
+          Add a place or activity. Others can view it and see reviews.
         </p>
       </div>
 
+      {/* Main Form Card */}
       <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="space-y-4">
@@ -119,15 +112,14 @@ function AddActivityPageInner() {
                 htmlFor="name"
                 className="text-sm font-black text-gray-400 uppercase tracking-widest ml-1"
               >
-                What do you want to do? *
+                Activity Name *
               </Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="e.g. Kayaking in Chicago"
+                placeholder="e.g. South Beach, MoMA, Trail Hike"
                 required
                 className={inputStyles}
-                defaultValue={prefName}
               />
             </div>
 
@@ -136,12 +128,8 @@ function AddActivityPageInner() {
                 htmlFor="address"
                 className="text-sm font-black text-gray-400 uppercase tracking-widest ml-1"
               >
-                Location hint (optional)
+                Address (optional)
               </Label>
-              <p className="text-xs text-gray-500 ml-1">
-                Extra detail if the search is ambiguous (neighborhood, lake name,
-                cross streets).
-              </p>
               <div className="relative">
                 <MapPin
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
@@ -150,38 +138,28 @@ function AddActivityPageInner() {
                 <Input
                   id="address"
                   name="address"
-                  placeholder="e.g. North Avenue Beach, Chicago"
+                  placeholder="e.g. 123 Main St, Miami, FL"
                   className={`${inputStyles} pl-12`}
-                  defaultValue={prefAddress}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label
-                htmlFor="bookingUrl"
+                htmlFor="placeId"
                 className="text-sm font-black text-gray-400 uppercase tracking-widest ml-1"
               >
-                Booking / tickets link (optional)
+                Place ID (optional)
               </Label>
-              <p className="text-xs text-gray-500 ml-1">
-                Paste a direct checkout or operator URL if you have one. If you
-                skip this, “Book now” sends people to{" "}
-                <strong className="font-semibold">Expedia hotel search</strong> for
-                the destination — Rapid is aimed at lodging property IDs, not
-                arbitrary activities like tours.
-              </p>
               <div className="relative">
-                <ExternalLink
+                <Info
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
                   size={18}
                 />
                 <Input
-                  id="bookingUrl"
-                  name="bookingUrl"
-                  type="url"
-                  inputMode="url"
-                  placeholder="https://…"
+                  id="placeId"
+                  name="placeId"
+                  placeholder="External place identifier"
                   className={`${inputStyles} pl-12`}
                 />
               </div>
@@ -223,19 +201,5 @@ function AddActivityPageInner() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function AddActivityPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <p className="text-gray-400 font-bold animate-pulse">Loading…</p>
-        </div>
-      }
-    >
-      <AddActivityPageInner />
-    </Suspense>
   );
 }

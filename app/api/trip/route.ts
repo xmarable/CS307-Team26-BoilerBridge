@@ -38,6 +38,7 @@ const createInitialItinerary = (fromDate: Date, toDate: Date) => {
 };
 
 const tripSchema = z.object({
+  // changed to accept groupId from frontend while keeping UUID validation
   groupId: z.string().uuid().optional(),
   groupID: z.string().uuid().optional(),
   fromCity: z.string().min(1),
@@ -47,10 +48,6 @@ const tripSchema = z.object({
   mode: z.enum(["flight", "train", "bus", "taxi"]),
   budget: z.coerce.number().positive("Budget must be a positive number."),
   tripConfirmed: z.boolean().optional(),
-  avoidActivities: z.array(z.string()).optional(),
-  avoidLocations: z.array(z.string()).optional(),
-  budgetMin: z.coerce.number().optional(),
-  budgetMax: z.coerce.number().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -74,6 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // logic: Normalize the ID from either groupId or groupID to match the model
     const groupID = result.data.groupID || result.data.groupId;
 
     if (!groupID) {
@@ -83,19 +81,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const {
-      fromCity,
-      toCity,
-      fromDate,
-      toDate,
-      mode,
-      budget,
-      tripConfirmed,
-      avoidActivities,
-      avoidLocations,
-      budgetMin,
-      budgetMax,
-    } = result.data;
+    const fromCity = result.data.fromCity;
+    const toCity = result.data.toCity;
+    const fromDate = result.data.fromDate;
+    const toDate = result.data.toDate;
+    const mode = result.data.mode;
+    const budget = result.data.budget;
+    const tripConfirmed = result.data.tripConfirmed;
 
     const permissionResult = (await getMemberPermissions(
       groupID,
@@ -133,31 +125,22 @@ export async function POST(req: NextRequest) {
       tripConfirmed: tripConfirmed ?? false,
       primaryItinerary: primary,
       rainyDayItinerary: rainyDay,
-      ...(avoidActivities != null && { avoidActivities }),
-      ...(avoidLocations != null && { avoidLocations }),
-      ...(budgetMin != null && { budgetMin }),
-      ...(budgetMax != null && { budgetMax }),
     });
 
-    const t = trip as Record<string, unknown>;
     return NextResponse.json(
       {
-        tripID: t._id?.toString(),
-        userId: t.userId?.toString(),
-        groupID: t.groupID?.toString(),
-        fromCity: t.fromCity,
-        toCity: t.toCity,
-        fromDate: t.fromDate,
-        toDate: t.toDate,
-        mode: t.mode,
-        budget: t.budget,
-        tripConfirmed: t.tripConfirmed,
-        primaryItinerary: t.primaryItinerary,
-        rainyDayItinerary: t.rainyDayItinerary,
-        avoidActivities: t.avoidActivities ?? [],
-        avoidLocations: t.avoidLocations ?? [],
-        budgetMin: t.budgetMin,
-        budgetMax: t.budgetMax,
+        tripID: trip._id.toString(),
+        userId: trip.userId.toString(),
+        groupID: trip.groupID.toString(),
+        fromCity: trip.fromCity,
+        toCity: trip.toCity,
+        fromDate: trip.fromDate,
+        toDate: trip.toDate,
+        mode: trip.mode,
+        budget: trip.budget,
+        tripConfirmed: trip.tripConfirmed,
+        primaryItinerary: trip.primaryItinerary,
+        rainyDayItinerary: trip.rainyDayItinerary,
       },
       { status: 201 },
     );
@@ -183,9 +166,9 @@ export async function GET() {
 
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    const payload = trips.map((t: Record<string, unknown>) => ({
-      tripID: t._id?.toString(),
-      userId: t.userId?.toString(),
+    const payload = trips.map((t: any) => ({
+      tripID: t._id.toString(),
+      userId: t.userId.toString(),
       groupID: t.groupID?.toString(),
       fromCity: t.fromCity,
       toCity: t.toCity,
@@ -196,10 +179,6 @@ export async function GET() {
       tripConfirmed: t.tripConfirmed,
       primaryItinerary: t.primaryItinerary,
       rainyDayItinerary: t.rainyDayItinerary,
-      avoidActivities: t.avoidActivities ?? [],
-      avoidLocations: t.avoidLocations ?? [],
-      budgetMin: t.budgetMin,
-      budgetMax: t.budgetMax,
     }));
 
     return NextResponse.json(payload, { status: 200 });

@@ -76,8 +76,7 @@ export const authOptions: NextAuthOptions = {
       if (token?.email) {
         try {
           const client = await clientPromise;
-          // Use default DB from MONGODB_URI (same as Mongoose/dbConnect), not a hardcoded name.
-          const db = client.db();
+          const db = client.db("BoilerBridge");
           const dbUser = await db
             .collection("users")
             .findOne({ email: token.email });
@@ -105,10 +104,9 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Deleted DB user: must not return `null` — NextAuth client runs Object.keys(data)
-      // on /api/auth/session JSON; `null` triggers "Cannot convert undefined or null to object".
+      // check the deletion flag we set in the jwt callback
       if ((token as any).isDeleted) {
-        return {} as any;
+        return null as any; // this kills the session and breaks the loop
       }
 
       if (session.user && token) {
