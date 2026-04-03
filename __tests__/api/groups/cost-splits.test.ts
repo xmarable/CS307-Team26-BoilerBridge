@@ -76,7 +76,7 @@ beforeAll(async () => {
       { userId: memberId, role: "Viewer" },
     ],
   });
-  groupId = group.groupID.toString();
+  groupId = String(group.groupID);
 
   const collectionRoute =
     await import("@/app/api/groups/[groupId]/cost-splits/route");

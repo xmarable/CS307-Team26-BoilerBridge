@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +30,13 @@ import {
   Edit3,
   Loader2,
   Zap,
-  CheckCircle2,
+  Wand2,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import ItineraryRegeneratePreviewModal, {
+  type PreviewOriginalRow,
+  type PreviewProposedRow,
+} from "@/components/group/ItineraryRegeneratePreviewModal";
 
 type CalendarEvent = {
   _id: string;
@@ -61,6 +67,11 @@ function toDatetimeLocalValue(date: Date) {
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
+function calendarDayKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function CalendarEventsPanel({ groupId }: Props) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +81,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [popupMsg, setPopupMsg] = useState("");
+  const [errorPopupTripLink, setErrorPopupTripLink] = useState(false);
 
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
@@ -97,12 +109,39 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [selectDayToken, setSelectDayToken] = useState("__none__");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOriginals, setPreviewOriginals] = useState<PreviewOriginalRow[]>(
+    [],
+  );
+  const [previewProposed, setPreviewProposed] = useState<PreviewProposedRow[]>(
+    [],
+  );
+  const [regenerating, setRegenerating] = useState(false);
+  const [applying, setApplying] = useState(false);
+
   const rangeQuery = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("from", new Date(from).toISOString());
     qs.set("to", new Date(to).toISOString());
     return `?${qs.toString()}`;
   }, [from, to]);
+
+  const daySelectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ev of events) {
+      const key = calendarDayKey(ev.startTime);
+      const d = new Date(ev.startTime);
+      const label = d.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      map.set(key, label);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [events]);
 
   async function fetchEvents() {
     try {
@@ -173,8 +212,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       });
       const data = await res.json();
       if (!res.ok) {
-        // show error if the generation fails
         setPopupMsg(data?.error || "Failed to generate itinerary.");
+        setErrorPopupTripLink(res.status === 404);
         setShowErrorPopup(true);
       } else {
         // show success if it worked
@@ -252,8 +291,83 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllForDay(dayKey: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const ev of events) {
+        if (calendarDayKey(ev.startTime) === dayKey) next.add(ev._id);
+      }
+      return next;
+    });
+  }
+
+  async function handleRegenerateSelected() {
+    if (selectedIds.size === 0) return;
+    try {
+      setRegenerating(true);
+      setErr(null);
+      const res = await fetch(`/api/groups/${groupId}/itinerary/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventIds: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Regeneration failed");
+      setPreviewOriginals(data.originals ?? []);
+      setPreviewProposed(data.proposed ?? []);
+      setPreviewOpen(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Regeneration failed";
+      setErr(msg);
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleApplyPreview() {
+    try {
+      setApplying(true);
+      setErr(null);
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/regenerate/apply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            replaceEventIds: previewOriginals.map((o) => o._id),
+            proposedEvents: previewProposed,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to apply changes");
+      setPreviewOpen(false);
+      setPreviewOriginals([]);
+      setPreviewProposed([]);
+      setSelectedIds(new Set());
+      await fetchEvents();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to apply changes";
+      setErr(msg);
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
+      {err && (
+        <p className="text-sm text-red-600 font-bold px-2">{err}</p>
+      )}
       {/* Search/Range Controls */}
       <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-4">
@@ -300,7 +414,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               itinerary
             </h3>
             <p className="text-gray-400 font-bold text-sm">
-              Converts your must-haves into a scheduled timeline
+              Builds a full timeline with Ollama (local) from your trip and
+              approved must-haves
             </p>
           </div>
           <Button
@@ -403,22 +518,74 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             </Button>
           </div>
         </div>
-        {err && (
-          <p className="mt-4 text-sm text-red-600 font-bold text-center">
-            {err}
-          </p>
-        )}
       </div>
 
       {/* Events Feed */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <h3 className="text-lg font-black text-gray-900">
-            Upcoming Activities
-          </h3>
-          <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
-            {events.length} Events Found
-          </Badge>
+        <div className="flex flex-col gap-4 px-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-black text-gray-900">
+              Upcoming Activities
+            </h3>
+            <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
+              {events.length} Events Found
+            </Badge>
+          </div>
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+            <div className="flex-1 min-w-[200px] max-w-md">
+              <Label className="text-xs font-bold text-gray-500 mb-1 block">
+                Select by day
+              </Label>
+              <Select
+                value={selectDayToken}
+                onValueChange={(v) => {
+                  setSelectDayToken(v);
+                  if (v !== "__none__") selectAllForDay(v);
+                }}
+              >
+                <SelectTrigger className="rounded-2xl border-gray-200 h-11 bg-white">
+                  <SelectValue placeholder="Choose a day…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="__none__">Clear day filter</SelectItem>
+                  {daySelectOptions.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl h-11 border-amber-200 text-amber-800 font-bold"
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setSelectDayToken("__none__");
+                }}
+                disabled={selectedIds.size === 0}
+              >
+                Clear selection
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleRegenerateSelected()}
+                disabled={
+                  selectedIds.size === 0 || regenerating || loading
+                }
+                className="rounded-2xl h-11 bg-linear-to-r from-violet-600 to-amber-600 hover:from-violet-700 hover:to-amber-700 text-white font-black gap-2"
+              >
+                {regenerating ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <Wand2 size={18} />
+                )}
+                Regenerate Selected
+              </Button>
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -446,7 +613,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                   key={ev._id}
                   className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-center gap-4"
                 >
-                  <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center shrink-0">
+                  <div className="flex items-start gap-3 shrink-0 md:items-center">
+                    <Checkbox
+                      checked={selectedIds.has(ev._id)}
+                      onCheckedChange={() => toggleSelected(ev._id)}
+                      className="mt-1 md:mt-0"
+                      aria-label={`Select ${ev.title}`}
+                    />
+                    <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
                     <span className="text-xs font-black text-amber-600 uppercase">
                       {new Date(ev.startTime).toLocaleString("default", {
                         month: "short",
@@ -455,6 +629,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                     <span className="text-xl font-black text-amber-700 leading-none">
                       {new Date(ev.startTime).getDate()}
                     </span>
+                    </div>
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -607,7 +782,13 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       </Dialog>
 
       {/* Error Popup Alert */}
-      <Dialog open={showErrorPopup} onOpenChange={setShowErrorPopup}>
+      <Dialog
+        open={showErrorPopup}
+        onOpenChange={(open) => {
+          setShowErrorPopup(open);
+          if (!open) setErrorPopupTripLink(false);
+        }}
+      >
         <DialogContent className="rounded-[2.5rem] border-4 border-red-600 p-10 bg-white shadow-[10px_10px_0px_0px_rgba(220,38,38,1)] max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
@@ -619,6 +800,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             <p className="text-xl font-black text-gray-900 leading-tight">
               {popupMsg}
             </p>
+            {errorPopupTripLink ? (
+              <Link
+                href={`/dashboard/groups/${groupId}/trip`}
+                className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+              >
+                Open trip settings
+              </Link>
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -666,6 +855,16 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ItineraryRegeneratePreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        originals={previewOriginals}
+        proposed={previewProposed}
+        applying={applying}
+        onAccept={() => void handleApplyPreview()}
+        onCancel={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }

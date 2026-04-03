@@ -36,7 +36,9 @@ await import("@/components/Navbar");
 
 // 5. Dynamic import of the component
 // logic: ensured this path matches your actual file structure to avoid import failures
-const TripPage = (await import("@/app/dashboard/trip/page")).default;
+const TripPage = (
+  await import("@/app/dashboard/groups/[groupId]/trip/page")
+).default;
 
 describe("TripPage", () => {
   // Now, inside your tests, you can even re-mock the return value if needed:
@@ -144,7 +146,7 @@ describe("TripPage", () => {
     expect(body.groupId).toBe("15105263-6166-40c8-977a-a3575375bc58");
 
     await waitFor(() => {
-      expect(window.location.href).toBe("/alltrips");
+      expect(window.location.href).toBe("/dashboard/alltrips");
     });
   });
 
@@ -175,6 +177,6 @@ describe("TripPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /create trip/i }));
 
     expect(await screen.findByText("Invalid input data")).toBeInTheDocument();
-    expect(window.location.href).not.toBe("/alltrips");
+    expect(window.location.href).not.toBe("/dashboard/alltrips");
   });
 });

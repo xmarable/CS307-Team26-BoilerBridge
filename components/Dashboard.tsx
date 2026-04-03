@@ -139,10 +139,10 @@ export function Dashboard({ initialData }: DashboardProps) {
                 Add Activity
               </Button>
             </Link>
-            <Link href="/dashboard/trips/new">
+            <Link href="/dashboard/groups">
               <Button className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium rounded-xl shadow-md transition-all">
                 <Plus className="mr-2" size={18} />
-                Create Trip
+                Plan a trip
               </Button>
             </Link>
           </div>
@@ -150,7 +150,7 @@ export function Dashboard({ initialData }: DashboardProps) {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-10">
           {trips.map((trip) => (
-            <Link key={trip.groupID} href={`/dashboard/trips/${trip.groupID}`}>
+            <Link key={trip.groupID} href={`/dashboard/groups/${trip.groupID}`}>
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all group">
                 <div className="h-44 overflow-hidden relative">
                   { }
