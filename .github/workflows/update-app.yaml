@@ -34,9 +34,22 @@ jobs:
           username: "xmarable2@gmail.com"
           password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Prune old images (500mb safety)
+      - name: Create tag
+        id: vars
+        run: echo "tag=$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Pre-build cleanup (Safety Flush)
         run: |
-          doctl registry repository delete-manifest boilerbridge-registry boilerbridge $(doctl registry repository list-tags boilerbridge --format Tag --no-header | grep -v 'latest' | grep -v '${{ github.sha }}') --force || true
+          # find all tags that aren't 'latest'
+          TAGS_TO_DELETE=$(doctl registry repository list-tags boilerbridge --format Tag --no-header | grep -v '^latest$')
+
+          # if tags exist, delete them to free up build space
+          if [ ! -z "$TAGS_TO_DELETE" ]; then
+            doctl registry repository delete-manifest boilerbridge $TAGS_TO_DELETE --force || true
+          fi
+
+          # nuke all untagged blobs
+          doctl registry repository delete-unmanifested boilerbridge --force || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,12 +61,17 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            registry.digitalocean.com/boilerbridge-registry/boilerbridge:${{ github.sha }}
             registry.digitalocean.com/boilerbridge-registry/boilerbridge:latest
+            registry.digitalocean.com/boilerbridge-registry/boilerbridge:v${{ steps.vars.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             MONGODB_URI=${{ secrets.MONGODB_URI }}
+
+      - name: Post-push cleanup (Final Prune)
+        run: |
+          # the 'old latest' became untagged the moment we pushed the new one, nuke it
+          doctl registry repository delete-unmanifested boilerbridge --force || true
 
       - name: Deploy to App Platform
         id: deploy
