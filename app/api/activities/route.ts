@@ -5,11 +5,32 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 
+const ReferenceLinkSchema = z.object({
+  title: z.string().min(1).trim(),
+  url: z.string().trim().min(1),
+});
+
 const CreateActivitySchema = z.object({
   name: z.string().min(1, "Name is required").trim(),
   address: z.string().trim().optional(),
   placeId: z.string().trim().optional(),
+  description: z.string().trim().optional(),
+  infoUrl: z.string().trim().optional(),
+  referenceLinks: z.array(ReferenceLinkSchema).optional(),
+  bookingUrl: z.string().trim().optional(),
+  estimatedCost: z.coerce.number().optional(),
 });
+
+function safeUrlString(s: string | undefined): string | undefined {
+  if (!s?.trim()) return undefined;
+  try {
+    const u = new URL(s.trim());
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
 
 function serializeId(id: unknown): string {
   if (id && typeof (id as { toString: () => string }).toString === "function") {
@@ -121,14 +142,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, address, placeId } = parsed.data;
+    const {
+      name,
+      address,
+      placeId,
+      description,
+      infoUrl,
+      referenceLinks,
+      bookingUrl,
+      estimatedCost,
+    } = parsed.data;
 
     await dbConnect();
+
+    const links =
+      referenceLinks
+        ?.map((l) => {
+          const url = safeUrlString(l.url);
+          if (!url) return null;
+          return { title: l.title, url };
+        })
+        .filter(Boolean) ?? [];
 
     const created = await Activity.create({
       name,
       address: address || undefined,
       placeId: placeId || undefined,
+      description: description || undefined,
+      infoUrl: safeUrlString(infoUrl),
+      referenceLinks: links.length ? links : undefined,
+      bookingUrl: safeUrlString(bookingUrl),
+      estimatedCost: estimatedCost != null ? estimatedCost : undefined,
       reviewCount: 0,
       reviews: [],
     });
