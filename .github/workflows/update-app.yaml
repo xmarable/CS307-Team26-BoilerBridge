@@ -27,6 +27,17 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
+      - name: Wait for Registry Availability
+        run: |
+          # if a GC is running, the registry is read-only
+          # we loop until it's done so our 'docker push' doesn't fail
+          echo "checking if registry is in read-only mode (GC running)..."
+          while doctl registry garbage-collection get-active boilerbridge-registry > /dev/null 2>&1; do
+            echo "garbage collection is active. waiting 15 seconds for write-access..."
+            sleep 15
+          done
+          echo "registry is writable. proceeding with build."
+
       - name: Log in to DigitalOcean Container Registry
         uses: docker/login-action@v4
         with:
