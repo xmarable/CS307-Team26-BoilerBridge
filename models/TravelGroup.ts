@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import mongoose, { mongo } from "mongoose";
 import { randomUUID } from "crypto";
 
@@ -76,45 +77,41 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const SMSSchema = new mongoose.Schema(
-  {
-    smsID: {
-      type: mongoose.Types.UUID,
-      default: () => randomUUID()
-    },
-    topic: {
-      type: String,
-      required: true
-    },
-    sentAt: {
-      type: Date,
-      required: true,
-      defualt: Date.now
-    }
-  }
-);
+const SMSSchema = new mongoose.Schema({
+  smsID: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  topic: {
+    type: String,
+    required: true,
+  },
+  sentAt: {
+    type: Date,
+    required: true,
+    defualt: Date.now,
+  },
+});
 
-const photoSchema = new mongoose.Schema(
-  {
-    photoId: {
-      type: mongoose.Types.UUID,
-      default: () => randomUUID()
-    },
-    image: {
-      type: String,
-      default: ""
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    },
-    uploaderID: {
-      type: mongoose.Types.UUID,
-      ref: "User",
-      required: true
-    }
-  }
-);
+const photoSchema = new mongoose.Schema({
+  photoId: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  image: {
+    type: String,
+    default: "",
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  uploaderID: {
+    type: mongoose.Types.UUID,
+    ref: "User",
+    required: true,
+  },
+});
 
 const paymentRequestSchema = new mongoose.Schema(
   {
@@ -159,31 +156,47 @@ const pendingRequestSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const pollSchema = new mongoose.Schema(
+const pollChoiceSchema = new mongoose.Schema(
   {
-    pollID: {
-      type: mongoose.Types.UUID,
-      default: () => randomUUID()
+    text: {
+      type: String,
+      required: true,
     },
-    createdBy: {
-      type: mongoose.Types.UUID,
-      required: true
+    count: {
+      type: Number,
+      default: 0,
     },
-    choices: {
-      type: [String],
-      default: [],
-      required: true
-    },
-    endsAt: {
-      type: Date,
-      required: true
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  }
-)
+  },
+  { _id: false }
+);
+
+const pollSchema = new mongoose.Schema({
+  pollId: {
+    type: mongoose.Types.UUID,
+    default: () => randomUUID(),
+  },
+  createdBy: {
+    type: mongoose.Types.UUID,
+    required: true,
+  },
+  question: {
+    type: String,
+    required: true
+  },
+  choices: {
+    type: [pollChoiceSchema],
+    default: [],
+    required: true,
+  },
+  endsAt: {
+    type: Date,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 const travelGroupSchema = new mongoose.Schema(
   {
@@ -211,7 +224,7 @@ const travelGroupSchema = new mongoose.Schema(
     ledger: [expenseSchema],
     smsLogs: {
       type: [SMSSchema],
-      default: []
+      default: [],
     },
     chatLogs: {
       type: [messageSchema],
@@ -219,10 +232,14 @@ const travelGroupSchema = new mongoose.Schema(
     },
     photos: {
       type: [photoSchema],
-      default: []
+      default: [],
     },
     paymentRequests: {
       type: [paymentRequestSchema],
+      default: [],
+    },
+    polls: {
+      type: [pollSchema],
       default: [],
     },
   },

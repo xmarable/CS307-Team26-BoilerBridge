@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
-import User from "@/models/User";
 
 export async function GET(
   req: Request,

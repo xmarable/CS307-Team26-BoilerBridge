@@ -11,13 +11,13 @@ function getSessionUserIds(session: any): string[] {
 }
 
 function isGroupLeader(group: any, userIds: string[]) {
-  return userIds.includes(group?.leaderID);
+  return userIds.includes(group?.leaderID?.toString());
 }
 
 function isGroupMember(group: any, userIds: string[]) {
   if (!Array.isArray(group?.membersList)) return false;
-  return group.membersList.some((memberId: string) =>
-    userIds.includes(memberId),
+  return group.membersList.some((m: any) =>
+    userIds.includes(m.userId?.toString()),
   );
 }
 
@@ -44,7 +44,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
@@ -151,7 +151,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const group = await TravelGroup.findById(groupId);
+    const group = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }

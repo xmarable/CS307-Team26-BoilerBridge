@@ -1,4 +1,5 @@
 /** @jest-environment node */
+
 import { jest } from "@jest/globals";
 
 const generateRainyDayPlan = (primary: any[]) => {

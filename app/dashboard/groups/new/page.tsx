@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -65,10 +66,16 @@ export default function CreateGroupPage() {
       return;
     }
 
-    const groupId = data.group?._id;
+    /* our schema uses groupID as the primary identifier. 
+       we check data.groupID first, then fallback to nested data.group.groupID
+    */
+    const groupId =
+      data.groupID || data.group?.groupID || data.group?._id || data._id;
+
     if (groupId) {
-      router.push(`/groups/${groupId}`);
+      router.push(`/dashboard/groups/${groupId}`);
     } else {
+      console.error("Missing groupID in response:", data);
       router.push("/dashboard");
     }
   };

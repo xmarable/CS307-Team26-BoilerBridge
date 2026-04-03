@@ -71,8 +71,8 @@ export async function PUT(
         { status: 404 },
       );
 
-    const canEdit =
-      item.addedBy?.toString() === userId || isLeader(group, userId);
+    const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
+    const canEdit = isCreator || isLeader(group, userId);
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -148,8 +148,8 @@ export async function DELETE(
         { status: 404 },
       );
 
-    const canDelete =
-      item.addedBy?.toString() === userId || isLeader(group, userId);
+    const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
+    const canDelete = isCreator || isLeader(group, userId);
     if (!canDelete) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
