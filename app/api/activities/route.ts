@@ -4,6 +4,7 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
+import { resolvePlaceFieldsForCreate } from "@/lib/travel/googlePlaces";
 
 const ReferenceLinkSchema = z.object({
   title: z.string().min(1).trim(),
@@ -11,12 +12,14 @@ const ReferenceLinkSchema = z.object({
 });
 
 const CreateActivitySchema = z.object({
+  /** Free-text: e.g. "Kayaking in Chicago" — server resolves Google Place ID when configured */
   name: z.string().min(1, "Name is required").trim(),
+  /** Optional disambiguation hint; combined with name for Places text search */
   address: z.string().trim().optional(),
-  placeId: z.string().trim().optional(),
   description: z.string().trim().optional(),
   infoUrl: z.string().trim().optional(),
   referenceLinks: z.array(ReferenceLinkSchema).optional(),
+  /** Specific vendor / ticket URL only — otherwise US16 uses destination hotel search */
   bookingUrl: z.string().trim().optional(),
   estimatedCost: z.coerce.number().optional(),
 });
@@ -145,7 +148,6 @@ export async function POST(req: NextRequest) {
     const {
       name,
       address,
-      placeId,
       description,
       infoUrl,
       referenceLinks,
@@ -154,6 +156,18 @@ export async function POST(req: NextRequest) {
     } = parsed.data;
 
     await dbConnect();
+
+    const resolved = await resolvePlaceFieldsForCreate(process.env.GOOGLE_MAPS_API_KEY, {
+      name,
+      address,
+    });
+
+    const mergedAddress = address?.trim() || resolved.address?.trim() || undefined;
+    const mergedDescription =
+      description?.trim() || resolved.description?.trim() || undefined;
+    const mergedInfoUrl =
+      safeUrlString(infoUrl) || safeUrlString(resolved.infoUrl) || undefined;
+    const mergedPlaceId = resolved.placeId?.trim() || undefined;
 
     const links =
       referenceLinks
@@ -164,14 +178,31 @@ export async function POST(req: NextRequest) {
         })
         .filter(Boolean) ?? [];
 
+    if (
+      resolved.googleMapsUri &&
+      !links.some((l) => l.url === resolved.googleMapsUri)
+    ) {
+      links.push({ title: "Google Maps", url: resolved.googleMapsUri });
+    }
+
     const created = await Activity.create({
       name,
-      address: address || undefined,
-      placeId: placeId || undefined,
-      description: description || undefined,
-      infoUrl: safeUrlString(infoUrl),
+      address: mergedAddress,
+      placeId: mergedPlaceId,
+      description: mergedDescription,
+      infoUrl: mergedInfoUrl,
       referenceLinks: links.length ? links : undefined,
       bookingUrl: safeUrlString(bookingUrl),
+      googleMapsUri: safeUrlString(resolved.googleMapsUri),
+      googleTypes:
+        resolved.googleTypes?.length ? resolved.googleTypes : undefined,
+      priceLevel:
+        resolved.priceLevel != null ? resolved.priceLevel : undefined,
+      phoneNumber: resolved.phoneNumber?.trim() || undefined,
+      openingHoursSummary: resolved.openingHoursSummary?.trim() || undefined,
+      googlePhotoReference: resolved.googlePhotoReference?.trim() || undefined,
+      googlePhotoMediaResource:
+        resolved.googlePhotoMediaResource?.trim() || undefined,
       estimatedCost: estimatedCost != null ? estimatedCost : undefined,
       reviewCount: 0,
       reviews: [],

@@ -76,7 +76,8 @@ export const authOptions: NextAuthOptions = {
       if (token?.email) {
         try {
           const client = await clientPromise;
-          const db = client.db("BoilerBridge");
+          // Use default DB from MONGODB_URI (same as Mongoose/dbConnect), not a hardcoded name.
+          const db = client.db();
           const dbUser = await db
             .collection("users")
             .findOne({ email: token.email });

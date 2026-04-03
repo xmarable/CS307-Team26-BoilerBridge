@@ -4,18 +4,12 @@ import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
-
-function serializeId(id: unknown): string {
-  if (id && typeof (id as { toString: () => string }).toString === "function") {
-    return (id as { toString: () => string }).toString();
-  }
-  return String(id);
-}
+import { enrichActivityForApi } from "@/lib/travel/enrichActivityForApi";
 
 /**
  * GET /api/activities/[activityId]
- * US15: Full activity details for the Activity Information page.
- * US16: Includes bookingUrl when present.
+ * US15: Activity details + optional Google Places enrichment (GOOGLE_MAPS_API_KEY).
+ * US16: bookingUrl (manual, Expedia Rapid, or hotel-search fallback).
  */
 export async function GET(
   _req: NextRequest,
@@ -45,35 +39,11 @@ export async function GET(
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
-    const a = activity as {
-      _id: unknown;
-      placeId?: string;
-      name: string;
-      address?: string;
-      rating?: number;
-      reviewCount?: number;
-      estimatedCost?: number;
-      infoUrl?: string;
-      description?: string;
-      referenceLinks?: { title: string; url: string }[];
-      bookingUrl?: string;
-    };
+    const payload = await enrichActivityForApi(
+      activity as Parameters<typeof enrichActivityForApi>[0],
+    );
 
-    return NextResponse.json({
-      activity: {
-        _id: serializeId(a._id),
-        placeId: a.placeId,
-        name: a.name,
-        address: a.address,
-        rating: a.rating ?? null,
-        reviewCount: a.reviewCount ?? 0,
-        estimatedCost: a.estimatedCost,
-        infoUrl: a.infoUrl,
-        description: a.description,
-        referenceLinks: Array.isArray(a.referenceLinks) ? a.referenceLinks : [],
-        bookingUrl: a.bookingUrl,
-      },
-    });
+    return NextResponse.json(payload);
   } catch (err: unknown) {
     console.error("GET /api/activities/[activityId] error:", err);
     return NextResponse.json(
