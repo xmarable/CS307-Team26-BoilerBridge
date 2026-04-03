@@ -104,9 +104,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // check the deletion flag we set in the jwt callback
+      // Deleted DB user: must not return `null` — NextAuth client runs Object.keys(data)
+      // on /api/auth/session JSON; `null` triggers "Cannot convert undefined or null to object".
       if ((token as any).isDeleted) {
-        return null as any; // this kills the session and breaks the loop
+        return {} as any;
       }
 
       if (session.user && token) {
