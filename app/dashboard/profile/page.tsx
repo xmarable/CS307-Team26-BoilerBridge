@@ -39,7 +39,7 @@ export default async function MePage() {
     tripReminders: dbUser.settings.notifications.tripReminders,
     friendRequests: dbUser.settings.notifications.friendRequests,
     groupInvites: dbUser.settings.notifications.groupInvites,
-    groupNotifitaions: dbUser.settings.notifications.groupNotifitaions,
+    groupNotifications: dbUser.settings.notifications.groupNotifications,
   }
 
   return (

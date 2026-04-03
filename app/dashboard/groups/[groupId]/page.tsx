@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+import GroupNotification from "@/components/Notification/GroupNotification";
 
 type GroupSummary = {
   groupID: string;
@@ -264,6 +265,12 @@ export default function GroupDashboard() {
               icon={<AlignEndHorizontal size={22} />}
               label="Polls"
             />
+            {isLeader && <SidebarButton
+              active={activeSection === "notify"}
+              onClick={() => setActiveSection("notify")}
+              icon={<MessageSquare size={22} />}
+              label="Notify"
+            />}
             <SidebarButton
               active={activeSection === "messages"}
               onClick={() => setActiveSection("messages")}
@@ -542,6 +549,17 @@ export default function GroupDashboard() {
                   />
                 )}
               </div>
+            </div>
+          )}
+
+          {isLeader && activeSection === "notify" && (
+            <div>
+              <GroupNotification 
+                activeGroup={{
+                  groupID: group.groupID,
+                  groupName: group.groupName,
+                }}
+              />
             </div>
           )}
         </main>
