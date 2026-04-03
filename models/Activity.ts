@@ -7,6 +7,11 @@ export interface IReview {
   time: Date;
 }
 
+export interface IReferenceLink {
+  title: string;
+  url: string;
+}
+
 export interface IActivity extends Document {
   placeId?: string;
   name: string;
@@ -16,6 +21,14 @@ export interface IActivity extends Document {
   reviews: IReview[];
   /** Optional estimated cost for budget-based recommendations (US14) */
   estimatedCost?: number;
+  /** US15: primary informational URL (e.g. official site) */
+  infoUrl?: string;
+  /** US15: long-form description for the activity info page */
+  description?: string;
+  /** US15: curated external references (open in new tab) */
+  referenceLinks?: IReferenceLink[];
+  /** US16: optional deep link to a booking vendor (Expedia, venue, etc.) */
+  bookingUrl?: string;
   /** Cached summary fields */
   sentimentSummary?: string;
   highlights?: string[];
@@ -36,6 +49,14 @@ const ReviewSchema = new Schema<IReview>(
   { _id: false }
 );
 
+const ReferenceLinkSchema = new Schema<IReferenceLink>(
+  {
+    title: { type: String, required: true, trim: true },
+    url: { type: String, required: true, trim: true },
+  },
+  { _id: false }
+);
+
 const ActivitySchema = new Schema<IActivity>(
   {
     placeId: { type: String, index: true },
@@ -48,6 +69,10 @@ const ActivitySchema = new Schema<IActivity>(
       default: [],
     },
     estimatedCost: { type: Number },
+    infoUrl: { type: String, trim: true },
+    description: { type: String, trim: true },
+    referenceLinks: { type: [ReferenceLinkSchema], default: [] },
+    bookingUrl: { type: String, trim: true },
     sentimentSummary: { type: String },
     highlights: [{ type: String }],
     pros: [{ type: String }],
