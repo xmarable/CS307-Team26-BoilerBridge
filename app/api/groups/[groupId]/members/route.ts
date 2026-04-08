@@ -25,9 +25,7 @@ export async function GET(
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    // cast groupId string to BSON UUID
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
-
     const group = await TravelGroup.findOne({ groupID: binaryGroupId }).lean();
     if (!group) {
       return NextResponse.json({ error: "group not found" }, { status: 404 });
@@ -42,15 +40,6 @@ export async function GET(
       return NextResponse.json({ error: "Access denied." }, { status: 403 });
     }
 
-    /**
-     * THE FIX:
-     * 1. Get all member ID strings
-     * 2. Query users. Since UUID matching is failing, we fetch all and filter in JS
-     * OR we use the binary IDs explicitly.
-     */
-    const memberIdStrings = group.membersList.map((m: any) =>
-      m.userId.toString(),
-    );
     const binaryMemberIds = group.membersList.map(
       (m: any) => new (mongoose.Types as any).UUID(m.userId.toString()),
     );
@@ -61,13 +50,10 @@ export async function GET(
 
     const mappedMembers = group.membersList.map((m: any) => {
       const memberIdStr = m.userId.toString();
-
-      // find user doc by comparing strings
       const userDoc = users.find(
         (u: any) => u.userId.toString() === memberIdStr,
       );
 
-      // FALLBACK LOGIC: if it's YOU, use your session username if DB lookup failed
       let displayName = "unknown user";
       if (userDoc) {
         displayName = userDoc.username || userDoc.name || displayName;
@@ -100,9 +86,6 @@ export async function GET(
   }
 }
 
-/**
- * POST, PATCH, and DELETE remain the same as they use the correct binary casting
- */
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ groupId: string }> },
@@ -110,19 +93,63 @@ export async function POST(
   try {
     const { groupId } = await context.params;
     await dbConnect();
+    const session = await getServerSession(authOptions);
+    const sessionUserId = (session?.user as any)?.userId;
+
+    if (!sessionUserId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
     const group = await TravelGroup.findOne({ groupID: binaryGroupId });
-    if (!group)
+    if (!group) {
       return NextResponse.json({ error: "group not found" }, { status: 404 });
+    }
+
+    // logic: test expects 403 if not leader
+    if (group.leaderID.toString() !== sessionUserId.toString()) {
+      return NextResponse.json(
+        { error: "only the leader can invite" },
+        { status: 403 },
+      );
+    }
+
     const { email } = await req.json();
     const targetUser = await User.findOne({
       email: email.toLowerCase().trim(),
     });
-    if (!targetUser)
+    if (!targetUser) {
       return NextResponse.json({ error: "user not found" }, { status: 404 });
+    }
+
+    // logic: test expects 400 if user is already a member
+    const alreadyMember = group.membersList.some(
+      (m: any) => m.userId.toString() === targetUser.userId.toString(),
+    );
+    if (alreadyMember) {
+      return NextResponse.json(
+        { error: "already in the group" },
+        { status: 400 },
+      );
+    }
+
+    // update group state lol
     group.pendingRequests.push({ email: targetUser.email, sentAt: new Date() });
+    group.membersList.push({ userId: targetUser.userId, role: "Viewer" });
     await group.save();
-    return NextResponse.json({ message: "success" }, { status: 201 });
+
+    return NextResponse.json(
+      {
+        message: "success",
+        group: {
+          ...group.toObject(),
+          groupID: group.groupID.toString(),
+          leaderID: group.leaderID.toString(),
+          pendingRequests: group.pendingRequests,
+        },
+      },
+      { status: 201 },
+    );
   } catch (err) {
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
@@ -134,7 +161,6 @@ export async function PATCH(
 ) {
   try {
     const { groupId } = await context.params;
-    const session = await getServerSession(authOptions);
     const { targetUserId, newRole } = await req.json();
     await dbConnect();
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);

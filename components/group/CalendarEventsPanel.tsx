@@ -112,9 +112,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [selectDayToken, setSelectDayToken] = useState("__none__");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewOriginals, setPreviewOriginals] = useState<PreviewOriginalRow[]>(
-    [],
-  );
+  const [previewOriginals, setPreviewOriginals] = useState<
+    PreviewOriginalRow[]
+  >([]);
   const [previewProposed, setPreviewProposed] = useState<PreviewProposedRow[]>(
     [],
   );
@@ -365,9 +365,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
 
   return (
     <div className="space-y-8">
-      {err && (
-        <p className="text-sm text-red-600 font-bold px-2">{err}</p>
-      )}
+      {err && <p className="text-sm text-red-600 font-bold px-2">{err}</p>}
       {/* Search/Range Controls */}
       <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-4">
@@ -532,7 +530,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             </Badge>
           </div>
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
-            <div className="flex-1 min-w-[200px] max-w-md">
+            <div className="flex-1 min-w-50 max-w-md">
               <Label className="text-xs font-bold text-gray-500 mb-1 block">
                 Select by day
               </Label>
@@ -572,9 +570,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               <Button
                 type="button"
                 onClick={() => void handleRegenerateSelected()}
-                disabled={
-                  selectedIds.size === 0 || regenerating || loading
-                }
+                disabled={selectedIds.size === 0 || regenerating || loading}
                 className="rounded-2xl h-11 bg-linear-to-r from-violet-600 to-amber-600 hover:from-violet-700 hover:to-amber-700 text-white font-black gap-2"
               >
                 {regenerating ? (
@@ -621,14 +617,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                       aria-label={`Select ${ev.title}`}
                     />
                     <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
-                    <span className="text-xs font-black text-amber-600 uppercase">
-                      {new Date(ev.startTime).toLocaleString("default", {
-                        month: "short",
-                      })}
-                    </span>
-                    <span className="text-xl font-black text-amber-700 leading-none">
-                      {new Date(ev.startTime).getDate()}
-                    </span>
+                      <span className="text-xs font-black text-amber-600 uppercase">
+                        {new Date(ev.startTime).toLocaleString("default", {
+                          month: "short",
+                        })}
+                      </span>
+                      <span className="text-xl font-black text-amber-700 leading-none">
+                        {new Date(ev.startTime).getDate()}
+                      </span>
                     </div>
                   </div>
 
