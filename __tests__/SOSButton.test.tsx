@@ -12,13 +12,10 @@ describe("SOSButton Acceptance Criteria", () => {
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     global.fetch = jest.fn<any>();
-
-    // Setup window.location mock for dialing logic
-    Object.defineProperty(window, "location", {
-      value: { href: "" },
-      writable: true,
-      configurable: true,
-    });
+    // None of the test cases click the dial buttons (Police/Ambulance/Fire),
+    // so window.location.href is never set during these tests.
+    // Mocking window.location itself is unnecessary and throws in jsdom
+    // because window.location is non-configurable.
   });
 
   afterEach(() => {

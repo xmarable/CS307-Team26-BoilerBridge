@@ -37,7 +37,9 @@ import ItineraryRegeneratePreviewModal, {
   type PreviewOriginalRow,
   type PreviewProposedRow,
 } from "@/components/group/ItineraryRegeneratePreviewModal";
+import { ActivityVoting } from "@/components/group/ActivityVoting";
 
+/* ---------- Types ---------- */
 type CalendarEvent = {
   _id: string;
   title: string;
@@ -57,6 +59,7 @@ type Props = {
   groupId: string;
 };
 
+/* ---------- Helper Functions ---------- */
 function toDatetimeLocalValue(date: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
   const yyyy = date.getFullYear();
@@ -67,29 +70,35 @@ function toDatetimeLocalValue(date: Date) {
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
+/** Returns a YYYY‑MM‑DD string for the day part of an ISO date */
 function calendarDayKey(iso: string) {
   const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/* ---------- Main Component ---------- */
 export default function CalendarEventsPanel({ groupId }: Props) {
+  /* ---------- Local State ---------- */
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // state for error and success popups
+  // UI pop‑ups
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [popupMsg, setPopupMsg] = useState("");
   const [errorPopupTripLink, setErrorPopupTripLink] = useState(false);
 
+  // Form fields for creating a new event
   const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
   const [to, setTo] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return toDatetimeLocalValue(d);
   });
-
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startTime, setStartTime] = useState(() =>
@@ -102,25 +111,33 @@ export default function CalendarEventsPanel({ groupId }: Props) {
   });
   const [location, setLocation] = useState("");
   const [eventType, setEventType] = useState("activity");
+
+  // UI status flags
   const [creating, setCreating] = useState(false);
   const [generating, setGenerating] = useState(false);
-
   const [editOpen, setEditOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [selectDayToken, setSelectDayToken] = useState("__none__");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewOriginals, setPreviewOriginals] = useState<PreviewOriginalRow[]>(
-    [],
-  );
+  const [previewOriginals, setPreviewOriginals] = useState<
+    PreviewOriginalRow[]
+  >([]);
   const [previewProposed, setPreviewProposed] = useState<PreviewProposedRow[]>(
     [],
   );
   const [regenerating, setRegenerating] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [voteData, setVoteData] = useState<
+    Record<
+      string,
+      { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
+    >
+  >({});
 
+  /* ---------- Derived Values ---------- */
+  // Query string for the date range picker
   const rangeQuery = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("from", new Date(from).toISOString());
@@ -128,6 +145,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     return `?${qs.toString()}`;
   }, [from, to]);
 
+  // Options for the “select by day” dropdown
   const daySelectOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const ev of events) {
@@ -143,19 +161,29 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [events]);
 
+  /* ---------- API Calls ---------- */
   async function fetchEvents() {
     try {
       setLoading(true);
       setErr(null);
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events${rangeQuery}`,
-        {
-          method: "GET",
-        },
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load events.");
-      setEvents(data.events ?? data.calendarEvents ?? []);
+      const loaded: CalendarEvent[] = data.events ?? data.calendarEvents ?? [];
+      setEvents(loaded);
+
+      if (loaded.length > 0) {
+        const ids = loaded.map((e) => e._id).join(",");
+        const voteRes = await fetch(
+          `/api/groups/${groupId}/itinerary/vote?activityIds=${ids}`,
+        );
+        if (voteRes.ok) {
+          const voteJson = await voteRes.json();
+          setVoteData(voteJson.votes ?? {});
+        }
+      }
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load events.");
     } finally {
@@ -163,34 +191,26 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     }
   }
 
-  useEffect(() => {
-    fetchEvents();
-  }, [groupId, rangeQuery]);
-
   async function handleCreate() {
     try {
       setCreating(true);
       setErr(null);
-      const startISO = new Date(startTime).toISOString();
-      const endISO = new Date(endTime).toISOString();
-
       const res = await fetch(`/api/groups/${groupId}/calendar/events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || undefined,
-          startTime: startISO,
-          endTime: endISO,
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date(endTime).toISOString(),
           location: location.trim() || undefined,
           eventType,
           source: "manual",
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to create event.");
-
+      // Reset the form
       setTitle("");
       setDescription("");
       setLocation("");
@@ -216,7 +236,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         setErrorPopupTripLink(res.status === 404);
         setShowErrorPopup(true);
       } else {
-        // show success if it worked
         setPopupMsg(data?.message || "Itinerary sparked successfully.");
         setShowSuccessPopup(true);
         await fetchEvents();
@@ -227,17 +246,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     } finally {
       setGenerating(false);
     }
-  }
-
-  function openEdit(ev: CalendarEvent) {
-    setEditEvent(ev);
-    setTitle(ev.title);
-    setDescription(ev.description ?? "");
-    setLocation(ev.location ?? "");
-    setEventType(ev.eventType ?? "activity");
-    setStartTime(toDatetimeLocalValue(new Date(ev.startTime)));
-    setEndTime(toDatetimeLocalValue(new Date(ev.endTime)));
-    setEditOpen(true);
   }
 
   async function saveEdit() {
@@ -260,10 +268,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           }),
         },
       );
-
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to update event.");
-
+      // Close edit dialog
       setEditOpen(false);
       setEditEvent(null);
       await fetchEvents();
@@ -279,9 +286,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
       setErr(null);
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events/${eventId}`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" },
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
@@ -289,25 +294,6 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete event.");
     }
-  }
-
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function selectAllForDay(dayKey: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const ev of events) {
-        if (calendarDayKey(ev.startTime) === dayKey) next.add(ev._id);
-      }
-      return next;
-    });
   }
 
   async function handleRegenerateSelected() {
@@ -363,12 +349,53 @@ export default function CalendarEventsPanel({ groupId }: Props) {
     }
   }
 
+  /* ---------- UI Helpers ---------- */
+  function openEdit(ev: CalendarEvent) {
+    setEditEvent(ev);
+    setTitle(ev.title);
+    setDescription(ev.description ?? "");
+    setLocation(ev.location ?? "");
+    setEventType(ev.eventType ?? "activity");
+    setStartTime(toDatetimeLocalValue(new Date(ev.startTime)));
+    setEndTime(toDatetimeLocalValue(new Date(ev.endTime)));
+    setEditOpen(true);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllForDay(dayKey: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const ev of events) {
+        if (calendarDayKey(ev.startTime) === dayKey) next.add(ev._id);
+      }
+      return next;
+    });
+  }
+
+  /* ---------- Effects ---------- */
+  useEffect(() => {
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, rangeQuery]);
+
+  /* ---------- Render ---------- */
   return (
     <div className="space-y-8">
-      {err && (
-        <p className="text-sm text-red-600 font-bold px-2">{err}</p>
-      )}
-      {/* Search/Range Controls */}
+      {/* ==================== */}
+      {/* Global error banner   */}
+      {/* ==================== */}
+      {err && <p className="text-sm text-red-600 font-bold px-2">{err}</p>}
+
+      {/* ====================================================== */}
+      {/*   Date‑range selector (From / To) + Refresh button   */}
+      {/* ====================================================== */}
       <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -383,7 +410,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           </Button>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* From */}
           <div className="space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">From</Label>
             <Input
@@ -393,6 +422,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
+
+          {/* To */}
           <div className="space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">To</Label>
             <Input
@@ -405,17 +436,19 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </div>
       </div>
 
-      {/* Baseline Itinerary Generator Trigger */}
+      {/* ====================================================== */}
+      {/*  Baseline itinerary generator (spark button)       */}
+      {/* ====================================================== */}
       <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-1 text-center md:text-left">
             <h3 className="text-2xl font-black tracking-tighter flex items-center justify-center md:justify-start gap-2 uppercase">
-              <Zap className="text-amber-400 fill-amber-400" size={24} /> spark
-              itinerary
+              <Zap className="text-amber-400 fill-amber-400" size={24} />
+              spark itinerary
             </h3>
             <p className="text-gray-400 font-bold text-sm">
               Builds a full timeline with Ollama (local) from your trip and
-              approved must-haves
+              approved must‑haves
             </p>
           </div>
           <Button
@@ -432,8 +465,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </div>
       </div>
 
-      {/* Add Event Form */}
+      {/* ====================================================== */}
+      {/*               Add Event Form (Manual entry)          */}
+      {/* ====================================================== */}
       <div className="bg-amber-50/50 rounded-[2.5rem] p-8 border border-amber-100/50">
+        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-200">
             <Plus size={24} />
@@ -443,7 +479,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </h3>
         </div>
 
+        {/* Form fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Title (full‑width) */}
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">
               Event Title *
@@ -456,6 +494,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             />
           </div>
 
+          {/* Start Time */}
           <div className="space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">Start Time</Label>
             <Input
@@ -466,6 +505,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             />
           </div>
 
+          {/* End Time */}
           <div className="space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">End Time</Label>
             <Input
@@ -476,6 +516,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             />
           </div>
 
+          {/* Location */}
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">Location</Label>
             <div className="relative">
@@ -492,6 +533,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             </div>
           </div>
 
+          {/* Event type selector */}
           <div className="space-y-1.5">
             <Label className="text-gray-700 font-bold ml-1">Type</Label>
             <Select value={eventType} onValueChange={setEventType}>
@@ -508,6 +550,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             </Select>
           </div>
 
+          {/* Submit button */}
           <div className="flex items-end">
             <Button
               onClick={handleCreate}
@@ -520,8 +563,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </div>
       </div>
 
-      {/* Events Feed */}
+      {/* ====================================================== */}
+      {/*               Events Feed (list + actions)           */}
+      {/* ====================================================== */}
       <div className="space-y-4">
+        {/* Header + day filter */}
         <div className="flex flex-col gap-4 px-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-black text-gray-900">
@@ -531,8 +577,10 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               {events.length} Events Found
             </Badge>
           </div>
+
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
-            <div className="flex-1 min-w-[200px] max-w-md">
+            {/* Day selector */}
+            <div className="flex-1 min-w-50 max-w-md">
               <Label className="text-xs font-bold text-gray-500 mb-1 block">
                 Select by day
               </Label>
@@ -556,6 +604,8 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Action buttons */}
             <div className="flex items-end gap-2">
               <Button
                 type="button"
@@ -569,12 +619,11 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               >
                 Clear selection
               </Button>
+
               <Button
                 type="button"
                 onClick={() => void handleRegenerateSelected()}
-                disabled={
-                  selectedIds.size === 0 || regenerating || loading
-                }
+                disabled={selectedIds.size === 0 || regenerating || loading}
                 className="rounded-2xl h-11 bg-linear-to-r from-violet-600 to-amber-600 hover:from-violet-700 hover:to-amber-700 text-white font-black gap-2"
               >
                 {regenerating ? (
@@ -588,6 +637,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </div>
         </div>
 
+        {/* Events list / empty state / loading */}
         {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-amber-500" size={32} />
@@ -613,6 +663,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                   key={ev._id}
                   className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-center gap-4"
                 >
+                  {/* Checkbox + date badge */}
                   <div className="flex items-start gap-3 shrink-0 md:items-center">
                     <Checkbox
                       checked={selectedIds.has(ev._id)}
@@ -621,17 +672,18 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                       aria-label={`Select ${ev.title}`}
                     />
                     <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
-                    <span className="text-xs font-black text-amber-600 uppercase">
-                      {new Date(ev.startTime).toLocaleString("default", {
-                        month: "short",
-                      })}
-                    </span>
-                    <span className="text-xl font-black text-amber-700 leading-none">
-                      {new Date(ev.startTime).getDate()}
-                    </span>
+                      <span className="text-xs font-black text-amber-600 uppercase">
+                        {new Date(ev.startTime).toLocaleString("default", {
+                          month: "short",
+                        })}
+                      </span>
+                      <span className="text-xl font-black text-amber-700 leading-none">
+                        {new Date(ev.startTime).getDate()}
+                      </span>
                     </div>
                   </div>
 
+                  {/* Main event info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-black text-gray-900 text-lg truncate">
@@ -645,6 +697,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                       </Badge>
                     </div>
 
+                    {/* Time + location line */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock size={14} className="text-amber-500" />
@@ -665,13 +718,27 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                         </span>
                       )}
                     </div>
+
+                    {/* Optional description */}
                     {ev.description && (
                       <p className="mt-2 text-sm text-gray-600 line-clamp-1">
                         {ev.description}
                       </p>
                     )}
+
+                    {/* Voting widget */}
+                    <div className="mt-3">
+                      <ActivityVoting
+                        activityId={ev._id}
+                        groupId={groupId}
+                        initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+                        initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+                        userVote={voteData[ev._id]?.userVote ?? null}
+                      />
+                    </div>
                   </div>
 
+                  {/* Edit / Delete buttons (shown on hover) */}
                   <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
@@ -696,7 +763,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         )}
       </div>
 
-      {/* Edit Dialog */}
+      {/* ==================== */}
+      {/* Edit Event Dialog   */}
+      {/* ==================== */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="rounded-[2.5rem] p-8 border-none">
           <DialogHeader>
@@ -706,6 +775,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Title */}
             <div className="space-y-1.5">
               <Label className="font-bold text-gray-700 ml-1">Title *</Label>
               <Input
@@ -715,6 +785,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               />
             </div>
 
+            {/* Start / End */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="font-bold text-gray-700 ml-1">Start</Label>
@@ -725,6 +796,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
                   className="rounded-2xl border-gray-200 h-12 bg-gray-50 text-gray-900"
                 />
               </div>
+
               <div className="space-y-1.5">
                 <Label className="font-bold text-gray-700 ml-1">End</Label>
                 <Input
@@ -736,6 +808,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               </div>
             </div>
 
+            {/* Location */}
             <div className="space-y-1.5">
               <Label className="font-bold text-gray-700 ml-1">Location</Label>
               <Input
@@ -745,6 +818,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               />
             </div>
 
+            {/* Type selector */}
             <div className="space-y-1.5">
               <Label className="font-bold text-gray-700 ml-1">Type</Label>
               <Select value={eventType} onValueChange={setEventType}>
@@ -781,7 +855,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Error Popup Alert */}
+      {/* ==================== */}
+      {/* Error Popup Dialog */}
+      {/* ==================== */}
       <Dialog
         open={showErrorPopup}
         onOpenChange={(open) => {
@@ -800,14 +876,14 @@ export default function CalendarEventsPanel({ groupId }: Props) {
             <p className="text-xl font-black text-gray-900 leading-tight">
               {popupMsg}
             </p>
-            {errorPopupTripLink ? (
+            {errorPopupTripLink && (
               <Link
                 href={`/dashboard/groups/${groupId}/trip`}
                 className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
               >
                 Open trip settings
               </Link>
-            ) : null}
+            )}
           </div>
 
           <DialogFooter>
@@ -821,7 +897,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Success Popup Alert */}
+      {/* ==================== */}
+      {/* Success Popup Dialog */}
+      {/* ==================== */}
       <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
         <DialogContent className="rounded-[2.5rem] border-4 border-amber-500 p-0 bg-white shadow-[10px_10px_0px_0px_rgba(245,158,11,1)] max-w-md mx-auto overflow-hidden">
           {/* forced centering container */}
@@ -843,7 +921,7 @@ export default function CalendarEventsPanel({ groupId }: Props) {
               </p>
             </div>
 
-            {/* button section - forced full width */}
+            {/* button */}
             <div className="w-full">
               <Button
                 onClick={() => setShowSuccessPopup(false)}
@@ -856,6 +934,9 @@ export default function CalendarEventsPanel({ groupId }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* ==================== */}
+      {/* Regeneration Preview Modal */}
+      {/* ==================== */}
       <ItineraryRegeneratePreviewModal
         open={previewOpen}
         onOpenChange={setPreviewOpen}

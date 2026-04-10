@@ -1,22 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
-
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
-
-import TravelGroup from "@/models/TravelGroup";
 import CalendarEvent from "@/models/CalendarEvent";
-
-function isMemberOrLeader(group: any, userMongoId: string) {
-  const leader = group?.leaderID?.toString() === userMongoId;
-  const member =
-    Array.isArray(group?.membersList) &&
-    group.membersList.some(
-      (m: any) => (m.userId || m)?.toString() === userMongoId,
-    );
-  return leader || member;
-}
+import { getMemberPermissions } from "@/lib/roles";
 
 const CreateEventSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -32,7 +21,7 @@ const CreateEventSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> },
+  context: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -41,18 +30,15 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId } = await params;
-
+    const { groupId } = await context.params;
     await dbConnect();
 
-    // use findOne with the groupID field because groupId is a UUID string, not a Mongo ObjectId
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
-    if (!group) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
-    }
-
-    if (!isMemberOrLeader(group, userMongoId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const permissions = await getMemberPermissions(groupId, userMongoId);
+    if (permissions.status !== 200) {
+      return NextResponse.json(
+        { error: permissions.error },
+        { status: permissions.status },
+      );
     }
 
     const body = await req.json();
@@ -98,7 +84,7 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ groupId: string }> },
+  context: { params: Promise<{ groupId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -107,18 +93,15 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { groupId } = await params;
-
+    const { groupId } = await context.params;
     await dbConnect();
 
-    // use findOne with the groupID field to avoid CastError on UUID strings
-    const group: any = await TravelGroup.findOne({ groupID: groupId }).lean();
-    if (!group) {
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
-    }
-
-    if (!isMemberOrLeader(group, userMongoId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const permissions = await getMemberPermissions(groupId, userMongoId);
+    if (permissions.status !== 200) {
+      return NextResponse.json(
+        { error: permissions.error },
+        { status: permissions.status },
+      );
     }
 
     const { searchParams } = new URL(req.url);

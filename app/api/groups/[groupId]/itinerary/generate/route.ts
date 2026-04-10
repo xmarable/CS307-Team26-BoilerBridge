@@ -146,6 +146,7 @@ export async function POST(
       count: created.length,
     });
   } catch (err: unknown) {
+    // i want to see why this is failing so im logging the whole err object lol
     console.error("Itinerary generation error:", err);
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(

@@ -76,9 +76,9 @@ export default function ExpenseSummaryPanel({
     "active" | "settled" | "all"
   >("active");
   const [includeBreakdown, setIncludeBreakdown] = useState(false);
-  const [settlementSort, setSettlementSort] = useState<"amount-desc" | "amount-asc">(
-    "amount-desc",
-  );
+  const [settlementSort, setSettlementSort] = useState<
+    "amount-desc" | "amount-asc"
+  >("amount-desc");
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [prModal, setPrModal] = useState<{
     debtorUserId: string;
@@ -97,10 +97,9 @@ export default function ExpenseSummaryPanel({
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(
-        `/api/groups/${groupId}/ledger/summary?${qs}`,
-        { credentials: "include" },
-      );
+      const res = await fetch(`/api/groups/${groupId}/ledger/summary?${qs}`, {
+        credentials: "include",
+      });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         setErr(j.error || `Request failed (${res.status})`);
@@ -177,7 +176,7 @@ export default function ExpenseSummaryPanel({
               setExpenseFilter(v as "active" | "settled" | "all")
             }
           >
-            <SelectTrigger className="w-[220px] rounded-xl border-gray-200">
+            <SelectTrigger className="w-55 rounded-xl border-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -198,7 +197,7 @@ export default function ExpenseSummaryPanel({
               setSettlementSort(v as "amount-desc" | "amount-asc")
             }
           >
-            <SelectTrigger className="w-[200px] rounded-xl border-gray-200">
+            <SelectTrigger className="w-50 rounded-xl border-gray-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -230,7 +229,7 @@ export default function ExpenseSummaryPanel({
       </p>
 
       {meta.hasNoExpenses && (
-        <div className="rounded-[2rem] border border-amber-100 bg-amber-50/80 p-8 text-center">
+        <div className="rounded-4xl border border-amber-100 bg-amber-50/80 p-8 text-center">
           <p className="text-lg font-black text-amber-900">
             There are no expenses to summarize yet.
           </p>
@@ -241,7 +240,7 @@ export default function ExpenseSummaryPanel({
       )}
 
       {!meta.hasNoExpenses && meta.allExpensesSettled && (
-        <div className="rounded-[2rem] border border-green-100 bg-green-50/90 p-8 text-center">
+        <div className="rounded-4xl border border-green-100 bg-green-50/90 p-8 text-center">
           <p className="text-lg font-black text-green-900">All settled up!</p>
           <p className="text-green-800/80 mt-2 font-medium">
             Every expense in this group is marked settled. Switch to &quot;All
@@ -258,147 +257,157 @@ export default function ExpenseSummaryPanel({
 
       {meta.hasNoExpenses ? null : (
         <>
-      <section className="space-y-3">
-        <h3 className="text-xl font-black text-gray-900 tracking-tight px-1">
-          Net balance
-        </h3>
-        <p className="text-xs text-gray-500 px-1 -mt-1">
-          Positive = you are owed money · Negative = you owe others
-        </p>
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-3 font-bold text-gray-600">Member</th>
-                <th className="px-6 py-3 font-bold text-gray-600 text-right">
-                  Net
-                </th>
-                {includeBreakdown && data.breakdown && (
-                  <th className="px-6 py-3 font-bold text-gray-600 w-12" />
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {data.balances.map((row) => {
-                const lines = data.breakdown?.[row.userId] ?? [];
-                const open = expandedUsers.has(row.userId);
-                return (
-                  <Fragment key={row.userId}>
-                    <tr className="border-b border-gray-50 last:border-0">
-                      <td className="px-6 py-4 font-bold text-gray-900">
-                        {row.displayName}
-                      </td>
-                      <td
-                        className={`px-6 py-4 text-right font-black ${
-                          row.netCents > 0
-                            ? "text-green-700"
-                            : row.netCents < 0
-                              ? "text-red-600"
-                              : "text-gray-500"
-                        }`}
-                      >
-                        {formatMoney(row.netAmount)}
-                      </td>
-                      {includeBreakdown && data.breakdown && (
-                        <td className="px-2 py-2">
-                          {lines.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleUser(row.userId)}
-                              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-                              aria-expanded={open}
-                            >
-                              {open ? (
-                                <ChevronDown size={18} />
-                              ) : (
-                                <ChevronRight size={18} />
-                              )}
-                            </button>
-                          ) : null}
-                        </td>
-                      )}
-                    </tr>
-                    {includeBreakdown &&
-                      open &&
-                      lines.map((line, idx) => (
-                        <tr
-                          key={`${row.userId}-${line.expenseID ?? idx}-${line.kind}-${idx}`}
-                          className="bg-gray-50/80 text-xs"
-                        >
-                          <td
-                            className="px-6 py-2 pl-12 text-gray-600"
-                            colSpan={includeBreakdown && data.breakdown ? 3 : 2}
-                          >
-                            <span className="font-semibold">
-                              {line.kind === "credit"
-                                ? "Owed to you"
-                                : `You owe ${line.counterpartyDisplayName ?? "member"}`}
-                            </span>
-                            {line.description ? ` · ${line.description}` : ""}
-                            <span className="ml-2 tabular-nums font-bold text-gray-800">
-                              {formatMoney(line.amount)}
-                            </span>
+          <section className="space-y-3">
+            <h3 className="text-xl font-black text-gray-900 tracking-tight px-1">
+              Net balance
+            </h3>
+            <p className="text-xs text-gray-500 px-1 -mt-1">
+              Positive = you are owed money · Negative = you owe others
+            </p>
+            <div className="bg-white rounded-4xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-3 font-bold text-gray-600">
+                      Member
+                    </th>
+                    <th className="px-6 py-3 font-bold text-gray-600 text-right">
+                      Net
+                    </th>
+                    {includeBreakdown && data.breakdown && (
+                      <th className="px-6 py-3 font-bold text-gray-600 w-12" />
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.balances.map((row) => {
+                    const lines = data.breakdown?.[row.userId] ?? [];
+                    const open = expandedUsers.has(row.userId);
+                    return (
+                      <Fragment key={row.userId}>
+                        <tr className="border-b border-gray-50 last:border-0">
+                          <td className="px-6 py-4 font-bold text-gray-900">
+                            {row.displayName}
                           </td>
+                          <td
+                            className={`px-6 py-4 text-right font-black ${
+                              row.netCents > 0
+                                ? "text-green-700"
+                                : row.netCents < 0
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                            }`}
+                          >
+                            {formatMoney(row.netAmount)}
+                          </td>
+                          {includeBreakdown && data.breakdown && (
+                            <td className="px-2 py-2">
+                              {lines.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleUser(row.userId)}
+                                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                                  aria-expanded={open}
+                                >
+                                  {open ? (
+                                    <ChevronDown size={18} />
+                                  ) : (
+                                    <ChevronRight size={18} />
+                                  )}
+                                </button>
+                              ) : null}
+                            </td>
+                          )}
                         </tr>
-                      ))}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                        {includeBreakdown &&
+                          open &&
+                          lines.map((line, idx) => (
+                            <tr
+                              key={`${row.userId}-${line.expenseID ?? idx}-${line.kind}-${idx}`}
+                              className="bg-gray-50/80 text-xs"
+                            >
+                              <td
+                                className="px-6 py-2 pl-12 text-gray-600"
+                                colSpan={
+                                  includeBreakdown && data.breakdown ? 3 : 2
+                                }
+                              >
+                                <span className="font-semibold">
+                                  {line.kind === "credit"
+                                    ? "Owed to you"
+                                    : `You owe ${line.counterpartyDisplayName ?? "member"}`}
+                                </span>
+                                {line.description
+                                  ? ` · ${line.description}`
+                                  : ""}
+                                <span className="ml-2 tabular-nums font-bold text-gray-800">
+                                  {formatMoney(line.amount)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-      <section className="space-y-3">
-        <h3 className="text-xl font-black text-gray-900 tracking-tight px-1">
-          Suggested settlements
-        </h3>
-        <p className="text-xs text-gray-500 px-1 -mt-1">
-          Fewest payments to settle up (min cash flow)
-        </p>
-        {sortedSettlements.length === 0 ? (
-          <div className="rounded-[2rem] border border-gray-100 bg-gray-50 p-6 text-gray-600 font-medium">
-            No payments needed — everyone is even for this filter.
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {sortedSettlements.map((s, i) => (
-              <li
-                key={`${s.fromUserId}-${s.toUserId}-${i}`}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 flex flex-wrap items-center justify-between gap-3"
-              >
-                <span className="font-bold text-gray-900">
-                  <span className="text-amber-700">{s.fromDisplayName}</span>
-                  <span className="text-gray-400 font-medium mx-2">pays</span>
-                  <span className="text-gray-900">{s.toDisplayName}</span>
-                </span>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-black text-lg text-gray-900 tabular-nums">
-                    {formatMoney(s.amount)}
-                  </span>
-                  {uid && s.toUserId === uid ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl border-amber-200 text-amber-800 hover:bg-amber-50"
-                      onClick={() =>
-                        setPrModal({
-                          debtorUserId: s.fromUserId,
-                          debtorDisplayName: s.fromDisplayName,
-                          amount: s.amount,
-                        })
-                      }
-                    >
-                      Request payment
-                    </Button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <section className="space-y-3">
+            <h3 className="text-xl font-black text-gray-900 tracking-tight px-1">
+              Suggested settlements
+            </h3>
+            <p className="text-xs text-gray-500 px-1 -mt-1">
+              Fewest payments to settle up (min cash flow)
+            </p>
+            {sortedSettlements.length === 0 ? (
+              <div className="rounded-4xl border border-gray-100 bg-gray-50 p-6 text-gray-600 font-medium">
+                No payments needed — everyone is even for this filter.
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {sortedSettlements.map((s, i) => (
+                  <li
+                    key={`${s.fromUserId}-${s.toUserId}-${i}`}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4 flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <span className="font-bold text-gray-900">
+                      <span className="text-amber-700">
+                        {s.fromDisplayName}
+                      </span>
+                      <span className="text-gray-400 font-medium mx-2">
+                        pays
+                      </span>
+                      <span className="text-gray-900">{s.toDisplayName}</span>
+                    </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="font-black text-lg text-gray-900 tabular-nums">
+                        {formatMoney(s.amount)}
+                      </span>
+                      {uid && s.toUserId === uid ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-xl border-amber-200 text-amber-800 hover:bg-amber-50"
+                          onClick={() =>
+                            setPrModal({
+                              debtorUserId: s.fromUserId,
+                              debtorDisplayName: s.fromDisplayName,
+                              amount: s.amount,
+                            })
+                          }
+                        >
+                          Request payment
+                        </Button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </>
       )}
 

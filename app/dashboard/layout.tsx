@@ -26,7 +26,6 @@ export default async function DashboardLayout({
 
   await dbConnect();
 
-  // Fetch the full user document to get the UUID and preferred display names
   const userData = await User.findOne(
     { email: session.user.email },
     {
@@ -42,42 +41,41 @@ export default async function DashboardLayout({
     redirect("/signin");
   }
 
-  // extract the userId for parallel data pre-fetching
-  const userId = userData.userId;
+  // logic: force the string conversion immediately and store it as a plain string lol
+  const userIdString = userData.userId.toString();
 
-  // 1. start parallel fetches to "warm up" all dashboard dependencies
-  // this ensures that data for groups, trips, and friends is cached or ready
   const [userGroups, pendingRequests, activeTrips] = await Promise.all([
-    TravelGroup.find({ "membersList.userId": userId }).lean(),
-    FriendRequest.find({ receiverId: userId, status: "pending" }).lean(),
-    Trip.find({ userId: userId }).sort({ fromDate: 1 }).limit(5).lean(),
+    TravelGroup.find({ "membersList.userId": userData.userId }).lean(),
+    FriendRequest.find({
+      receiverId: userData.userId,
+      status: "pending",
+    }).lean(),
+    Trip.find({ userId: userData.userId })
+      .sort({ fromDate: 1 })
+      .limit(5)
+      .lean(),
   ]);
 
-  // Create an enhanced session object to pass down to Nav and Sidebar
   const enhancedSession = {
-    ...session,
     user: {
-      ...session.user,
-      name: userData.name || session.user.name,
-      image: userData.image || session.user.image,
-      username: userData.username || (session.user as any).username,
-      userId: userData.userId, // Critical for routing and role checks
-      isStudentVerified:
-        userData.settings?.security?.isStudentVerified || false, // added for navbar check
-      // injecting pre-fetched metadata into the session context
+      name: userData.name || session.user.name || null,
+      email: session.user.email,
+      image: userData.image || session.user.image || null,
+      username: userData.username || (session.user as any).username || null,
+      userId: userIdString,
+      isStudentVerified: !!userData.settings?.security?.isStudentVerified,
       groupCount: userGroups.length,
       pendingFriends: pendingRequests.length,
       hasActiveTrips: activeTrips.length > 0,
     },
+    expires: session.expires,
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* this starts the background loading immediately */}
       <DashboardWarmer />
       <Navbar session={enhancedSession} />
       <div className="flex flex-1 overflow-hidden">
-        {/* passing enhanced session to sidebar if it needs pre-fetched counts */}
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
           <div className="h-full">{children}</div>

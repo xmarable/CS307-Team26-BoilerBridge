@@ -125,7 +125,7 @@ export default function GroupTripPage() {
         return;
       }
 
-      window.location.href = "/dashboard/alltrips";
+      router.push("/dashboard/alltrips");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
