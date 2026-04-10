@@ -94,10 +94,9 @@ export default function PaymentRequestsPanel({
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(
-        `/api/groups/${groupId}/payment-requests`,
-        { credentials: "include" },
-      );
+      const res = await fetch(`/api/groups/${groupId}/payment-requests`, {
+        credentials: "include",
+      });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(j.error || `Failed to load (${res.status})`);
@@ -135,7 +134,9 @@ export default function PaymentRequestsPanel({
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(
-          typeof j.error === "string" ? j.error : `Update failed (${res.status})`,
+          typeof j.error === "string"
+            ? j.error
+            : `Update failed (${res.status})`,
         );
         toast.error(
           typeof j.error === "string" ? j.error : "Could not confirm payment.",
@@ -153,10 +154,7 @@ export default function PaymentRequestsPanel({
     }
   };
 
-  const declineRequest = async (
-    r: PaymentRequestRow,
-    reason?: string,
-  ) => {
+  const declineRequest = async (r: PaymentRequestRow, reason?: string) => {
     setActionId(r.requestID);
     try {
       const res = await fetch(
@@ -197,10 +195,7 @@ export default function PaymentRequestsPanel({
     if (!declineTarget) return;
     setDeclineSubmitting(true);
     try {
-      await declineRequest(
-        declineTarget,
-        declineReason.trim() || undefined,
-      );
+      await declineRequest(declineTarget, declineReason.trim() || undefined);
     } finally {
       setDeclineSubmitting(false);
     }
@@ -386,7 +381,7 @@ export default function PaymentRequestsPanel({
             <Label htmlFor="decline-reason">Reason (optional)</Label>
             <Textarea
               id="decline-reason"
-              className="rounded-xl min-h-[88px]"
+              className="rounded-xl min-h-22"
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
               placeholder="e.g. Already paid cash"

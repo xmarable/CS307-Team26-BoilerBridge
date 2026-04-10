@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Search, LogOut, Settings, CheckCircle2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { NotificationBell } from "./NotificationBell";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +14,15 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function Navbar({ session }: { session?: any }) {
+  const [mounted, setMounted] = useState(false);
   const user = session?.user;
+
+  // logic: wait until client-side hydration is done to show user-specific stuff lol
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const displayName = user?.name || user?.username || "User";
   const displayInitial = displayName.charAt(0).toUpperCase();
@@ -46,82 +56,81 @@ export function Navbar({ session }: { session?: any }) {
         <div className="flex items-center gap-4">
           <NotificationBell />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div className="relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all rounded-full border border-gray-100 w-10 h-10 bg-gray-100 flex items-center justify-center">
-                <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
-                  {profileImage ? (
-                    /* Standard img tag bypasses Shadcn/Avatar hydration lag */
-                     
-                    <img
-                      src={profileImage}
-                      alt={displayName}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 text-white font-bold flex items-center justify-center">
-                      {displayInitial}
-                    </div>
-                  )}
-                </div>
-                {/* Verified Badge Overlay */}
-                {isVerified && (
-                  <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm z-50">
-                    <CheckCircle2
-                      size={14}
-                      className="text-green-600 fill-green-50"
-                    />
-                  </div>
-                )}
-              </div>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="end"
-              className="w-56 mt-2 rounded-xl shadow-lg border-gray-200 bg-white p-1"
-            >
-              <DropdownMenuLabel className="font-normal px-2 py-2">
-                <div className="flex flex-col space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-bold leading-none text-gray-900">
-                      {user?.name || `@${user?.username}` || "User"}
-                    </p>
-                    {isVerified && (
-                      <CheckCircle2 size={12} className="text-green-600" />
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <span className="relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all rounded-full border border-gray-100 w-10 h-10 bg-gray-100 flex items-center justify-center outline-none">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+                    {profileImage ? (
+                      <img
+                        src={profileImage}
+                        alt={displayName}
+                        className="w-full h-full object-cover"
+                        loading="eager"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 text-white font-bold flex items-center justify-center">
+                        {displayInitial}
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs leading-none text-gray-500 truncate">
-                    {user?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
+                  {isVerified && (
+                    <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm z-50">
+                      <CheckCircle2
+                        size={14}
+                        className="text-green-600 fill-green-50"
+                      />
+                    </div>
+                  )}
+                </span>
+              </DropdownMenuTrigger>
 
-              <DropdownMenuSeparator className="bg-gray-100" />
+              <DropdownMenuContent
+                align="end"
+                className="w-56 mt-2 rounded-xl shadow-lg border-gray-200 bg-white p-1"
+              >
+                <DropdownMenuLabel className="font-normal px-2 py-2">
+                  <div className="flex flex-col space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold leading-none text-gray-900">
+                        {user?.name || `@${user?.username}` || "User"}
+                      </p>
+                      {isVerified && (
+                        <CheckCircle2 size={12} className="text-green-600" />
+                      )}
+                    </div>
+                    <p className="text-xs leading-none text-gray-500 truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
 
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/dashboard/profile"
-                  className="flex items-center w-full px-2 py-2 text-sm text-gray-700 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Account Settings</span>
-                </Link>
-              </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-gray-100" />
 
-              <DropdownMenuSeparator className="bg-gray-100" />
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/dashboard/profile"
+                    className="flex items-center w-full px-2 py-2 text-sm text-gray-700 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer"
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Account Settings</span>
+                  </Link>
+                </DropdownMenuItem>
 
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/signout"
-                  className="flex items-center w-full px-2 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuSeparator className="bg-gray-100" />
+
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/signout"
+                    className="flex items-center w-full px-2 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </header>

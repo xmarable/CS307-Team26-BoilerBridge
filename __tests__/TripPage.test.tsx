@@ -13,11 +13,13 @@ await jest.unstable_mockModule("next-auth/react", () => ({
   })),
 }));
 
-// 2. Mock next/navigation - Added useParams to prevent SyntaxError since the component now uses it
+// 2. Mock next/navigation - stable references so tests can assert on router.push
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
 await jest.unstable_mockModule("next/navigation", () => ({
   useRouter: jest.fn(() => ({
-    push: jest.fn(),
-    replace: jest.fn(),
+    push: mockPush,
+    replace: mockReplace,
   })),
   useParams: jest.fn(() => ({
     groupId: "15105263-6166-40c8-977a-a3575375bc58", // mock the group context for the test
@@ -46,10 +48,10 @@ describe("TripPage", () => {
 
   beforeEach(() => {
     global.fetch = jest.fn<any>();
-    Object.defineProperty(window, "location", {
-      value: { href: "" },
-      writable: true,
-    });
+    mockPush.mockClear();
+    mockReplace.mockClear();
+    // window.location is non-configurable in jsdom and cannot be replaced;
+    // the component now uses router.push for navigation so no location mock needed.
   });
 
   afterEach(() => {
@@ -146,7 +148,7 @@ describe("TripPage", () => {
     expect(body.groupId).toBe("15105263-6166-40c8-977a-a3575375bc58");
 
     await waitFor(() => {
-      expect(window.location.href).toBe("/dashboard/alltrips");
+      expect(mockPush).toHaveBeenCalledWith("/dashboard/alltrips");
     });
   });
 
@@ -177,6 +179,6 @@ describe("TripPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /create trip/i }));
 
     expect(await screen.findByText("Invalid input data")).toBeInTheDocument();
-    expect(window.location.href).not.toBe("/dashboard/alltrips");
+    expect(mockPush).not.toHaveBeenCalledWith("/dashboard/alltrips");
   });
 });
