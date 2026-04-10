@@ -183,17 +183,58 @@ export async function DELETE(
   context: { params: Promise<{ groupId: string }> },
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    const sessionUserId = (session?.user as any)?.userId;
+
+    if (!sessionUserId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const { groupId } = await context.params;
-    const { userId } = await req.json();
     await dbConnect();
+
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
     const group = await TravelGroup.findOne({ groupID: binaryGroupId });
-    if (group) {
+
+    if (!group) {
+      return NextResponse.json({ error: "group not found" }, { status: 404 });
+    }
+
+    // only the leader can remove members or cancel invitations
+    if (group.leaderID.toString() !== sessionUserId.toString()) {
+      return NextResponse.json(
+        { error: "only the leader can perform this action" },
+        { status: 403 },
+      );
+    }
+
+    const body = await req.json();
+    const { userId, email } = body;
+
+    if (email) {
+      // cancel a pending invitation — remove from pendingRequests and membersList
+      const lowerEmail = (email as string).toLowerCase().trim();
+      group.pendingRequests = group.pendingRequests.filter(
+        (r: any) => r.email.toLowerCase() !== lowerEmail,
+      );
+      const targetUser = await User.findOne({ email: lowerEmail });
+      if (targetUser) {
+        group.membersList = group.membersList.filter(
+          (m: any) => m.userId.toString() !== targetUser.userId.toString(),
+        );
+      }
+    } else if (userId) {
       group.membersList = group.membersList.filter(
         (m: any) => m.userId.toString() !== userId.toString(),
       );
-      await group.save();
+    } else {
+      return NextResponse.json(
+        { error: "userId or email required" },
+        { status: 400 },
+      );
     }
+
+    await group.save();
     return NextResponse.json({ message: "removed" });
   } catch (err) {
     return NextResponse.json({ error: "server error" }, { status: 500 });
