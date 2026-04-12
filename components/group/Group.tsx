@@ -108,8 +108,10 @@ export default function GroupDashboard() {
         credentials: "include",
       });
       if (res.status === 401) return setError("Please log in.");
-      if (res.status === 403 || res.status === 404)
-        return setError("Access denied.");
+      if (res.status === 403 || res.status === 404) {
+        router.push("/dashboard");
+        return;
+      }
 
       const data = await res.json();
       if (data?.group) {
@@ -120,7 +122,7 @@ export default function GroupDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, router]);
 
   const fetchFriends = useCallback(async () => {
     try {

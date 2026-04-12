@@ -87,7 +87,9 @@ export default function EditTripPage() {
     fetch("/api/activities?limit=30", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : { activities: [] }))
       .then((data: { activities?: { name: string }[] }) => {
-        const names = (data.activities ?? []).map((a) => a.name).filter(Boolean);
+        const names = (data.activities ?? [])
+          .map((a) => a.name)
+          .filter(Boolean);
         setActivitySuggestions(names);
       })
       .catch(() => setActivitySuggestions([]));
@@ -95,6 +97,7 @@ export default function EditTripPage() {
 
   useEffect(() => {
     if (tripId && trip) fetchRecommendations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId, trip?._id]);
 
   const addMustHave = () => {
@@ -146,9 +149,18 @@ export default function EditTripPage() {
       credentials: "include",
     })
       .then((res) => (res.ok ? res.json() : { recommendations: [] }))
-      .then((data: { recommendations?: { _id: string; name: string; address?: string; estimatedCost?: number }[] }) => {
-        setRecommendations(data.recommendations ?? []);
-      })
+      .then(
+        (data: {
+          recommendations?: {
+            _id: string;
+            name: string;
+            address?: string;
+            estimatedCost?: number;
+          }[];
+        }) => {
+          setRecommendations(data.recommendations ?? []);
+        },
+      )
       .catch(() => setRecommendations([]))
       .finally(() => setRecommendationsLoading(false));
   };
@@ -344,9 +356,12 @@ export default function EditTripPage() {
         </div>
 
         <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-          <Label className="text-base font-medium">Activity preferences (US14)</Label>
+          <Label className="text-base font-medium">
+            Activity preferences (US14)
+          </Label>
           <p className="text-sm text-gray-500 mt-1 mb-3">
-            Mark activities or locations to avoid; suggestions will respect your budget range.
+            Mark activities or locations to avoid; suggestions will respect your
+            budget range.
           </p>
           <div className="space-y-4">
             <div>
@@ -356,8 +371,11 @@ export default function EditTripPage() {
                   placeholder="Type or select activity"
                   value={newAvoidActivity}
                   onChange={(e) => setNewAvoidActivity(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAvoidActivity())}
-                  className="max-w-[200px]"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    (e.preventDefault(), addAvoidActivity())
+                  }
+                  className="max-w-50"
                 />
                 <select
                   className="rounded-md border border-input bg-transparent px-3 py-2 text-sm h-9"
@@ -374,10 +392,17 @@ export default function EditTripPage() {
                     .filter((s) => !avoidActivities.includes(s))
                     .slice(0, 15)
                     .map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
                     ))}
                 </select>
-                <Button type="button" variant="outline" size="sm" onClick={addAvoidActivity}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addAvoidActivity}
+                >
                   Add
                 </Button>
               </div>
@@ -409,10 +434,18 @@ export default function EditTripPage() {
                   placeholder="e.g. Downtown, Airport"
                   value={newAvoidLocation}
                   onChange={(e) => setNewAvoidLocation(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAvoidLocation())}
-                  className="max-w-[200px]"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    (e.preventDefault(), addAvoidLocation())
+                  }
+                  className="max-w-50"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={addAvoidLocation}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addAvoidLocation}
+                >
                   Add
                 </Button>
               </div>
@@ -439,7 +472,9 @@ export default function EditTripPage() {
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
-                <Label htmlFor="budgetMin" className="text-sm">Budget range (min $)</Label>
+                <Label htmlFor="budgetMin" className="text-sm">
+                  Budget range (min $)
+                </Label>
                 <Input
                   id="budgetMin"
                   type="number"
@@ -451,7 +486,9 @@ export default function EditTripPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="budgetMax" className="text-sm">Budget range (max $)</Label>
+                <Label htmlFor="budgetMax" className="text-sm">
+                  Budget range (max $)
+                </Label>
                 <Input
                   id="budgetMax"
                   type="number"
@@ -480,10 +517,13 @@ export default function EditTripPage() {
             </Button>
           </div>
           <p className="text-sm text-gray-500 mb-2">
-            Recommendations based on your avoid list and budget range. Update preferences above and refresh.
+            Recommendations based on your avoid list and budget range. Update
+            preferences above and refresh.
           </p>
           {recommendations.length === 0 && !recommendationsLoading && (
-            <p className="text-sm text-gray-400 py-2">No suggestions yet. Click Refresh.</p>
+            <p className="text-sm text-gray-400 py-2">
+              No suggestions yet. Click Refresh.
+            </p>
           )}
           {recommendations.length > 0 && (
             <ul className="space-y-1.5 text-sm">
