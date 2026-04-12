@@ -5,10 +5,19 @@ dotenv.config({ path: ".env.local" });
 
 // ensure test db uri is set so tests that use dbconnect can run
 if (process.env.NODE_ENV === "test") {
-  process.env.TEST_MONGODB_URI =
-    process.env.TEST_MONGODB_URI ||
-    process.env.MONGODB_URI ||
-    "mongodb://localhost:27017/boilerbridge-test";
+  if (!process.env.TEST_MONGODB_URI) {
+    process.env.TEST_MONGODB_URI =
+      process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/boilerbridge-test";
+  }
+  // lib/dbConnect refuses TEST_MONGODB_URI === MONGODB_URI so test cleanup cannot wipe prod.
+  // If only MONGODB_URI is set (common in .env.local), point tests at a separate local DB name.
+  if (
+    process.env.MONGODB_URI &&
+    process.env.TEST_MONGODB_URI === process.env.MONGODB_URI
+  ) {
+    process.env.TEST_MONGODB_URI =
+      "mongodb://127.0.0.1:27017/boilerbridge-jest-isolated";
+  }
 }
 
 // polyfill globals used by next.js and api routes in jest node environment

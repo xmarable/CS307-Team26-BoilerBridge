@@ -82,37 +82,31 @@ export async function POST(
       );
     }
 
-    const mongoSession = await mongoose.startSession();
-    let inserted: unknown[] = [];
-
-    try {
-      await mongoSession.withTransaction(async () => {
-        const del = await CalendarEvent.deleteMany(
-          { _id: { $in: replaceEventIds }, groupId },
-          { session: mongoSession },
-        );
-        if (del.deletedCount !== replaceEventIds.length) {
-          throw new Error("Delete count mismatch");
-        }
-
-        const docs = proposedEvents.map((ev) => ({
-          title: ev.title,
-          description: ev.description,
-          startTime: ev.startTime,
-          endTime: ev.endTime,
-          location: ev.location,
-          eventType: ev.eventType ?? "general",
-          createdBy: userId,
-          groupId,
-          source: "itinerary" as const,
-          timezone: ev.timezone ?? "UTC",
-        }));
-
-        inserted = await CalendarEvent.insertMany(docs, { session: mongoSession });
-      });
-    } finally {
-      await mongoSession.endSession();
+    const del = await CalendarEvent.deleteMany({
+      _id: { $in: replaceEventIds },
+      groupId,
+    });
+    if (del.deletedCount !== replaceEventIds.length) {
+      return NextResponse.json(
+        { error: "Could not remove all events to replace; none were modified." },
+        { status: 409 },
+      );
     }
+
+    const docs = proposedEvents.map((ev) => ({
+      title: ev.title,
+      description: ev.description,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+      location: ev.location,
+      eventType: ev.eventType ?? "general",
+      createdBy: userId,
+      groupId,
+      source: "itinerary" as const,
+      timezone: ev.timezone ?? "UTC",
+    }));
+
+    const inserted = await CalendarEvent.insertMany(docs);
 
     return NextResponse.json({ events: inserted }, { status: 200 });
   } catch (err: unknown) {

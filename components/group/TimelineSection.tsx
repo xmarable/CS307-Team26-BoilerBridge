@@ -3,7 +3,13 @@
 import { Calendar } from "lucide-react";
 import CalendarEventsPanel from "./CalendarEventsPanel";
 
-export function TimelineSection({ groupId }: { groupId: string }) {
+export function TimelineSection({
+  groupId,
+  canPublishItinerary = false,
+}: {
+  groupId: string;
+  canPublishItinerary?: boolean;
+}) {
   return (
     <section className="space-y-6 flex-1 min-w-0">
       <div className="flex items-center gap-3 px-2">
@@ -15,7 +21,10 @@ export function TimelineSection({ groupId }: { groupId: string }) {
         </h2>
       </div>
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-187.5 overflow-y-auto custom-scrollbar">
-        <CalendarEventsPanel groupId={groupId} />
+        <CalendarEventsPanel
+          groupId={groupId}
+          canPublishItinerary={canPublishItinerary}
+        />
       </div>
     </section>
   );

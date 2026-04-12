@@ -28,9 +28,14 @@ export function ActivityVoting({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+    // Local dev without Pusher: skip realtime; voting still works via the API.
+    if (!key || !cluster) {
+      return;
+    }
+
+    const pusher = new Pusher(key, { cluster });
 
     const channel = pusher.subscribe(`group-${groupId}`);
 
