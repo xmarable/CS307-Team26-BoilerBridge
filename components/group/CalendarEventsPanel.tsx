@@ -38,6 +38,7 @@ import ItineraryRegeneratePreviewModal, {
   type PreviewProposedRow,
 } from "@/components/group/ItineraryRegeneratePreviewModal";
 import { ActivityVoting } from "@/components/group/ActivityVoting";
+import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
 
 /* ---------- Types ---------- */
 type CalendarEvent = {
@@ -57,6 +58,7 @@ type CalendarEvent = {
 
 type Props = {
   groupId: string;
+  canPublishItinerary?: boolean;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -80,7 +82,10 @@ function calendarDayKey(iso: string) {
 }
 
 /* ---------- Main Component ---------- */
-export default function CalendarEventsPanel({ groupId }: Props) {
+export default function CalendarEventsPanel({
+  groupId,
+  canPublishItinerary = false,
+}: Props) {
   /* ---------- Local State ---------- */
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -435,6 +440,15 @@ export default function CalendarEventsPanel({ groupId }: Props) {
           </div>
         </div>
       </div>
+
+      {canPublishItinerary ? (
+        <ItinerarySourcePublishControls
+          sourceType="group"
+          sourceId={groupId}
+          canPublish={canPublishItinerary}
+          hasItineraryContent={events.some((e) => e.source === "itinerary")}
+        />
+      ) : null}
 
       {/* ====================================================== */}
       {/*  Baseline itinerary generator (spark button)       */}

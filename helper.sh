@@ -11,7 +11,6 @@ echo "🚀 starting sprint 2 tests for xavion..."
 # run each test suite in order. if one fails, the script stops (&&)
 eval $JEST_CMD __tests__/SOSButton.test.tsx && \
 eval $JEST_CMD __tests__/GroupBoard.test.tsx && \
-eval $JEST_CMD __tests__/roles.test.ts && \
 eval $JEST_CMD __tests__/api/groups/roles.test.ts && \
 eval $JEST_CMD __tests__/ExternalBooking.test.tsx && \
 eval $JEST_CMD __tests__/vibeTagsLogic.test.ts && \

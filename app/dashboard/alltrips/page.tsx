@@ -8,7 +8,6 @@ import TripModel from "@/models/Trip";
 import User from "@/models/User";
 import Link from "next/link";
 import {
-  Plus,
   Calendar,
   Wallet,
   Car,
@@ -18,6 +17,7 @@ import {
   ArrowRight,
   Settings2,
 } from "lucide-react";
+import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
 
 type Trip = {
   _id: string;
@@ -29,6 +29,7 @@ type Trip = {
   budget: number;
   tripConfirmed: boolean;
   createdAt?: string;
+  primaryItinerary?: unknown[];
 };
 
 // --- Your Original Helper Functions ---
@@ -168,16 +169,24 @@ export default async function AllTripsPage() {
               )}
 
               {/* Your original Edit Link logic */}
-              <div className="mt-6 pt-6 border-t border-gray-50 flex items-center justify-between">
-                <Link
-                  href={`/trip/${t._id}/edit`}
-                  className="inline-flex items-center gap-2 text-sm font-black text-gray-400 hover:text-amber-600 transition-colors"
-                >
-                  <Settings2 size={18} />
-                  Edit preferences
-                </Link>
-                <div className="w-10 h-10 bg-gray-900 text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ArrowRight size={20} />
+              <div className="mt-6 pt-6 border-t border-gray-50 space-y-4">
+                <ItinerarySourcePublishControls
+                  sourceType="trip"
+                  sourceId={String(t._id)}
+                  canPublish
+                  hasItineraryContent={(t.primaryItinerary?.length ?? 0) > 0}
+                />
+                <div className="flex items-center justify-between">
+                  <Link
+                    href={`/dashboard/trip/${t._id}/edit`}
+                    className="inline-flex items-center gap-2 text-sm font-black text-gray-400 hover:text-amber-600 transition-colors"
+                  >
+                    <Settings2 size={18} />
+                    Edit preferences
+                  </Link>
+                  <div className="w-10 h-10 bg-gray-900 text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight size={20} />
+                  </div>
                 </div>
               </div>
             </div>
