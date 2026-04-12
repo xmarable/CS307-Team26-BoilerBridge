@@ -35,10 +35,10 @@ export async function GET(req: NextRequest) {
 
     const { page, limit, sort } = parsed.data;
     const skip = (page - 1) * limit;
-    const sortKey =
+    const sortKey: Record<string, 1 | -1> =
       sort === "popular"
-        ? { views: -1 as const, publishedAt: -1 as const }
-        : { publishedAt: -1 as const };
+        ? { views: -1, publishedAt: -1 }
+        : { publishedAt: -1 };
 
     const filter = { isPublic: true };
 

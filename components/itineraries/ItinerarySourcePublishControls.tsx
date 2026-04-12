@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
@@ -27,9 +26,7 @@ export function ItinerarySourcePublishControls({
   canPublish,
   hasItineraryContent,
 }: Props) {
-  const { data: session, status } = useSession();
-  const userId = (session?.user as { userId?: string } | undefined)?.userId;
-
+  const [viewerId, setViewerId] = useState<string | null>(null);
   const [publication, setPublication] = useState<Publication | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -43,15 +40,18 @@ export function ItinerarySourcePublishControls({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setPublication(null);
+      setViewerId(null);
       return;
     }
+    setViewerId(typeof data.viewerId === "string" ? data.viewerId : null);
     setPublication((data?.publication as Publication | null) ?? null);
   }, [sourceType, sourceId]);
 
   useEffect(() => {
-    if (status === "loading") return;
-    if (!userId || !canPublish) {
+    if (!canPublish) {
       setLoading(false);
+      setViewerId(null);
+      setPublication(null);
       return;
     }
     let cancelled = false;
@@ -66,12 +66,14 @@ export function ItinerarySourcePublishControls({
     return () => {
       cancelled = true;
     };
-  }, [userId, canPublish, refresh, status]);
+  }, [canPublish, refresh]);
 
   if (!canPublish) return null;
 
   const isPublisher =
-    publication && userId && String(publication.ownerId) === String(userId);
+    publication &&
+    viewerId &&
+    String(publication.ownerId) === String(viewerId);
   const publishedAndLive = publication?.isPublic === true;
 
   async function handlePublish() {
@@ -122,7 +124,7 @@ export function ItinerarySourcePublishControls({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+      <div className="relative z-10 flex items-center gap-2 text-sm text-gray-500 py-2">
         <Loader2 className="h-4 w-4 animate-spin" />
         Checking publish status…
       </div>
@@ -130,7 +132,7 @@ export function ItinerarySourcePublishControls({
   }
 
   return (
-    <div className="rounded-2xl border border-amber-100 bg-amber-50/40 px-4 py-3 space-y-2">
+    <div className="relative z-10 rounded-2xl border border-amber-100 bg-amber-50/40 px-4 py-3 space-y-2">
       <p className="text-sm font-bold text-gray-800">Share itinerary</p>
       <p className="text-xs text-gray-600">
         {hasItineraryContent
@@ -143,6 +145,11 @@ export function ItinerarySourcePublishControls({
           size="sm"
           className="rounded-xl bg-amber-600 hover:bg-amber-700"
           disabled={busy || !hasItineraryContent}
+          title={
+            !hasItineraryContent
+              ? "Add itinerary activities (trip) or generate a group plan first."
+              : undefined
+          }
           onClick={() => void handlePublish()}
         >
           {busy ? "Working…" : publication ? "Update snapshot" : "Publish"}

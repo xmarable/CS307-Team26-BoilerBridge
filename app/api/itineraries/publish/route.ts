@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       .lean();
 
     const snapEvents = serializeGroupItineraryEvents(
-      itineraryEvents as Record<string, unknown>[],
+      itineraryEvents as unknown as Record<string, unknown>[],
     );
     const fromCity = trip ? String((trip as { fromCity: string }).fromCity) : "";
     const toCity = trip ? String((trip as { toCity: string }).toCity) : "";
@@ -283,11 +283,12 @@ export async function GET(req: NextRequest) {
       .lean();
 
     if (!doc) {
-      return NextResponse.json({ publication: null });
+      return NextResponse.json({ viewerId: userId, publication: null });
     }
 
     const d = doc as { _id: mongoose.Types.ObjectId; isPublic?: boolean; ownerId: unknown };
     return NextResponse.json({
+      viewerId: userId,
       publication: {
         publicItineraryId: d._id.toString(),
         isPublic: !!d.isPublic,
