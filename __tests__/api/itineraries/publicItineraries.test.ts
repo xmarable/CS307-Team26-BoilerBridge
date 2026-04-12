@@ -43,14 +43,6 @@ let GETPublicDetail: (
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
-  if (
-    process.env.NODE_ENV === "test" &&
-    process.env.MONGODB_URI &&
-    process.env.TEST_MONGODB_URI === process.env.MONGODB_URI
-  ) {
-    process.env.TEST_MONGODB_URI =
-      "mongodb://127.0.0.1:27017/boilerbridge_test_public_itineraries";
-  }
   await dbConnect();
   const pub = await import("@/app/api/itineraries/publish/route");
   POSTPublish = pub.POST as typeof POSTPublish;
