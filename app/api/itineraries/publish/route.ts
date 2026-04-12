@@ -21,6 +21,10 @@ const publishBodySchema = z.object({
   sourceId: z.string().min(1, "sourceId is required"),
 });
 
+const patchBodySchema = publishBodySchema.extend({
+  isPublic: z.boolean(),
+});
+
 export async function POST(req: NextRequest) {
   try {
     await dbConnect();
@@ -191,6 +195,107 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: unknown) {
     console.error("POST /api/itineraries/publish:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+/** Toggle visibility / unpublish. Only the publisher (ownerId) may change this. */
+export async function PATCH(req: NextRequest) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.userId as string | undefined;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const json = await req.json().catch(() => null);
+    const parsed = patchBodySchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid request body" },
+        { status: 400 },
+      );
+    }
+
+    const { sourceType, sourceId, isPublic } = parsed.data;
+
+    if (sourceType === "trip" && !mongoose.Types.ObjectId.isValid(sourceId)) {
+      return NextResponse.json({ error: "Invalid trip id" }, { status: 400 });
+    }
+    if (sourceType === "group") {
+      const uuid = z.string().uuid().safeParse(sourceId);
+      if (!uuid.success) {
+        return NextResponse.json({ error: "Invalid group id" }, { status: 400 });
+      }
+    }
+
+    const doc = await PublicItinerary.findOne({ sourceType, sourceId });
+    if (!doc) {
+      return NextResponse.json({ error: "Publication not found" }, { status: 404 });
+    }
+    if (String(doc.ownerId) !== String(userId)) {
+      return NextResponse.json(
+        { error: "Forbidden: only the publisher can change visibility" },
+        { status: 403 },
+      );
+    }
+
+    doc.isPublic = isPublic;
+    await doc.save();
+
+    return NextResponse.json({
+      message: isPublic ? "Itinerary is now public" : "Itinerary removed from public feed",
+      isPublic: doc.isPublic,
+    });
+  } catch (err: unknown) {
+    console.error("PATCH /api/itineraries/publish:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+/** Current publication row for a source (for publish / unpublish UI). */
+export async function GET(req: NextRequest) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.userId as string | undefined;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const sourceType = searchParams.get("sourceType");
+    const sourceId = searchParams.get("sourceId");
+    const parsed = publishBodySchema.safeParse({ sourceType, sourceId });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "sourceType and sourceId query params are required" },
+        { status: 400 },
+      );
+    }
+
+    const doc = await PublicItinerary.findOne({
+      sourceType: parsed.data.sourceType,
+      sourceId: parsed.data.sourceId,
+    })
+      .select("_id isPublic ownerId")
+      .lean();
+
+    if (!doc) {
+      return NextResponse.json({ publication: null });
+    }
+
+    const d = doc as { _id: mongoose.Types.ObjectId; isPublic?: boolean; ownerId: unknown };
+    return NextResponse.json({
+      publication: {
+        publicItineraryId: d._id.toString(),
+        isPublic: !!d.isPublic,
+        ownerId: String(d.ownerId),
+      },
+    });
+  } catch (err: unknown) {
+    console.error("GET /api/itineraries/publish:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
