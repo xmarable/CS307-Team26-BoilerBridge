@@ -11,7 +11,8 @@ import {
   Settings,
   Users,
   ShieldAlert,
-  Group
+  Group,
+  Globe2,
 } from "lucide-react";
 import { base64 } from "zod";
 
@@ -24,6 +25,11 @@ const navItems = [
     badege: 11,
   },
   { name: "All Trips", href: "/dashboard/alltrips", icon: List },
+  {
+    name: "Public feed",
+    href: "/dashboard/public-itineraries",
+    icon: Globe2,
+  },
   { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/dashboard/discover", icon: TrendingUp },
   {
@@ -52,7 +58,11 @@ export function Sidebar() {
       <nav className="p-4 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive =
+            item.href === "/dashboard/public-itineraries"
+              ? pathname === item.href ||
+                pathname.startsWith(`${item.href}/`)
+              : pathname === item.href;
           const isSOS = item.href === "#sos";
 
           return (
