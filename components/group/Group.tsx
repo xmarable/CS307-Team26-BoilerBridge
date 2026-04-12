@@ -350,7 +350,12 @@ export default function GroupDashboard() {
                   )}
                 </div>
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
-                  <CalendarEventsPanel groupId={groupId!} />
+                  <CalendarEventsPanel
+                    groupId={groupId!}
+                    canPublishItinerary={
+                      userRole === "Leader" || userRole === "Admin"
+                    }
+                  />
                 </div>
               </section>
 

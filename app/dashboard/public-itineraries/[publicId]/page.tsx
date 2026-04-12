@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, Eye, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,14 +19,18 @@ type DetailResponse = {
   snapshot: Record<string, unknown>;
   ownerUsername: string;
   isOwner: boolean;
+  isPublic?: boolean;
 };
 
 export default function PublicItineraryDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const publicId = params?.publicId as string | undefined;
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const viewRecorded = useRef(false);
 
   useEffect(() => {
     if (!publicId) {
@@ -58,6 +62,48 @@ export default function PublicItineraryDetailPage() {
       cancelled = true;
     };
   }, [publicId]);
+
+  useEffect(() => {
+    if (!publicId || !data || viewRecorded.current) return;
+    viewRecorded.current = true;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/itineraries/public/${publicId}/view`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && typeof json.views === "number") {
+          setData((prev) => (prev ? { ...prev, views: json.views } : prev));
+        }
+      } catch {
+        /* ignore view tracking failures */
+      }
+    })();
+  }, [publicId, data]);
+
+  async function handleUnpublish() {
+    if (!data) return;
+    setUnpublishing(true);
+    try {
+      const res = await fetch("/api/itineraries/publish", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          sourceType: data.sourceType,
+          sourceId: data.sourceId,
+          isPublic: false,
+        }),
+      });
+      if (res.ok) {
+        router.push("/dashboard/public-itineraries");
+        return;
+      }
+    } finally {
+      setUnpublishing(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -132,6 +178,18 @@ export default function PublicItineraryDetailPage() {
           <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-wider text-gray-500">
             Read-only
           </span>
+          {data.isOwner && data.isPublic !== false ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-red-200 text-red-700 hover:bg-red-50"
+              disabled={unpublishing}
+              onClick={() => void handleUnpublish()}
+            >
+              {unpublishing ? "Removing…" : "Remove from public feed"}
+            </Button>
+          ) : null}
         </div>
       </div>
 

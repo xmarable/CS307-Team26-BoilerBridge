@@ -50,6 +50,7 @@ export async function GET(
       ownerId: String(d.ownerId),
       ownerUsername,
       isOwner: String(d.ownerId) === viewerId,
+      isPublic: !!d.isPublic,
     });
   } catch (err: unknown) {
     console.error("GET /api/itineraries/public/[publicId]:", err);
