@@ -92,7 +92,12 @@ export function GroupTripView({ initialData }: { initialData: any }) {
             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 items-stretch">
                 <MustHavesSection groupId={group.groupID} />
-                <TimelineSection groupId={group.groupID} />
+                <TimelineSection
+                  groupId={group.groupID}
+                  canPublishItinerary={
+                    userRole === "Leader" || userRole === "Admin"
+                  }
+                />
               </div>
 
               <section className="space-y-6">

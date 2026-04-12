@@ -7,7 +7,7 @@ echo "${CYAN}--- checking ur code ---${NC}"
 echo "checking build and tests before pushing..."
 
 # logic: run the build first since it's most likely to fail
-if npm run build && npm test; then
+if npm run build && npm run test:precommit; then
     echo "${GREEN}--- all clear! pushing to github, if build fails, try again. sometimes it just fails for no reason ---${NC}"
     exit 0
 else
