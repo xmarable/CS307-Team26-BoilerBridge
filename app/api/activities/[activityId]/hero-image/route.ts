@@ -14,6 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ activityId: string }> },
 ) {
   try {
+    // we cast the function to any before calling it to skip the "no exported member" check
     const session = await (getServerSession as any)(authOptions);
     const rawId =
       session?.user && "id" in session.user
@@ -87,7 +88,6 @@ export async function GET(
       },
     });
   } catch (err: unknown) {
-    console.error("GET hero-image error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Server error" },
       { status: 500 },
