@@ -93,6 +93,8 @@ export default function GroupDashboard() {
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
+  const [allowIteneraryShare, setAllowIteneraryShare] = useState(false);
+
   const [expensesTab, setExpensesTab] = useState<
     "summary" | "ledger" | "splits"
   >("summary");
@@ -162,6 +164,19 @@ export default function GroupDashboard() {
       alert("something went wrong");
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleToggle = async () => {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/itenerary/options`, {
+        method: "PATCH",
+        body: JSON.stringify({ allowShare: allowIteneraryShare })
+      });
+
+      setAllowIteneraryShare(!allowIteneraryShare);
+    } catch (e) {
+
     }
   };
 
@@ -343,12 +358,30 @@ export default function GroupDashboard() {
                     </h2>
                   </div>
                   {groupId && (
-                    <Link
-                      href={`/dashboard/groups/${groupId}/trip`}
-                      className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
-                    >
-                      Trip settings
-                    </Link>
+                    <div className="flex flex-l space-x-3 items-center">
+                      <Link
+                        href={`/dashboard/groups/${groupId}/trip`}
+                        className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
+                      >
+                        Trip settings
+                      </Link>
+                      <div className="flex flex-l">
+                        <p className="text-sm text-amber-700">
+                          Allow Share: 
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle()}
+                          className={`relative h-5 w-8 rounded-full transition-all ${allowIteneraryShare ? "bg-amber-500" : "bg-gray-200"
+                            }`}
+                        >
+                          <span
+                            className={`absolute left-0 top-1 h-3 w-3 rounded-full bg-white shadow transition-transform ${allowIteneraryShare ? "translate-x-4" : "translate-x-1"
+                              }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
@@ -557,11 +590,10 @@ export default function GroupDashboard() {
                   <button
                     key={tab}
                     onClick={() => setExpensesTab(tab)}
-                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
-                      expensesTab === tab
-                        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
-                        : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
-                    }`}
+                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${expensesTab === tab
+                      ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
+                      : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
+                      }`}
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
                   </button>
@@ -630,11 +662,10 @@ function SidebarButton({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all duration-300 group ${
-        active
-          ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-xl shadow-amber-200"
-          : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-      }`}
+      className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all duration-300 group ${active
+        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-xl shadow-amber-200"
+        : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+        }`}
     >
       <span
         className={`${active ? "text-white" : "text-gray-300 group-hover:text-amber-500"} transition-colors`}

@@ -225,6 +225,11 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
+    iteneraryId: {
+      type: mongoose.Schema.Types.UUID,
+      //required: true,
+      ref: "Itenerary"
+    },
     notifications: {
       type: [NotificationSchema],
       default: [],
