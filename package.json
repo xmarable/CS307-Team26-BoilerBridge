@@ -15,7 +15,7 @@
   },
   "type": "module",
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "npx patch-package",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
