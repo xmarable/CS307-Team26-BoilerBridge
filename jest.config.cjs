@@ -18,25 +18,30 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "mjs", "json", "node"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
-    // Map .js to $1 for ESM resolution; do not match .mjs (avoid stripping 'm' from .mjs)
     "^(\.{1,2}/.*)(?<!\\.m)\\.js$": "$1",
   },
   transform: {
-    "^.+\.(mt|t|cj|j)sx?$": [
-      "babel-jest",
+    "^.+\\.(mt|t|cj|j)sx?$": [
+      "@swc/jest",
       {
-        presets: [
-          [
-            "@babel/preset-env",
-            { targets: { node: "current" }, modules: false },
-          ],
-          "@babel/preset-typescript",
-          ["@babel/preset-react", { runtime: "automatic" }],
-        ],
-        plugins: ["@babel/plugin-syntax-top-level-await"],
+        jsc: {
+          parser: {
+            syntax: "typescript",
+            tsx: true,
+            dynamicImport: true,
+          },
+          transform: {
+            react: {
+              runtime: "automatic",
+            },
+          },
+          target: "esnext",
+        },
       },
     ],
   },
+  globalTeardown: "<rootDir>/jest.teardown.js",
+  modulePathIgnorePatterns: ["<rootDir>/.next/"],
   transformIgnorePatterns: [
     "/node_modules/(?!(bson|mongodb|mongoose|@mongodb-js|next-auth)/)",
   ],
