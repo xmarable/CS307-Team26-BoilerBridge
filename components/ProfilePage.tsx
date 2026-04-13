@@ -66,7 +66,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
       });
       if (res.ok) setStep("code");
       else alert("Failed to send code");
-    } catch (error) {
+    } catch {
       alert("Error sending code");
     } finally {
       setVLoading(false);
@@ -99,7 +99,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
       } else {
         alert(data.error || "Invalid code");
       }
-    } catch (error) {
+    } catch {
       alert("Error verifying code");
     } finally {
       setVLoading(false);
@@ -161,7 +161,7 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }
-    } catch (error) {
+    } catch {
       alert("An error occurred while saving.");
     } finally {
       setLoading(false);

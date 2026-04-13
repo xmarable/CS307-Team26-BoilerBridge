@@ -1,11 +1,11 @@
 import { jest } from "@jest/globals";
 
-const mockFindById = jest.fn();
-const mockUpdateOne = jest.fn().mockResolvedValue({ acknowledged: true });
-const mockDbConnect = jest.fn().mockResolvedValue(undefined);
+const mockFindById = jest.fn<any>();
+const mockUpdateOne = jest.fn<any>().mockResolvedValue({ acknowledged: true });
+const mockDbConnect = jest.fn<any>().mockResolvedValue(undefined);
 
 let GET: typeof import("@/app/api/activities/[activityId]/route").GET;
-let mockGetServerSession: jest.Mock;
+let mockGetServerSession: jest.Mock<any>;
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -68,7 +68,7 @@ describe("GET /api/activities/[activityId]", () => {
       user: { id: "user1" },
     });
     mockFindById.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(null),
+      lean: jest.fn<any>().mockResolvedValue(null),
     });
     const oid = "507f1f77bcf86cd799439011";
     const req = new Request(`http://localhost/api/activities/${oid}`);
@@ -100,7 +100,7 @@ describe("GET /api/activities/[activityId]", () => {
     };
 
     mockFindById.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(doc),
+      lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
     const oid = "507f1f77bcf86cd799439011";
@@ -136,7 +136,7 @@ describe("GET /api/activities/[activityId]", () => {
     };
 
     mockFindById.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(doc),
+      lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
     const oid = "507f1f77bcf86cd799439011";
@@ -167,7 +167,7 @@ describe("GET /api/activities/[activityId]", () => {
     };
 
     mockFindById.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(doc),
+      lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
     const oid = "507f1f77bcf86cd799439011";

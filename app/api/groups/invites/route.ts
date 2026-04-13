@@ -5,9 +5,10 @@ import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
 ): Promise<NextResponse<{ invites: any[] } | { error: string }>> {
   try {
+    void req; // to silence unused variable warning since we need the function signature to match Next.js expectations
     await dbConnect();
 
     const session = await getServerSession(authOptions);

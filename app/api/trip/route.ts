@@ -116,28 +116,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { primary, rainyDay } = createInitialItinerary(
-      new Date(fromDate),
-      new Date(toDate),
-    );
+    const existing = await Trip.findOne({ groupID });
 
-    const trip = await Trip.create({
-      userId,
-      groupID,
-      fromCity,
-      toCity,
-      fromDate: new Date(fromDate),
-      toDate: new Date(toDate),
-      mode,
-      budget: Number(budget),
-      tripConfirmed: tripConfirmed ?? false,
-      primaryItinerary: primary,
-      rainyDayItinerary: rainyDay,
-      ...(avoidActivities != null && { avoidActivities }),
-      ...(avoidLocations != null && { avoidLocations }),
-      ...(budgetMin != null && { budgetMin }),
-      ...(budgetMax != null && { budgetMax }),
-    });
+    const { primary, rainyDay } = existing
+      ? { primary: existing.primaryItinerary, rainyDay: existing.rainyDayItinerary }
+      : createInitialItinerary(new Date(fromDate), new Date(toDate));
+
+    const trip = await Trip.findOneAndUpdate(
+      { groupID },
+      {
+        $set: {
+          userId,
+          groupID,
+          fromCity,
+          toCity,
+          fromDate: new Date(fromDate),
+          toDate: new Date(toDate),
+          mode,
+          budget: Number(budget),
+          tripConfirmed: tripConfirmed ?? false,
+          primaryItinerary: primary,
+          rainyDayItinerary: rainyDay,
+          ...(avoidActivities != null && { avoidActivities }),
+          ...(avoidLocations != null && { avoidLocations }),
+          ...(budgetMin != null && { budgetMin }),
+          ...(budgetMax != null && { budgetMax }),
+        },
+      },
+      { upsert: true, new: true },
+    );
 
     const t = trip as Record<string, unknown>;
     return NextResponse.json(
@@ -159,7 +166,7 @@ export async function POST(req: NextRequest) {
         budgetMin: t.budgetMin,
         budgetMax: t.budgetMax,
       },
-      { status: 201 },
+      { status: existing ? 200 : 201 },
     );
   } catch (err: any) {
     console.error("POST /api/trip error:", err);

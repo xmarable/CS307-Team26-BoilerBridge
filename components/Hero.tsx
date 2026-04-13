@@ -7,7 +7,7 @@ interface HeroProps {
   readonly user?: any;
 }
 
-export function Hero(user: HeroProps) {
+export function Hero() {
   return (
     <section className="pt-32 pb-16 px-6 lg:px-8 bg-linear-to-b from-amber-50 to-white">
       <div className="mx-auto max-w-7xl">

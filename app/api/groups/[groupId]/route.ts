@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
+import CalendarEvent from "@/models/CalendarEvent";
+import Trip from "@/models/Trip";
 
 export async function GET(
   req: Request,
@@ -96,6 +98,62 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("PATCH group error:", error);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  context: { params: Promise<{ groupId: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.userId;
+
+    if (!userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const { groupId } = await context.params;
+    const { searchParams } = new URL(req.url);
+    const scope = searchParams.get("scope"); // "trip" | "group"
+
+    await dbConnect();
+
+    const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    const group = await TravelGroup.findOne({ groupID: binaryGroupId }).lean();
+
+    if (!group) {
+      return NextResponse.json({ error: "group not found" }, { status: 404 });
+    }
+
+    const isLeader = (group as any).leaderID.toString() === userId.toString();
+    if (!isLeader) {
+      return NextResponse.json(
+        { error: "only the leader can delete the group" },
+        { status: 403 },
+      );
+    }
+
+    if (scope === "trip") {
+      // Delete the Trip document and all calendar events, keep the group
+      await Promise.all([
+        Trip.deleteOne({ groupID: groupId }),
+        CalendarEvent.deleteMany({ groupId }),
+      ]);
+      return NextResponse.json({ ok: true, deleted: "trip" });
+    }
+
+    // Delete the group, its Trip document, and all calendar events
+    await Promise.all([
+      Trip.deleteOne({ groupID: groupId }),
+      CalendarEvent.deleteMany({ groupId }),
+      TravelGroup.deleteOne({ groupID: binaryGroupId }),
+    ]);
+
+    return NextResponse.json({ ok: true, deleted: "group" });
+  } catch (error) {
+    console.error("DELETE group error:", error);
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }

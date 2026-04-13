@@ -1,9 +1,7 @@
 "use client"
 
-import { MessageSquare, Send, Plus, Image, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, Image, Trash2 } from "lucide-react";
 import React, { useEffect, useState, useRef } from "react";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
 
 type GroupSummary = {
     groupID: string;
@@ -77,7 +75,7 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
                 if (!res.ok) return;
 
                 setPhotos(data.images ?? []);
-            } catch (error) {
+            } catch {
 
             } finally {
                 setLoadingPhotos(false);
@@ -101,7 +99,7 @@ export default function GroupPhotosPanel({ activeGroup, userId, isLeader }: { ac
             }
 
             setPhotos((prev) => prev.filter((photo) => photo.photoId !== imageId));
-        } catch (e) {
+        } catch {
 
         }
     }

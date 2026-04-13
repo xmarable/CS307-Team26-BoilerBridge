@@ -1,12 +1,8 @@
 "use client";
-
-import { Mail } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Footer } from "./Footer";
 import { useState } from "react";
 

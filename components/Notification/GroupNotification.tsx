@@ -54,8 +54,6 @@ export default function GroupNotification({ activeGroup }: { activeGroup: GroupS
       method: "POST",
       body: JSON.stringify({ topic: topic, content: content })
     });
-
-    const body = res.json();
     if (!res.ok) {
       setError("Invalid Message");
       setIsSubmitting(false);

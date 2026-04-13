@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 
  
-export default function MobileMenu({ isAuthed }: { isAuthed: boolean }) {
+export default function MobileMenu({ }: { isAuthed: boolean }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   return (

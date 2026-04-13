@@ -16,6 +16,36 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* ── BoilerBridge design tokens ───────────────────────────────────────
+     Usage: bg-bb-surface, text-bb-label, placeholder:text-bb-placeholder
+     Border: border-bb-border, ring-bb-ring
+     Brand:  bg-bb-brand, text-bb-brand, from-bb-brand to-bb-brand-to
+  ────────────────────────────────────────────────────────────────────── */
+
+  /* Brand gradient anchors */
+  --color-bb-brand: #f59e0b; /* amber-500  */
+  --color-bb-brand-to: #ea580c; /* orange-600 */
+
+  /* Surfaces */
+  --color-bb-surface: #ffffff; /* card / panel bg          */
+  --color-bb-surface-subtle: #f9fafb; /* gray-50  – section tint  */
+  --color-bb-surface-inset: #f3f4f6; /* gray-100 – inner bg      */
+
+  /* Text */
+  --color-bb-text: #111827; /* gray-900 – headings       */
+  --color-bb-text-sub: #4b5563; /* gray-600 – body copy      */
+  --color-bb-text-muted: #9ca3af; /* gray-400 – helper text    */
+  --color-bb-placeholder: #d1d5db; /* gray-300 – input placeholder */
+
+  /* Borders & rings */
+  --color-bb-border: #f3f4f6; /* gray-100 – card border    */
+  --color-bb-border-input: #e5e7eb; /* gray-200 – input border   */
+  --color-bb-ring: #fbbf24; /* amber-400 – focus ring    */
+
+  /* Status */
+  --color-bb-danger: #ef4444; /* red-500  */
+  --color-bb-danger-sub: #fef2f2; /* red-50   */
 }
 
 @media (prefers-color-scheme: dark) {

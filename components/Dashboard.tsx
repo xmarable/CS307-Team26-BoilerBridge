@@ -4,19 +4,11 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   Search,
-  Bell,
   Plus,
-  Map,
-  MessageSquare,
-  DollarSign,
-  Settings,
   Calendar,
-  TrendingUp,
-  Clock,
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import Link from "next/link";
 
@@ -100,11 +92,6 @@ interface DashboardProps {
 
 export function Dashboard({ initialData }: DashboardProps) {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState("my-trips");
-
-  // Determine the best name to display
-  const displayName =
-    session?.user?.name || (session?.user as any)?.username || "Boilermaker";
 
   return (
     <div className="p-6 lg:p-8">

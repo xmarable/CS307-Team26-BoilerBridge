@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import TravelGroup from "@/models/TravelGroup";
@@ -21,7 +22,6 @@ const PollDeleteSchema = z.object({
   pollId: z.uuid(),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function verifyUser(params: Promise<any>) {
   // Verify user logged in
   const session = await getServerSession(authOptions);
@@ -29,7 +29,6 @@ async function verifyUser(params: Promise<any>) {
   if (!userId) {
     return null;
   }
-  // console.log(userId);
 
   // Verify user exists
   await dbConnect();
@@ -47,7 +46,6 @@ async function verifyUser(params: Promise<any>) {
   }
 
   // Verify user in member list
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (!group.membersList.some((m: any) => m.userId.toString() === userId)) {
     return null;
   }
@@ -68,9 +66,8 @@ export async function POST(
   const body = await req.json();
   const poll = PollSchema.safeParse(body);
   if (!poll.success) {
-    console.log(poll.error);
     return NextResponse.json(
-      { error: poll.error.issues, details: poll.error },
+      { error: "validation failed", details: poll.error.flatten() },
       { status: 400 },
     );
   }
@@ -86,7 +83,6 @@ export async function POST(
     endsAt: poll.data.endsAt,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   info.group.polls.push(newPoll as any);
   await info.group.save();
 
@@ -121,7 +117,7 @@ export async function DELETE(
   const pollId = PollDeleteSchema.safeParse(body);
   if (!pollId.success) {
     return NextResponse.json(
-      { error: "Poll deletion", details: pollId.error.flatten() },
+      { error: "Poll deletion failed", details: pollId.error.flatten() },
       { status: 400 },
     );
   }
