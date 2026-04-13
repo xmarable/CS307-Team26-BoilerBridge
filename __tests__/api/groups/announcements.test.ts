@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 
 let POST: any, GET: any, DELETE: any;
 let User: any, TravelGroup: any, dbConnect: any, bcrypt: any;
-let mockGetServerSession: jest.MockedFunction<any>;
+
+let mockGetServerSession: jest.Mock<any>;
 
 let groupUUID: string;
 let leaderId: string, leaderEmail: string;
@@ -21,13 +22,13 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
-  ({ default: bcrypt } = await import("bcryptjs"));
-  ({ default: dbConnect } = await import("@/lib/dbConnect"));
-  ({ default: User } = await import("@/models/User"));
-  ({ default: TravelGroup } = await import("@/models/TravelGroup"));
+  ({ default: bcrypt } = (await import("bcryptjs")) as any);
+  ({ default: dbConnect } = (await import("@/lib/dbConnect")) as any);
+  ({ default: User } = (await import("@/models/User")) as any);
+  ({ default: TravelGroup } = (await import("@/models/TravelGroup")) as any);
 
   await dbConnect();
   await TravelGroup.deleteMany({});
@@ -72,9 +73,8 @@ beforeAll(async () => {
 
   groupUUID = group.groupID.toString();
 
-  const route = await import(
-    "@/app/api/groups/[groupId]/announcements/route"
-  );
+  const route =
+    (await import("@/app/api/groups/[groupId]/announcements/route")) as any;
   POST = route.POST;
   GET = route.GET;
   DELETE = route.DELETE;
@@ -94,14 +94,11 @@ afterAll(async () => {
 beforeEach(() => jest.clearAllMocks());
 
 function makePostReq(gId: string, body: object) {
-  return new Request(
-    `http://localhost/api/groups/${gId}/announcements`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  return new Request(`http://localhost/api/groups/${gId}/announcements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function makeGetReq(gId: string) {
@@ -109,14 +106,11 @@ function makeGetReq(gId: string) {
 }
 
 function makeDeleteReq(gId: string, body: object) {
-  return new Request(
-    `http://localhost/api/groups/${gId}/announcements`,
-    {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  return new Request(`http://localhost/api/groups/${gId}/announcements`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 const ctx = (gId: string) => ({
@@ -126,7 +120,10 @@ const ctx = (gId: string) => ({
 describe("POST /api/groups/:groupId/announcements", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
-    const res = await POST(makePostReq(groupUUID, { content: "hi" }), ctx(groupUUID));
+    const res = await POST(
+      makePostReq(groupUUID, { content: "hi" }),
+      ctx(groupUUID),
+    );
     expect(res.status).toBe(401);
   });
 
@@ -172,7 +169,6 @@ describe("POST /api/groups/:groupId/announcements", () => {
 
 describe("GET /api/groups/:groupId/announcements", () => {
   it("returns announcements sorted newest first", async () => {
-    // seed a second announcement
     mockGetServerSession.mockResolvedValue({
       user: { email: leaderEmail },
       expires: "9999",
@@ -186,7 +182,6 @@ describe("GET /api/groups/:groupId/announcements", () => {
     expect(res.status).toBe(200);
     const list = await res.json();
     expect(Array.isArray(list)).toBe(true);
-    // newest should be first
     if (list.length > 1) {
       const t0 = new Date(list[0].timestamp).getTime();
       const t1 = new Date(list[1].timestamp).getTime();
@@ -233,7 +228,6 @@ describe("DELETE /api/groups/:groupId/announcements", () => {
   });
 
   it("leader can delete an existing announcement", async () => {
-    // first create one to get its ID
     mockGetServerSession.mockResolvedValue({
       user: { email: leaderEmail },
       expires: "9999",

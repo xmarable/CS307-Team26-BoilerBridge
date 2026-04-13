@@ -20,7 +20,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -73,9 +73,7 @@ beforeAll(async () => {
   POLL_GET = pollRoute.GET;
   POLL_DELETE = pollRoute.DELETE;
 
-  const voteRoute = await import(
-    "@/app/api/groups/[groupId]/polls/vote/route"
-  );
+  const voteRoute = await import("@/app/api/groups/[groupId]/polls/vote/route");
   VOTE_POST = voteRoute.POST;
 });
 
@@ -137,7 +135,10 @@ const validPoll = () => ({
 describe("POST /api/groups/:groupId/polls", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
-    const res = await POLL_POST(pollReq(groupUUID, validPoll()), ctx(groupUUID));
+    const res = await POLL_POST(
+      pollReq(groupUUID, validPoll()),
+      ctx(groupUUID),
+    );
     expect(res.status).toBe(401);
   });
 
@@ -146,7 +147,10 @@ describe("POST /api/groups/:groupId/polls", () => {
       user: { userId: outsiderId },
       expires: "9999",
     });
-    const res = await POLL_POST(pollReq(groupUUID, validPoll()), ctx(groupUUID));
+    const res = await POLL_POST(
+      pollReq(groupUUID, validPoll()),
+      ctx(groupUUID),
+    );
     expect(res.status).toBe(401);
   });
 
@@ -179,7 +183,10 @@ describe("POST /api/groups/:groupId/polls", () => {
       user: { userId: memberId },
       expires: "9999",
     });
-    const res = await POLL_POST(pollReq(groupUUID, validPoll()), ctx(groupUUID));
+    const res = await POLL_POST(
+      pollReq(groupUUID, validPoll()),
+      ctx(groupUUID),
+    );
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.polls.question).toBe("Which city should we visit?");
@@ -253,7 +260,10 @@ describe("POST /api/groups/:groupId/polls/vote", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await POLL_POST(pollReq(groupUUID, validPoll()), ctx(groupUUID));
+    const res = await POLL_POST(
+      pollReq(groupUUID, validPoll()),
+      ctx(groupUUID),
+    );
     const data = await res.json();
     activePollId = data.polls.pollId;
   });

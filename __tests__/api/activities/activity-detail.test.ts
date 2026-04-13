@@ -25,8 +25,8 @@ await jest.unstable_mockModule("@/models/Activity", () => ({
 
 beforeAll(async () => {
   jest.resetModules();
-  const nextAuth = await import("next-auth");
-  mockGetServerSession = nextAuth.getServerSession as unknown as jest.Mock;
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession;
 
   const route = await import("@/app/api/activities/[activityId]/route");
   GET = route.GET;

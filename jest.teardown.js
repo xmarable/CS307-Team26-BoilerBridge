@@ -1,12 +1,16 @@
-import { disconnect } from "mongoose";
+import mongoose from "mongoose";
 
-// eslint-disable-next-line import/no-anonymous-default-export
-export default async () => {
-  await disconnect();
-  console.log("👋 all db connections closed");
+const teardown = async () => {
+  try {
+    // wait for mongoose to close everything properly
+    await mongoose.connection.close();
+    await mongoose.disconnect();
 
-  // give it a tiny bit of time to log and then kill the process
-  if (process.env.NODE_ENV === "test") {
-    process.exit(0);
+    console.log("👋 all db connections closed");
+  } catch (err) {
+    console.error("error during teardown:", err);
   }
+  // DO NOT use process.exit(0) here
 };
+
+export default teardown;
