@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ activityId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await (getServerSession as any)(authOptions);
     const rawId =
       session?.user && "id" in session.user
         ? (session.user as { id: string }).id
