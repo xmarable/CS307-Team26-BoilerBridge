@@ -7,7 +7,7 @@ interface HeroProps {
   readonly user?: any;
 }
 
-export function Hero() {
+export function Hero({ user }: HeroProps) {
   return (
     <section className="pt-32 pb-16 px-6 lg:px-8 bg-linear-to-b from-amber-50 to-white">
       <div className="mx-auto max-w-7xl">
@@ -17,23 +17,23 @@ export function Hero() {
               <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
               <span className="text-sm">Made for College Students</span>
             </div>
-            
+
             <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Plan Group Trips{" "}
               <span className="bg-linear-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
                 Without the Chaos
               </span>
             </h1>
-            
+
             <p className="text-xl text-gray-600">
-              Coordinate with friends, split costs, and create unforgettable memories. 
-              BoilerBridge makes group travel planning actually fun.
+              Coordinate with friends, split costs, and create unforgettable
+              memories. BoilerBridge makes group travel planning actually fun.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
               <Link href="/signin">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-lg text-white"
                 >
                   Start Planning Free
@@ -64,7 +64,7 @@ export function Hero() {
 
           <div className="relative">
             <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl">
-              { }
+              {}
               <img
                 src="https://images.unsplash.com/photo-1586195518174-b88cd52f6571?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2xsZWdlJTIwc3R1ZGVudHMlMjBncm91cCUyMHRyYXZlbHxlbnwxfHx8fDE3NzEwMDI5Njd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
                 alt="College students planning trip together"

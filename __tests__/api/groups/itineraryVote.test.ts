@@ -19,7 +19,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 // ── Mock Pusher so POST/DELETE don't need real credentials ──────────────────
 jest.unstable_mockModule("pusher", () => ({
   default: jest.fn().mockImplementation(() => ({
-    trigger: jest.fn().mockResolvedValue(undefined),
+    trigger: (jest.fn() as any).mockResolvedValue(undefined),
   })),
 }));
 

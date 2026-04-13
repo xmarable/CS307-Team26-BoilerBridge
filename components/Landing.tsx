@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Hero } from "./Hero";
@@ -11,7 +12,7 @@ interface LandingProps {
   readonly user?: any;
 }
 
-export function Landing(user: LandingProps) {
+export function Landing({ user }: LandingProps) {
   return (
     <div className="min-h-screen bg-white">
       <main>

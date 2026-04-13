@@ -15,6 +15,7 @@
   },
   "type": "module",
   "scripts": {
+    "preinstall": "node -e \"if(process.version.split('.')[0].replace('v','') < 22) { console.error('\\n🚨 FATAL ERROR: node 22 is required. u r on ' + process.version + '\\nplease update node or use nvm install 22 && nvm use 22\\n'); process.exit(1); }\"",
     "postinstall": "npx patch-package",
     "dev": "next dev",
     "build": "next build",

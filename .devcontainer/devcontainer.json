@@ -1,6 +1,6 @@
 {
   "name": "BoilerBridge Dev Environment",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "moby": false

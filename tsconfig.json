@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "types": ["jest", "node"],
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -9,6 +8,7 @@
     "noEmit": true,
     "noImplicitAny": false,
     "esModuleInterop": true,
+    "noUnusedLocals": false,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
