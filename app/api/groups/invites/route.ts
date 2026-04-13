@@ -6,6 +6,7 @@ import TravelGroup from "@/models/TravelGroup";
 
 export async function GET(
   req: NextRequest,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<NextResponse<{ invites: any[] } | { error: string }>> {
   try {
     void req; // to silence unused variable warning since we need the function signature to match Next.js expectations
