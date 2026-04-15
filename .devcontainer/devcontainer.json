@@ -23,7 +23,6 @@
         "prisma.prisma"
       ],
       "settings": {
-        "workbench.colorTheme": "Default Dark Modern",
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
@@ -34,9 +33,15 @@
           "**/.git/objects/**": true,
           "**/.git/subtree-entries/**": true,
           "**/node_modules/**": true,
-          "**/.next/**": true
+          "**/.next/**": true,
+          "**/dist/**": true
         },
-        "terminal.integrated.defaultProfile.linux": "zsh"
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "js/ts.tsserver.maxMemory": 4096,
+        "typescript.tsserver.useSeparateSyntaxServer": false,
+        "js/ts.tsserver.automaticTypeAcquisition.enabled": false,
+        "git.autorefresh": false,
+        "git.enabled": true
       }
     }
   },

@@ -23,15 +23,30 @@ export async function GET(
     const { groupId } = await context.params;
     await dbConnect();
 
-    const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    // validate the uuid format to prevent mongoose errors
+    let binaryGroupId;
+    try {
+      // strip hyphens if they exist to get clean hex
+      const cleanHex = groupId.replace(/-/g, "");
+      binaryGroupId = mongoose.Types.UUID.createFromHexString(cleanHex);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+      // fallback just in case the string is already formatted
+      binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    }
+
+    // query using both the id and membership to verify it exists for this user
     const groupDoc = await TravelGroup.findOne({
       groupID: binaryGroupId,
+      "membersList.userId": userId,
     }).lean();
 
     if (!groupDoc) {
+      console.error(`Group not found for ID: ${groupId}`);
       return NextResponse.json({ error: "group not found" }, { status: 404 });
     }
 
+    // compare userIds as strings to avoid objectid vs uuid comparison issues
     const isMember = groupDoc.membersList.some(
       (m: any) => m.userId.toString() === userId.toString(),
     );
