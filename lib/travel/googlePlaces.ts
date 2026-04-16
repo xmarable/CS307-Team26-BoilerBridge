@@ -217,25 +217,13 @@ async function legacyPlaceDetails(
   return mapLegacyDetailsToEnrichment(json.result, id);
 }
 
-export type PlacesTextSearchBias = {
-  latitude: number;
-  longitude: number;
-  /** Meters; default applied by callers when omitted. */
-  radiusMeters?: number;
-};
-
 async function legacyTextSearchThenDetails(
   apiKey: string,
   textQuery: string,
-  bias?: PlacesTextSearchBias | null,
 ): Promise<GooglePlaceEnrichment | null> {
   const u = new URL(LEGACY_TEXTSEARCH);
   u.searchParams.set("query", textQuery);
   u.searchParams.set("key", apiKey);
-  if (bias && Number.isFinite(bias.latitude) && Number.isFinite(bias.longitude)) {
-    u.searchParams.set("location", `${bias.latitude},${bias.longitude}`);
-    u.searchParams.set("radius", String(bias.radiusMeters ?? 45000));
-  }
 
   const sRes = await fetch(u.toString(), fetchOpts);
   const sJson = (await sRes.json()) as {
@@ -403,31 +391,9 @@ async function placeDetails(
 /**
  * Text search returns top match place id, then Place Details fills reviews, links, summary.
  */
-function buildTextSearchBody(
-  textQuery: string,
-  bias?: PlacesTextSearchBias | null,
-): string {
-  const q = textQuery.trim();
-  const body: Record<string, unknown> = { textQuery: q, languageCode: "en" };
-  if (
-    bias &&
-    Number.isFinite(bias.latitude) &&
-    Number.isFinite(bias.longitude)
-  ) {
-    body.locationBias = {
-      circle: {
-        center: { latitude: bias.latitude, longitude: bias.longitude },
-        radius: bias.radiusMeters ?? 45000,
-      },
-    };
-  }
-  return JSON.stringify(body);
-}
-
 async function textSearchThenDetails(
   apiKey: string,
   textQuery: string,
-  bias?: PlacesTextSearchBias | null,
 ): Promise<GooglePlaceEnrichment | null> {
   const q = textQuery.trim();
   if (!q) return null;
@@ -440,7 +406,7 @@ async function textSearchThenDetails(
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask": SEARCH_FIELD_MASK_MIN,
     },
-    body: buildTextSearchBody(q, bias),
+    body: JSON.stringify({ textQuery: q, languageCode: "en" }),
   });
 
   if (!res.ok) {
@@ -449,7 +415,7 @@ async function textSearchThenDetails(
       console.warn(
         "[Google Places] Text Search (New) disabled in GCP — using legacy textsearch + details.",
       );
-      return legacyTextSearchThenDetails(apiKey, q, bias);
+      return legacyTextSearchThenDetails(apiKey, q);
     }
     console.error(
       "[Google Places] searchText failed:",
@@ -513,15 +479,10 @@ async function legacyTextSearchMulti(
   apiKey: string,
   textQuery: string,
   maxResults: number,
-  bias?: PlacesTextSearchBias | null,
 ): Promise<GooglePlaceSearchHit[]> {
   const u = new URL(LEGACY_TEXTSEARCH);
   u.searchParams.set("query", textQuery.trim());
   u.searchParams.set("key", apiKey);
-  if (bias && Number.isFinite(bias.latitude) && Number.isFinite(bias.longitude)) {
-    u.searchParams.set("location", `${bias.latitude},${bias.longitude}`);
-    u.searchParams.set("radius", String(bias.radiusMeters ?? 45000));
-  }
 
   const res = await fetch(u.toString(), fetchOpts);
   const json = (await res.json()) as {
@@ -561,7 +522,6 @@ async function newTextSearchMulti(
   apiKey: string,
   textQuery: string,
   maxResults: number,
-  bias?: PlacesTextSearchBias | null,
 ): Promise<GooglePlaceSearchHit[]> {
   const q = textQuery.trim();
   if (!q) return [];
@@ -575,7 +535,7 @@ async function newTextSearchMulti(
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": fieldMask,
       },
-      body: buildTextSearchBody(q, bias),
+      body: JSON.stringify({ textQuery: q, languageCode: "en" }),
     });
   };
 
@@ -583,7 +543,7 @@ async function newTextSearchMulti(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     if (shouldFallbackToLegacyPlaces(body)) {
-      return legacyTextSearchMulti(apiKey, q, maxResults, bias);
+      return legacyTextSearchMulti(apiKey, q, maxResults);
     }
     if (res.status === 400) {
       res = await post(SEARCH_FIELD_MASK_MIN);
@@ -609,10 +569,6 @@ async function newTextSearchMulti(
   return out;
 }
 
-export type SearchPlacesTextOptions = {
-  bias?: PlacesTextSearchBias | null;
-};
-
 /**
  * Multiple text-search hits for discovery UI (no Place Details round-trip per row).
  */
@@ -620,13 +576,12 @@ export async function searchPlacesText(
   apiKey: string | undefined | null,
   textQuery: string,
   maxResults = 8,
-  options?: SearchPlacesTextOptions | null,
 ): Promise<GooglePlaceSearchHit[]> {
   const key = apiKey?.trim();
   const q = textQuery.trim();
   if (!key || q.length < 2) return [];
   const cap = Math.min(Math.max(maxResults, 1), 12);
-  return newTextSearchMulti(key, q, cap, options?.bias ?? null);
+  return newTextSearchMulti(key, q, cap);
 }
 
 /** Build a Google image URL for server-side fetch only (API key as query param). */
@@ -667,8 +622,6 @@ export async function fetchGooglePlaceEnrichment(
   options: {
     placeId?: string | null;
     fallbackTextQuery?: string | null;
-    /** Biases text search toward the trip destination (or similar). */
-    textSearchBias?: PlacesTextSearchBias | null;
   },
 ): Promise<GooglePlaceEnrichment | null> {
   const key = apiKey.trim();
@@ -683,11 +636,7 @@ export async function fetchGooglePlaceEnrichment(
   }
 
   if (options.fallbackTextQuery?.trim()) {
-    return textSearchThenDetails(
-      key,
-      options.fallbackTextQuery.trim(),
-      options.textSearchBias ?? null,
-    );
+    return textSearchThenDetails(key, options.fallbackTextQuery.trim());
   }
 
   return null;

@@ -23,19 +23,6 @@ function normalize(s: string): string {
  * Returns true if the item should be excluded because its name or address
  * matches any entry in avoidActivities or avoidLocations.
  */
-export function matchesAvoidList(
-  title: string,
-  location: string | undefined,
-  avoidActivities: string[],
-  avoidLocations: string[],
-): boolean {
-  return shouldExclude(
-    { name: title, address: location },
-    avoidActivities,
-    avoidLocations,
-  );
-}
-
 function shouldExclude(
   item: RecommendableItem,
   avoidActivities: string[],

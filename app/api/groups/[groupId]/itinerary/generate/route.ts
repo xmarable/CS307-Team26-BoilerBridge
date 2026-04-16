@@ -7,12 +7,8 @@ import { getMemberPermissions } from "@/lib/roles";
 import {
   generateFullTripEvents,
   type MustHaveContext,
+  type TripContext,
 } from "@/lib/itinerary/generateFull";
-import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationContext";
-import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
-import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
-import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
-import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
 
 import CalendarEvent from "@/models/CalendarEvent";
 import MustHave from "@/models/MustHave";
@@ -54,32 +50,16 @@ export async function POST(
       );
     }
 
-    let selectedTripId: string | undefined;
-    try {
-      const body = (await req.json()) as { tripId?: unknown };
-      if (typeof body?.tripId === "string" && body.tripId.trim().length > 0) {
-        selectedTripId = body.tripId.trim();
-      }
-    } catch {
-      // Empty body is valid; fallback to latest trip for the group.
-    }
-
-    const trip = selectedTripId
-      ? await Trip.findOne({
-          _id: selectedTripId as never,
-          groupID: groupId as never,
-        }).lean()
-      : await Trip.findOne({ groupID: groupId as never })
-          .sort({ createdAt: -1 })
-          .lean();
+    const trip = await Trip.findOne({ groupID: groupId as never })
+      .sort({ createdAt: -1 })
+      .lean();
     if (!trip) {
       return NextResponse.json(
         {
-          error: selectedTripId
-            ? "The selected trip could not be found for this group."
-            : "No trip is set up for this group yet. Use Trip settings next to Timeline (group page) to add route, dates, and budget, then try again.",
+          error:
+            "No trip is set up for this group yet. Use Trip settings next to Timeline (group page) to add route, dates, and budget, then try again.",
         },
-        { status: selectedTripId ? 400 : 404 },
+        { status: 404 },
       );
     }
 
@@ -105,28 +85,30 @@ export async function POST(
       address: (m as { address?: string }).address,
       category: (m as { category?: string }).category,
       notes: (m as { notes?: string }).notes,
-      placeId:
-        typeof (m as { placeId?: string }).placeId === "string"
-          ? (m as { placeId?: string }).placeId
-          : undefined,
     }));
 
-    const tripCtx = mapTripToGenerationContext({
-      ...(trip as Record<string, unknown>),
+    if (approvedMustHaves.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No approved must-haves found. Please approve at least one place to generate an itinerary.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const tripCtx: TripContext = {
+      fromCity: String((trip as { fromCity: string }).fromCity),
+      toCity: String((trip as { toCity: string }).toCity),
       fromDate: startDate,
       toDate: endDate,
-    });
+      mode: String((trip as { mode: string }).mode),
+      budget: Number((trip as { budget: number }).budget),
+    };
 
     let proposed;
     try {
       proposed = await generateFullTripEvents(tripCtx, approvedMustHaves);
-      proposed = normalizeProposedTimeline(proposed, { trip: tripCtx });
-      proposed = filterProposedEventsByAvoidLists(
-        proposed,
-        tripCtx.avoidActivities ?? [],
-        tripCtx.avoidLocations ?? [],
-        approvedMustHaves,
-      );
     } catch (e) {
       console.error("Ollama full itinerary generation:", e);
       const msg = e instanceof Error ? e.message : String(e);
@@ -144,30 +126,17 @@ export async function POST(
       source: "itinerary",
     } as never);
 
-    let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
-    linkRows = await augmentResolvedLinksWithTextSearch(proposed, linkRows, {
-      toCity: tripCtx.toCity,
-      fromCity: tripCtx.fromCity,
-    });
-
-    const destCity = tripCtx.toCity?.trim() ?? "";
-
-    const docs = proposed.map((ev, i) => ({
+    const docs = proposed.map((ev) => ({
       title: ev.title,
       description: ev.description,
       startTime: ev.startTime,
       endTime: ev.endTime,
-      location: linkRows[i]?.linkedLocationHint?.trim() || ev.location,
+      location: ev.location,
       eventType: ev.eventType ?? "general",
       createdBy: userId,
       groupId,
       source: "itinerary" as const,
       timezone: ev.timezone ?? "UTC",
-      ...(destCity ? { itineraryDestinationCity: destCity } : {}),
-      ...(linkRows[i]?.linkedActivityId
-        ? { linkedActivityId: linkRows[i]!.linkedActivityId }
-        : {}),
-      ...(linkRows[i]?.linkedPlaceId ? { linkedPlaceId: linkRows[i]!.linkedPlaceId } : {}),
     }));
 
     const created = await CalendarEvent.insertMany(docs);

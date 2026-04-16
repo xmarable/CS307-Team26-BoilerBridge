@@ -20,6 +20,4 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 EXPOSE 3000
 
-# Wait for Ollama, then pull the default small model so /api/chat does not 404 on first use.
-# Override with OLLAMA_MODEL in docker-compose or .env.local.
-CMD ["sh", "-c", "ollama serve & sleep 2; i=0; while [ \"$i\" -lt 45 ]; do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; i=$((i+1)); sleep 1; done; ollama pull \"${OLLAMA_MODEL:-llama3.2:1b}\" || echo \"[ollama] model pull failed; run: ollama pull ${OLLAMA_MODEL:-llama3.2:1b}\"; exec npm run dev"]
+CMD ["sh", "-c", "ollama serve & sleep 5 && npm run dev || tail -f /dev/null"]

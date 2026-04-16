@@ -21,23 +21,18 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const placeId = searchParams.get("placeId")?.trim();
-    const name = searchParams.get("name")?.trim() || "Place";
-    const address = searchParams.get("address")?.trim() || undefined;
-    const destinationCity = searchParams.get("destination")?.trim() || undefined;
-
-    if (!placeId && (!name || name.trim().length < 2)) {
-      return NextResponse.json(
-        { error: "Provide placeId, or name with at least 2 characters." },
-        { status: 400 },
-      );
+    if (!placeId) {
+      return NextResponse.json({ error: "placeId is required" }, { status: 400 });
     }
 
+    const name = searchParams.get("name")?.trim() || "Place";
+    const address = searchParams.get("address")?.trim() || undefined;
+
     const payload = await enrichActivityForApi({
-      ...(placeId ? { placeId } : {}),
-      name: name.trim() || "Place",
+      placeId,
+      name,
       address,
       reviewCount: 0,
-      ...(destinationCity ? { destinationCity } : {}),
     });
 
     return NextResponse.json({ ...payload, isPreview: true });

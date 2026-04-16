@@ -324,60 +324,6 @@ describe("POST /api/groups/[groupId]/itinerary/regenerate", () => {
     await TravelGroup.deleteOne({ groupID });
     await User.deleteOne({ userId: leaderId });
   });
-
-  it("passes current trip avoid lists and budget range into partial generator input (US14)", async () => {
-    const { leaderId, groupID } = await createLeaderAndGroup();
-
-    await Trip.updateOne(
-      { groupID },
-      {
-        $set: {
-          avoidActivities: ["Zoo", "Nightclub"],
-          avoidLocations: ["Strip"],
-          budgetMin: 50,
-          budgetMax: 400,
-        },
-      },
-    );
-
-    const ev = await CalendarEvent.create({
-      title: "Brunch",
-      startTime: new Date("2026-06-03T12:00:00Z"),
-      endTime: new Date("2026-06-03T13:00:00Z"),
-      createdBy: leaderId,
-      groupId: groupID,
-      source: "itinerary",
-    });
-
-    mockGetServerSession.mockResolvedValue({
-      user: { userId: leaderId, email: "x@test.com" },
-      expires: "9999-12-31T23:59:59.999Z",
-    });
-
-    const req = new Request(
-      `http://localhost/api/groups/${groupID}/itinerary/regenerate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventIds: [String(ev._id)] }),
-      },
-    );
-
-    const res = await POSTRegenerate(req, {
-      params: Promise.resolve({ groupId: groupID }),
-    });
-    expect(res.status).toBe(200);
-
-    expect(lastGenerateInput?.trip.avoidActivities).toEqual(["Zoo", "Nightclub"]);
-    expect(lastGenerateInput?.trip.avoidLocations).toEqual(["Strip"]);
-    expect(lastGenerateInput?.trip.budgetMin).toBe(50);
-    expect(lastGenerateInput?.trip.budgetMax).toBe(400);
-
-    await CalendarEvent.deleteMany({ groupId: groupID });
-    await Trip.deleteMany({ groupID });
-    await TravelGroup.deleteOne({ groupID });
-    await User.deleteOne({ userId: leaderId });
-  });
 });
 
 describe("POST /api/groups/[groupId]/itinerary/regenerate/apply", () => {

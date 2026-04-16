@@ -13,9 +13,6 @@ import {
   generatePartialItinerary,
   type GeneratePartialItineraryInput,
 } from "@/lib/itinerary/generatePartial";
-import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationContext";
-import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
-import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
 
 const RegenerateBodySchema = z
   .object({
@@ -192,11 +189,14 @@ export async function POST(
       }
     }
 
-    const tripCtx = mapTripToGenerationContext({
-      ...(trip as Record<string, unknown>),
+    const tripCtx: GeneratePartialItineraryInput["trip"] = {
+      fromCity: String((trip as { fromCity: string }).fromCity),
+      toCity: String((trip as { toCity: string }).toCity),
       fromDate: new Date((trip as { fromDate: Date }).fromDate),
       toDate: new Date((trip as { toDate: Date }).toDate),
-    }) satisfies GeneratePartialItineraryInput["trip"];
+      mode: String((trip as { mode: string }).mode),
+      budget: Number((trip as { budget: number }).budget),
+    };
 
     const approvedMustHaves: GeneratePartialItineraryInput["approvedMustHaves"] =
       mustHaveDocs.map((m) => ({
@@ -204,7 +204,6 @@ export async function POST(
         address: m.address ?? undefined,
         category: m.category ?? undefined,
         notes: m.notes ?? undefined,
-        placeId: typeof m.placeId === "string" ? m.placeId : undefined,
       }));
 
     const targetEvents: GeneratePartialItineraryInput["targetEvents"] =
@@ -217,18 +216,11 @@ export async function POST(
         eventType: e.eventType,
       }));
 
-    let proposed = await generatePartialItinerary({
+    const proposed = await generatePartialItinerary({
       trip: tripCtx,
       approvedMustHaves,
       targetEvents,
     });
-    proposed = normalizeProposedTimeline(proposed, { trip: tripCtx, slice: true });
-    proposed = filterProposedEventsByAvoidLists(
-      proposed,
-      tripCtx.avoidActivities ?? [],
-      tripCtx.avoidLocations ?? [],
-      approvedMustHaves,
-    );
 
     const originals = targetDocs.map(serializeEvent);
     const proposedSerialized = proposed.map((p) => serializeProposed(p));

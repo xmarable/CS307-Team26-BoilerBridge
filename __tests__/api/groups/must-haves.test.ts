@@ -27,21 +27,6 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 
 await jest.unstable_mockModule("@/lib/itinerary/generateFull", () => ({
   generateFullTripEvents: jest.fn(async (ctx: any, mustHaves: any[]) => {
-    if (!mustHaves.length) {
-      const s = new Date(ctx.fromDate.getTime() + 10 * 3600000);
-      const e = new Date(ctx.fromDate.getTime() + 12 * 3600000);
-      return [
-        {
-          title: `Explore ${ctx.toCity}`,
-          description: "Mock itinerary with no must-haves",
-          startTime: s,
-          endTime: e,
-          location: ctx.toCity,
-          eventType: "activity",
-          timezone: "UTC",
-        },
-      ];
-    }
     return mustHaves.map((mh: any, i: number) => ({
       title: mh.name,
       description: mh.notes || "Mock description",
@@ -652,19 +637,17 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     });
     expect(res.status).toBe(200);
     const data = await res.json();
-    // finalizeItineraryProposedEvents injects outbound + return travel for intercity trips
-    expect(data.count).toBe(4);
+    expect(data.count).toBe(2);
     expect(data.message).toMatch(/itinerary/i);
 
     const events = await CalendarEvent.find({
       groupId: groupUUID,
       source: "itinerary",
     } as any);
-    expect(events.length).toBe(4);
+    expect(events.length).toBe(2);
     const titles = events.map((e: { title: any }) => e.title);
     expect(titles).toContain("Eiffel Tower");
     expect(titles).toContain("Louvre Museum");
-    expect(titles.some((t: string) => /Travel:.*→/.test(t))).toBe(true);
   });
 
   it("prioritizes higher-priority must-haves (sorted by priority desc)", async () => {
@@ -677,12 +660,7 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       groupId: groupUUID,
       source: "itinerary",
     } as any).sort({ startTime: 1 });
-    const eiffel = events.find((ev: { title: string }) => ev.title === "Eiffel Tower");
-    const louvre = events.find((ev: { title: string }) => ev.title === "Louvre Museum");
-    expect(eiffel && louvre).toBeTruthy();
-    expect(new Date(eiffel.startTime).getTime()).toBeLessThan(
-      new Date(louvre.startTime).getTime(),
-    );
+    expect(events[0].title).toBe("Eiffel Tower");
   });
 
   it("does not include proposed or rejected must-haves in the itinerary", async () => {
@@ -722,7 +700,7 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     expect(titles).not.toContain("Rejected Spot");
   });
 
-  it("still generates an itinerary when no approved must-haves exist", async () => {
+  it("returns 400 when no approved must-haves exist", async () => {
     const hash = await bcrypt.hash("pass", 10);
     const emptyLeader = await User.create({
       username: "gen_empty_leader",
@@ -756,9 +734,9 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     const res = await GENERATE(makeGenerateRequest(emptyUUID), {
       params: Promise.resolve({ groupId: emptyUUID }),
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const data = await res.json();
-    expect(data.count).toBeGreaterThan(0);
+    expect(data.error).toMatch(/no approved/i);
   });
 
   it("returns 404 when no trip is found for the group", async () => {

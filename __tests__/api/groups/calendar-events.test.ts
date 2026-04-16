@@ -145,19 +145,13 @@ function makeDeleteRequest(gId: string, eventId: string) {
 const futureStart = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
 const futureEnd = () => new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
-/** startHoursFromNow avoids overlapping other tests' persisted events. */
-const validEvent = (opts?: { title?: string; startHoursFromNow?: number }) => {
-  const hours = opts?.startHoursFromNow ?? 1;
-  const start = new Date(Date.now() + hours * 60 * 60 * 1000);
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
-  return {
-    title: opts?.title ?? "Team Dinner",
-    startTime: start.toISOString(),
-    endTime: end.toISOString(),
-    location: "The Capital Grille",
-    eventType: "food",
-  };
-};
+const validEvent = () => ({
+  title: "Team Dinner",
+  startTime: futureStart(),
+  endTime: futureEnd(),
+  location: "The Capital Grille",
+  eventType: "food",
+});
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 
@@ -358,42 +352,12 @@ describe("POST /api/groups/:groupId/calendar/events", () => {
       expires: "9999",
     });
     const res = await POST(
-      makePostRequest(
-        groupUUID,
-        validEvent({ title: "Member Event", startHoursFromNow: 72 }),
-      ),
+      makePostRequest(groupUUID, { ...validEvent(), title: "Member Event" }),
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.event.createdBy).toBe(memberId);
-  });
-
-  it("returns 409 when new event overlaps an existing one", async () => {
-    const base = Date.now() + 86400000 * 20;
-    await CalendarEvent.create({
-      title: "Existing Slot",
-      startTime: new Date(base),
-      endTime: new Date(base + 2 * 3600000),
-      groupId: groupUUID,
-      createdBy: leaderId,
-    });
-    mockGetServerSession.mockResolvedValue({
-      user: { userId: leaderId },
-      expires: "9999",
-    });
-    const res = await POST(
-      makePostRequest(groupUUID, {
-        title: "Overlap Try",
-        startTime: new Date(base + 3600000).toISOString(),
-        endTime: new Date(base + 3 * 3600000).toISOString(),
-      }),
-      { params: Promise.resolve({ groupId: groupUUID }) },
-    );
-    expect(res.status).toBe(409);
-    const data = await res.json();
-    expect(data.conflictWith?.title).toBe("Existing Slot");
-    await CalendarEvent.deleteMany({ title: "Existing Slot" });
   });
 });
 
@@ -404,11 +368,10 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
   let memberEventId: string;
 
   beforeAll(async () => {
-    const base = Date.now() + 86400000 * 40;
     const leaderEvent = await CalendarEvent.create({
       title: "Leader Event",
-      startTime: new Date(base),
-      endTime: new Date(base + 3600000),
+      startTime: new Date(Date.now() + 3600000),
+      endTime: new Date(Date.now() + 7200000),
       groupId: groupUUID,
       createdBy: leaderId,
     });
@@ -416,8 +379,8 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
 
     const memberEvent = await CalendarEvent.create({
       title: "Member Event",
-      startTime: new Date(base + 2 * 3600000),
-      endTime: new Date(base + 3 * 3600000),
+      startTime: new Date(Date.now() + 3600000),
+      endTime: new Date(Date.now() + 7200000),
       groupId: groupUUID,
       createdBy: memberId,
     });
@@ -477,44 +440,6 @@ describe("PUT /api/groups/:groupId/calendar/events/:eventId", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.event.title).toBe("Updated by Member");
-  });
-
-  it("returns 409 when update would overlap another event", async () => {
-    const base = Date.now() + 86400000 * 25;
-    const a = await CalendarEvent.create({
-      title: "PutOverlap A",
-      startTime: new Date(base + 10 * 3600000),
-      endTime: new Date(base + 12 * 3600000),
-      groupId: groupUUID,
-      createdBy: leaderId,
-    });
-    const b = await CalendarEvent.create({
-      title: "PutOverlap B",
-      startTime: new Date(base + 14 * 3600000),
-      endTime: new Date(base + 16 * 3600000),
-      groupId: groupUUID,
-      createdBy: leaderId,
-    });
-    mockGetServerSession.mockResolvedValue({
-      user: { userId: leaderId },
-      expires: "9999",
-    });
-    const res = await PUT(
-      makePutRequest(groupUUID, String(b._id), {
-        startTime: new Date(base + 11 * 3600000).toISOString(),
-        endTime: new Date(base + 13 * 3600000).toISOString(),
-      }),
-      {
-        params: Promise.resolve({
-          groupId: groupUUID,
-          eventId: String(b._id),
-        }),
-      },
-    );
-    expect(res.status).toBe(409);
-    const data = await res.json();
-    expect(data.conflictWith?.title).toBe("PutOverlap A");
-    await CalendarEvent.deleteMany({ _id: { $in: [a._id, b._id] } });
   });
 
   it("allows leader to update any event", async () => {

@@ -6,7 +6,6 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import CalendarEvent from "@/models/CalendarEvent";
 import { getMemberPermissions } from "@/lib/roles";
-import { findCalendarEventOverlap } from "@/lib/calendar/findCalendarEventOverlap";
 
 const CreateEventSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -56,24 +55,6 @@ export async function POST(
       return NextResponse.json(
         { error: "Invalid time range: endTime must be after startTime" },
         { status: 400 },
-      );
-    }
-
-    const conflict = await findCalendarEventOverlap(groupId, {
-      start: data.startTime,
-      end: data.endTime,
-    });
-    if (conflict) {
-      return NextResponse.json(
-        {
-          error: "That time overlaps another activity in the timeline.",
-          conflictWith: {
-            title: conflict.title,
-            startTime: conflict.startTime.toISOString(),
-            endTime: conflict.endTime.toISOString(),
-          },
-        },
-        { status: 409 },
       );
     }
 
