@@ -18,6 +18,10 @@ export type TripContext = {
   toDate: Date;
   mode: string;
   budget: number;
+  budgetMin?: number;
+  budgetMax?: number;
+  avoidActivities?: string[];
+  avoidLocations?: string[];
 };
 
 export type MustHaveContext = {
@@ -25,6 +29,7 @@ export type MustHaveContext = {
   address?: string;
   category?: string;
   notes?: string;
+  placeId?: string;
 };
 
 export type TargetEventContext = {
@@ -57,13 +62,17 @@ function validateProposedList(raw: unknown): ProposedEventInput[] {
 
 function buildPrompt(input: GeneratePartialItineraryInput): string {
   const { trip, approvedMustHaves, targetEvents } = input;
+  const budgetRange =
+    trip.budgetMin != null || trip.budgetMax != null
+      ? ` (range ${trip.budgetMin ?? 0}-${trip.budgetMax ?? "any"})`
+      : "";
   const mustHaveBlock =
     approvedMustHaves.length === 0
       ? "(none)"
       : approvedMustHaves
           .map(
             (m) =>
-              `- ${m.name}${m.address ? ` @ ${m.address}` : ""}${m.category ? ` [${m.category}]` : ""}${m.notes ? ` — ${m.notes}` : ""}`,
+              `- ${m.name}${m.address ? ` @ ${m.address}` : ""}${m.category ? ` [${m.category}]` : ""}${m.placeId ? ` (placeId: ${m.placeId})` : ""}${m.notes ? ` — ${m.notes}` : ""}`,
           )
           .join("\n");
 
@@ -77,7 +86,10 @@ function buildPrompt(input: GeneratePartialItineraryInput): string {
   return `You are a travel itinerary assistant.
 
 Trip: ${trip.fromCity} → ${trip.toCity}, ${trip.fromDate.toISOString().slice(0, 10)} to ${trip.toDate.toISOString().slice(0, 10)}.
-Transport: ${trip.mode}. Budget hint: ${trip.budget}.
+Transport: ${trip.mode}. Budget hint: ${trip.budget}${budgetRange}.
+Destination city is "${trip.toCity.trim()}". Replacement activities must be real venues in or near ${trip.toCity.trim()} (not other cities). For chain brands, make the "location" field explicitly local to ${trip.toCity.trim()}.
+Avoid activities: ${(trip.avoidActivities ?? []).join(", ") || "(none)"}.
+Avoid locations: ${(trip.avoidLocations ?? []).join(", ") || "(none)"}.
 
 Approved must-have places (must stay reflected in replacements where relevant):
 ${mustHaveBlock}
@@ -87,6 +99,7 @@ ${sliceBlock}
 
 Respond with a JSON object: { "events": [ ... ] }
 Each event must have: title (string), description (string, optional), startTime (ISO 8601 string), endTime (ISO 8601 string), location (string, optional), eventType (string, optional), timezone (string, optional, default UTC).
+Use realistic same-day durations (about 1–3 hours for typical attractions, ~1–2 hours for meals). Avoid placeholder windows like midnight→noon unless it is an overnight/red-eye travel block labeled as travel/transit.
 The "events" array MUST contain EXACTLY ${targetEvents.length} objects, in the same order as the slice above. Do not add or merge entries; one output event per input line.
 `;
 }

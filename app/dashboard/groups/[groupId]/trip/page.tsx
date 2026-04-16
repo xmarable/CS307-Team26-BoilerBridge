@@ -125,7 +125,14 @@ export default function GroupTripPage() {
         return;
       }
 
-      router.push("/dashboard/alltrips");
+      const tripId =
+        typeof data?.tripID === "string" && data.tripID.length > 0
+          ? data.tripID
+          : "";
+      const sparkReadyQuery = tripId
+        ? `?sparkReady=1&tripCreated=1&tripId=${encodeURIComponent(tripId)}`
+        : "?sparkReady=1&tripCreated=1";
+      router.push(`/dashboard/groups/${groupId}${sparkReadyQuery}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

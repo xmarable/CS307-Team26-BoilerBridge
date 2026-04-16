@@ -1,8 +1,10 @@
 /**
  * Local Ollama: POST /api/chat with JSON format.
- * Env: OLLAMA_BASE_URL (default http://127.0.0.1:11434), OLLAMA_MODEL (e.g. llama3.2).
+ * Env: OLLAMA_BASE_URL (default http://127.0.0.1:11434), OLLAMA_MODEL (e.g. llama3.2:1b).
  * OLLAMA_SKIP=1: throw so callers use stubs (tests / offline).
  */
+
+import { formatOllamaHttpError } from "@/lib/itinerary/ollamaErrors";
 
 export type OllamaChatMessage = {
   role: "user" | "assistant" | "system";
@@ -21,8 +23,17 @@ function stripJsonFence(s: string): string {
 }
 
 export function parseJsonFromOllamaContent(content: string): unknown {
-  const raw = stripJsonFence(content);
-  return JSON.parse(raw);
+  const raw = stripJsonFence(content.trim());
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(raw.slice(start, end + 1));
+    }
+    throw new Error("Could not parse JSON from model output");
+  }
 }
 
 export async function ollamaChatJson(
@@ -36,22 +47,30 @@ export async function ollamaChatJson(
     /\/$/,
     "",
   );
-  const model = process.env.OLLAMA_MODEL ?? "llama3.2";
+  const model = process.env.OLLAMA_MODEL ?? "llama3.2:1b";
 
-  const res = await fetch(`${base}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: false,
-      format: "json",
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        format: "json",
+      }),
+    });
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Could not reach Ollama at ${base}. Is Ollama running? (${reason})`,
+    );
+  }
 
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(`Ollama HTTP ${res.status}: ${t.slice(0, 500)}`);
+    throw new Error(formatOllamaHttpError(res.status, t, model));
   }
 
   const data = (await res.json()) as {

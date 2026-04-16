@@ -10,17 +10,17 @@ import {
   parseJsonFromOllamaContent,
 } from "@/lib/itinerary/ollamaClient";
 import type { MustHaveContext, TripContext } from "@/lib/itinerary/generatePartial";
+import { inferPlanningTimezone } from "@/lib/itinerary/inferPlanningTimezone";
+import { coerceOllamaJsonToProposedEvents } from "@/lib/itinerary/coerceOllamaItineraryJson";
 
 export type { TripContext, MustHaveContext } from "@/lib/itinerary/generatePartial";
 
-function validateFullResponse(raw: unknown): ProposedEventInput[] {
+function validateFullResponseStrict(raw: unknown): ProposedEventInput[] | null {
   const parsed = ProposedEventsResponseSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new Error("Model JSON must be an object with a non-empty events array");
-  }
+  if (!parsed.success) return null;
   for (const ev of parsed.data.events) {
     if (ev.endTime <= ev.startTime) {
-      throw new Error("Each event must have endTime after startTime");
+      return null;
     }
   }
   return parsed.data.events;
@@ -30,32 +30,47 @@ function buildFullTripPrompt(
   trip: TripContext,
   approvedMustHaves: MustHaveContext[],
 ): string {
+  const budgetRange =
+    trip.budgetMin != null || trip.budgetMax != null
+      ? ` (range ${trip.budgetMin ?? 0}-${trip.budgetMax ?? "any"})`
+      : "";
   const mh =
     approvedMustHaves.length === 0
       ? "(none — suggest a reasonable schedule anyway)"
       : approvedMustHaves
           .map(
             (m) =>
-              `- ${m.name}${m.address ? ` @ ${m.address}` : ""}${m.category ? ` [${m.category}]` : ""}`,
+              `- ${m.name}${m.address ? ` @ ${m.address}` : ""}${m.category ? ` [${m.category}]` : ""}${m.placeId ? ` (placeId: ${m.placeId})` : ""}`,
           )
           .join("\n");
+
+  const planningTz = inferPlanningTimezone(trip.toCity, trip.fromCity);
 
   return `You are a travel planner. Output JSON only.
 
 Trip: ${trip.fromCity} → ${trip.toCity}
 Dates: ${trip.fromDate.toISOString().slice(0, 10)} through ${trip.toDate.toISOString().slice(0, 10)} (inclusive window).
-Transport: ${trip.mode}. Budget hint: ${trip.budget}.
+Transport mode: ${trip.mode} (use this for realistic travel pacing: flights need airport buffers; bus/train need longer en-route blocks; taxi implies shorter hops inside a metro).
+Budget hint: ${trip.budget}${budgetRange}.
+Avoid activities: ${(trip.avoidActivities ?? []).join(", ") || "(none)"}.
+Avoid locations: ${(trip.avoidLocations ?? []).join(", ") || "(none)"}.
 
 Approved must-include items:
 ${mh}
 
+Planning timezone (use for the "timezone" field on every event): "${planningTz}".
+Destination city for this trip is "${trip.toCity.trim()}". Every real-world venue, meal, or attraction (except explicit intercity travel blocks) MUST be a plausible location in or immediately next to ${trip.toCity.trim()} — not other metros. For national chains (e.g. bakeries, restaurants), put the neighborhood or street context in the "location" field so it is clearly the ${trip.toCity.trim()} branch (e.g. include "${trip.toCity.trim()}" or a well-known local area in that city). Do not schedule NYC/LA/Miami/etc. locations when the destination is ${trip.toCity.trim()}.
+Schedule human-style days: morning / afternoon / evening. Typical attractions: about 1–3 hours; meals about 1–1.5 hours.
+If ${trip.fromCity.trim()} and ${trip.toCity.trim()} are different cities, do NOT place normal sightseeing before a realistic arrival on day 1 — start day 1 with an explicit travel/transit block or begin attractions mid/late afternoon after implied arrival.
+Leave modest gaps between stops in the destination (implicit buffer); do not stack back-to-back all-day attractions.
+Never use absurd same-day windows like 00:00→12:00 for a museum or neighborhood walk unless it is clearly labeled overnight travel.
+
 Return a single JSON object: { "events": [ { "title": string, "description"?: string, "startTime": string (ISO 8601), "endTime": string (ISO 8601), "location"?: string, "eventType"?: string, "timezone"?: string } ] }
 
 Rules:
-- Multiple events per day where realistic; each event about 1–4 hours unless travel blocks need longer.
 - endTime strictly after startTime for every event.
-- Include approved must-haves as real events at sensible times.
-- timezone default "UTC" unless justified.`;
+- Include approved must-haves as real events at sensible times; use eventType "travel" or "transit" for intercity legs when appropriate.
+- Set "timezone" to "${planningTz}" on every event (ISO timestamps must match that zone's local intent).`;
 }
 
 function stubFullTrip(
@@ -128,13 +143,30 @@ export async function generateFullTripEvents(
 
   const alt = z.array(ProposedEventSchema).safeParse(raw);
   if (alt.success) {
-    for (const ev of alt.data) {
-      if (ev.endTime <= ev.startTime) {
-        throw new Error("Each event must have endTime after startTime");
-      }
-    }
-    return alt.data;
+    const repaired = alt.data.map((ev) =>
+      ev.endTime > ev.startTime
+        ? ev
+        : { ...ev, endTime: new Date(ev.startTime.getTime() + 90 * 60 * 1000) },
+    );
+    return repaired;
   }
 
-  return validateFullResponse(raw);
+  const strict = validateFullResponseStrict(raw);
+  if (strict && strict.length > 0) return strict;
+
+  const coerced = coerceOllamaJsonToProposedEvents(raw);
+  if (coerced.length > 0) {
+    console.warn(
+      "[itinerary] Ollama JSON used relaxed coercion (alternate keys, snake_case, or nested arrays).",
+    );
+    return coerced;
+  }
+
+  console.warn(
+    "[itinerary] Ollama returned no parseable events; using deterministic stub itinerary. Raw keys:",
+    raw !== null && typeof raw === "object" && !Array.isArray(raw)
+      ? Object.keys(raw as object).join(", ")
+      : typeof raw,
+  );
+  return stubFullTrip(trip, approvedMustHaves);
 }

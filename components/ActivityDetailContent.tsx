@@ -52,9 +52,13 @@ export interface ActivityDetailPayload {
 export type ActivityDetailContentProps =
   | { activityId: string }
   | {
-      previewPlaceId: string;
+      /** When set, loads Google + booking detail for that place (US15). */
+      previewPlaceId?: string;
+      /** Required for name-only preview; also sent with placeId as display hint. */
       previewName?: string;
       previewAddress?: string;
+      /** Trip destination / metro — biases text search away from wrong-city chain hits */
+      previewDestinationCity?: string;
     };
 
 function formatPlaceType(t: string): string {
@@ -71,9 +75,14 @@ export function ActivityDetailContent(props: ActivityDetailContentProps) {
   const [error, setError] = useState<string | null>(null);
 
   const activityId = "activityId" in props ? props.activityId : undefined;
-  const previewPlaceId = "previewPlaceId" in props ? props.previewPlaceId : undefined;
-  const previewName = "previewName" in props ? props.previewName : undefined;
-  const previewAddress = "previewAddress" in props ? props.previewAddress : undefined;
+  const previewPlaceId =
+    "activityId" in props ? undefined : props.previewPlaceId?.trim() || undefined;
+  const previewName =
+    "activityId" in props ? undefined : props.previewName?.trim() || undefined;
+  const previewAddress =
+    "activityId" in props ? undefined : props.previewAddress?.trim() || undefined;
+  const previewDestinationCity =
+    "activityId" in props ? undefined : props.previewDestinationCity?.trim() || undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -83,11 +92,12 @@ export function ActivityDetailContent(props: ActivityDetailContentProps) {
     let url: string | null = null;
     if (activityId) {
       url = `/api/activities/${activityId}`;
-    } else if (previewPlaceId) {
+    } else if (previewPlaceId || (previewName && previewName.length >= 2)) {
       const p = new URLSearchParams();
-      p.set("placeId", previewPlaceId);
-      if (previewName) p.set("name", previewName);
+      if (previewPlaceId) p.set("placeId", previewPlaceId);
+      p.set("name", previewName && previewName.length >= 2 ? previewName : "Place");
       if (previewAddress) p.set("address", previewAddress);
+      if (previewDestinationCity) p.set("destination", previewDestinationCity);
       url = `/api/activities/preview?${p.toString()}`;
     }
 
@@ -129,7 +139,7 @@ export function ActivityDetailContent(props: ActivityDetailContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [activityId, previewPlaceId, previewName, previewAddress]);
+  }, [activityId, previewPlaceId, previewName, previewAddress, previewDestinationCity]);
 
   if (loading) {
     return (

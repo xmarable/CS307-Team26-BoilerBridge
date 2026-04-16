@@ -15,6 +15,7 @@ function PreviewInner() {
   const placeId = searchParams.get("placeId")?.trim();
   const name = searchParams.get("name")?.trim() || undefined;
   const address = searchParams.get("address")?.trim() || undefined;
+  const destination = searchParams.get("destination")?.trim() || undefined;
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -30,15 +31,18 @@ function PreviewInner() {
     );
   }
 
-  if (!placeId) {
+  const hasPlace = Boolean(placeId);
+  const hasNameQuery = Boolean(name && name.length >= 2);
+  if (!hasPlace && !hasNameQuery) {
     return (
       <div
         className="rounded-xl border border-amber-200 bg-amber-50/80 p-6 text-center"
         role="alert"
       >
-        <p className="font-medium text-gray-900">Missing place</p>
+        <p className="font-medium text-gray-900">Missing place or name</p>
         <p className="text-sm text-gray-600 mt-1">
-          Open this page from search results, or browse activities to pick a place.
+          Open this page from search results, an itinerary link, or browse activities to pick a
+          place.
         </p>
         <Button className="mt-4 bg-amber-600 hover:bg-amber-700 text-white" size="sm" asChild>
           <Link href="/dashboard/activities">Browse activities</Link>
@@ -49,9 +53,10 @@ function PreviewInner() {
 
   return (
     <ActivityDetailContent
-      previewPlaceId={placeId}
+      previewPlaceId={placeId ?? undefined}
       previewName={name}
       previewAddress={address}
+      previewDestinationCity={destination}
     />
   );
 }

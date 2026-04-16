@@ -148,7 +148,9 @@ describe("TripPage", () => {
     expect(body.groupId).toBe("15105263-6166-40c8-977a-a3575375bc58");
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/dashboard/alltrips");
+      expect(mockPush).toHaveBeenCalledWith(
+        "/dashboard/groups/15105263-6166-40c8-977a-a3575375bc58?sparkReady=1&tripCreated=1&tripId=abc12345-abcd-abcd-abcd-abc123456789",
+      );
     });
   });
 
@@ -179,6 +181,6 @@ describe("TripPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /create trip/i }));
 
     expect(await screen.findByText("Invalid input data")).toBeInTheDocument();
-    expect(mockPush).not.toHaveBeenCalledWith("/dashboard/alltrips");
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
