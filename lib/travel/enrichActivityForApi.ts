@@ -1,5 +1,6 @@
 import Activity from "@/models/Activity";
 import { sanitizeHttpsUrl } from "@/lib/safeExternalUrl";
+import { geocodeCityCenter } from "@/lib/travel/geocodeCityCenter";
 import { fetchGooglePlaceEnrichment } from "./googlePlaces";
 import { resolveExpediaBookingUrl } from "./expediaRapid";
 import {
@@ -27,6 +28,8 @@ export type ActivityLeanForEnrichment = {
   placeId?: string;
   name: string;
   address?: string;
+  /** When resolving by text only, anchor search to this metro (e.g. trip destination). */
+  destinationCity?: string;
   rating?: number;
   reviewCount?: number;
   estimatedCost?: number;
@@ -78,11 +81,26 @@ export async function enrichActivityForApi(
   let google: any = null;
   if (googleKey) {
     try {
+      const dest = activity.destinationCity?.trim();
+      const baseText = activity.placeId?.trim()
+        ? null
+        : [activity.name, activity.address].filter(Boolean).join(", ");
+      let fallbackTextQuery: string | null = baseText;
+      if (fallbackTextQuery && dest) {
+        if (!fallbackTextQuery.toLowerCase().includes(dest.toLowerCase())) {
+          fallbackTextQuery = `${fallbackTextQuery}, ${dest}`;
+        }
+      }
+      let textSearchBias: { latitude: number; longitude: number; radiusMeters?: number } | null =
+        null;
+      if (!activity.placeId?.trim() && dest) {
+        const c = await geocodeCityCenter(googleKey, dest);
+        if (c) textSearchBias = { ...c, radiusMeters: 50000 };
+      }
       google = await fetchGooglePlaceEnrichment(googleKey, {
         placeId: activity.placeId,
-        fallbackTextQuery: activity.placeId?.trim()
-          ? null
-          : [activity.name, activity.address].filter(Boolean).join(", "),
+        fallbackTextQuery,
+        textSearchBias,
       });
     } catch (e) {
       console.warn("[Google Places] enrichment error", e);
@@ -228,12 +246,15 @@ export async function enrichActivityForApi(
         google?.googlePhotoReference?.trim(),
       );
 
+  const effectivePlaceId =
+    activity.placeId?.trim() || google?.placeId?.trim() || undefined;
+
   let heroImageUrl: string | undefined;
   if (hasHeroPhoto) {
     if (hasMongoId) {
       heroImageUrl = `/api/activities/${idStr}/hero-image`;
-    } else if (activity.placeId?.trim()) {
-      heroImageUrl = `/api/activities/preview/hero-image?placeId=${encodeURIComponent(activity.placeId.trim())}`;
+    } else if (effectivePlaceId) {
+      heroImageUrl = `/api/activities/preview/hero-image?placeId=${encodeURIComponent(effectivePlaceId)}`;
     }
   }
 
@@ -246,7 +267,7 @@ export async function enrichActivityForApi(
     activity: {
       _id: idStr,
       isPreview,
-      placeId: activity.placeId,
+      placeId: effectivePlaceId,
       name: resolvedName,
       address,
       rating: displayRating,
