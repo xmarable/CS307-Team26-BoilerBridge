@@ -63,7 +63,15 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Request body is required" },
+      { status: 400 },
+    );
+  }
   const poll = PollSchema.safeParse(body);
   if (!poll.success) {
     return NextResponse.json(
@@ -113,7 +121,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Request body is required" },
+      { status: 400 },
+    );
+  }
   const pollId = PollDeleteSchema.safeParse(body);
   if (!pollId.success) {
     return NextResponse.json(

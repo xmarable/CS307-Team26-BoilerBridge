@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import dbConnect from "@/lib/dbConnect";
@@ -18,10 +19,7 @@ export async function DELETE(
 
     // verify authentication
     if (!userId) {
-      return NextResponse.json(
-        { error: "unauthorized" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const { groupId, memberId } = await params;
@@ -99,9 +97,6 @@ export async function DELETE(
       "DELETE /api/groups/[groupId]/members/[memberId] error:",
       error,
     );
-    return NextResponse.json(
-      { error: "server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }

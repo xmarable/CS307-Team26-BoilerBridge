@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+// import your global styles here
+import "@/app/globals.css";
+
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -454,61 +457,59 @@ export default function GroupDashboard() {
         </Sheet>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-10">
-        <aside className="w-full lg:w-70 shrink-0">
-          <div className="bg-bb-surface p-6 rounded-[2.5rem] shadow-sm space-y-2 sticky top-10 border border-bb-border">
-            <SidebarButton
-              active={activeSection === "overview"}
-              onClick={() => setActiveSection("overview")}
-              icon={<LayoutGrid size={22} />}
-              label="Overview"
+      <div className="flex flex-col gap-6">
+        <nav className="bg-bb-surface border border-bb-border rounded-4xl p-2 flex gap-1 shadow-sm w-full">
+          <TabButton
+            active={activeSection === "overview"}
+            onClick={() => setActiveSection("overview")}
+            icon={<LayoutGrid size={18} />}
+            label="Overview"
+          />
+          <TabButton
+            active={activeSection === "itinerary"}
+            onClick={() => setActiveSection("itinerary")}
+            icon={<Calendar size={18} />}
+            label="Itinerary"
+          />
+          <TabButton
+            active={activeSection === "polls"}
+            onClick={() => setActiveSection("polls")}
+            icon={<AlignEndHorizontal size={18} />}
+            label="Polls"
+          />
+          {isLeader && (
+            <TabButton
+              active={activeSection === "notify"}
+              onClick={() => setActiveSection("notify")}
+              icon={<MessageSquare size={18} />}
+              label="Notify"
             />
-            <SidebarButton
-              active={activeSection === "itinerary"}
-              onClick={() => setActiveSection("itinerary")}
-              icon={<Calendar size={22} />}
-              label="Itinerary"
-            />
-            <SidebarButton
-              active={activeSection === "polls"}
-              onClick={() => setActiveSection("polls")}
-              icon={<AlignEndHorizontal size={22} />}
-              label="Polls"
-            />
-            {isLeader && (
-              <SidebarButton
-                active={activeSection === "notify"}
-                onClick={() => setActiveSection("notify")}
-                icon={<MessageSquare size={22} />}
-                label="Notify"
-              />
-            )}
-            <SidebarButton
-              active={activeSection === "messages"}
-              onClick={() => setActiveSection("messages")}
-              icon={<MessageSquare size={22} />}
-              label="Messages"
-            />
-            <SidebarButton
-              active={activeSection === "photos"}
-              onClick={() => setActiveSection("photos")}
-              icon={<Image size={22} />}
-              label="Photos"
-            />
-            <SidebarButton
-              active={activeSection === "members"}
-              onClick={() => setActiveSection("members")}
-              icon={<Users size={22} />}
-              label="Members"
-            />
-            <SidebarButton
-              active={activeSection === "expenses"}
-              onClick={() => setActiveSection("expenses")}
-              icon={<DollarSign size={22} />}
-              label="Expenses"
-            />
-          </div>
-        </aside>
+          )}
+          <TabButton
+            active={activeSection === "messages"}
+            onClick={() => setActiveSection("messages")}
+            icon={<MessageSquare size={18} />}
+            label="Messages"
+          />
+          <TabButton
+            active={activeSection === "photos"}
+            onClick={() => setActiveSection("photos")}
+            icon={<Image size={18} />}
+            label="Photos"
+          />
+          <TabButton
+            active={activeSection === "members"}
+            onClick={() => setActiveSection("members")}
+            icon={<Users size={18} />}
+            label="Members"
+          />
+          <TabButton
+            active={activeSection === "expenses"}
+            onClick={() => setActiveSection("expenses")}
+            icon={<DollarSign size={18} />}
+            label="Expenses"
+          />
+        </nav>
 
         <main className="flex-1 min-w-0">
           {activeSection === "overview" && (
@@ -809,7 +810,7 @@ export default function GroupDashboard() {
   );
 }
 
-function SidebarButton({
+function TabButton({
   active,
   onClick,
   icon,
@@ -823,24 +824,14 @@ function SidebarButton({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all duration-300 group ${
+      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl transition-all duration-200 font-bold text-sm ${
         active
-          ? "bg-linear-to-r from-bb-brand to-bb-brand-to text-white shadow-xl shadow-amber-200"
+          ? "bg-linear-to-r from-bb-brand to-bb-brand-to text-white shadow-lg shadow-amber-100"
           : "text-bb-text-muted hover:bg-bb-surface-subtle hover:text-bb-text-sub"
       }`}
     >
-      <span
-        className={`${active ? "text-white" : "text-bb-placeholder group-hover:text-bb-brand"} transition-colors`}
-      >
-        {icon}
-      </span>
-      <span className="font-bold text-lg tracking-tight">{label}</span>
-      {active && (
-        <ArrowRight
-          size={18}
-          className="ml-auto animate-in slide-in-from-left-2"
-        />
-      )}
+      <span>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }

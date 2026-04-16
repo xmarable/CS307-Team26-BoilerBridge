@@ -6,7 +6,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
   --font-geist-sans: "Geist Sans", sans-serif;
   --font-geist-mono: "Geist Mono", monospace;
 }
@@ -17,35 +17,38 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* ── BoilerBridge design tokens ───────────────────────────────────────
-     Usage: bg-bb-surface, text-bb-label, placeholder:text-bb-placeholder
-     Border: border-bb-border, ring-bb-ring
-     Brand:  bg-bb-brand, text-bb-brand, from-bb-brand to-bb-brand-to
-  ────────────────────────────────────────────────────────────────────── */
-
   /* Brand gradient anchors */
-  --color-bb-brand: #f59e0b; /* amber-500  */
-  --color-bb-brand-to: #ea580c; /* orange-600 */
+  --color-bb-brand: #f59e0b;
+  --color-bb-brand-to: #ea580c;
 
   /* Surfaces */
-  --color-bb-surface: #ffffff; /* card / panel bg          */
-  --color-bb-surface-subtle: #f9fafb; /* gray-50  – section tint  */
-  --color-bb-surface-inset: #f3f4f6; /* gray-100 – inner bg      */
+  --color-bb-surface: #ffffff;
+  --color-bb-surface-subtle: #f9fafb;
+  --color-bb-surface-inset: #f3f4f6;
 
-  /* Text */
-  --color-bb-text: #111827; /* gray-900 – headings       */
-  --color-bb-text-sub: #4b5563; /* gray-600 – body copy      */
-  --color-bb-text-muted: #9ca3af; /* gray-400 – helper text    */
-  --color-bb-placeholder: #d1d5db; /* gray-300 – input placeholder */
+  /* Text - explicit hex for black to ensure no ghosting */
+  --color-bb-text: #111827;
+  --color-bb-text-sub: #4b5563;
+  --color-bb-text-muted: #9ca3af;
+  --color-bb-placeholder: #d1d5db;
 
   /* Borders & rings */
-  --color-bb-border: #f3f4f6; /* gray-100 – card border    */
-  --color-bb-border-input: #e5e7eb; /* gray-200 – input border   */
-  --color-bb-ring: #fbbf24; /* amber-400 – focus ring    */
+  --color-bb-border: #f3f4f6;
+  --color-bb-border-input: #e5e7eb;
+  --color-bb-ring: #fbbf24;
 
   /* Status */
-  --color-bb-danger: #ef4444; /* red-500  */
-  --color-bb-danger-sub: #fef2f2; /* red-50   */
+  --color-bb-danger: #ef4444;
+  --color-bb-danger-sub: #fef2f2;
+}
+
+/* ── Global Placeholders ──────────────────────────────────────────
+   Only targets the hint text. Forces visibility and light gray.
+   Using :where() reduces specificity so it doesn't fight your classes.
+────────────────────────────────────────────────────────────────── */
+:where(input, textarea)::placeholder {
+  color: #d1d5db !important;
+  opacity: 1 !important;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,4 +64,8 @@ body {
   font-family: var(--font-sans);
   margin: 0;
   padding: 0;
+}
+
+input {
+  color: #111827 !important;
 }

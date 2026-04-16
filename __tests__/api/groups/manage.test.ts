@@ -503,10 +503,10 @@ describe("POST /api/groups/[groupId]/members", () => {
     const updated = await TravelGroup.findOne({
       groupID: group.groupID.toString(),
     });
-    const updatedIds = updated!.membersList.map((m: any) =>
-      m.userId.toString(),
+    const pendingList = updated!.pendingRequests.map((r: any) =>
+      r.email.toLowerCase(),
     );
-    expect(updatedIds).toContain(newUser.userId.toString());
+    expect(pendingList).toContain(newUser.email.toLowerCase());
 
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
     await User.deleteMany({

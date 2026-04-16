@@ -94,11 +94,7 @@ export function MemberManagement({
     }
   };
 
-  const confirmAndRemove = (
-    userId: string,
-    name: string,
-    isSelf: boolean,
-  ) => {
+  const confirmAndRemove = (userId: string, name: string, isSelf: boolean) => {
     if (isSelf && isCurrentUserLeader && members.length > 1) {
       alert("You must transfer leadership to another member before leaving.");
       return;
@@ -201,9 +197,7 @@ export function MemberManagement({
             Group Members
           </h3>
           <button
-            onClick={() =>
-              confirmAndRemove(currentUserId, "myself", true)
-            }
+            onClick={() => confirmAndRemove(currentUserId, "myself", true)}
             className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
           >
             <LogOut size={16} />
@@ -224,8 +218,7 @@ export function MemberManagement({
                   </div>
                   <div>
                     <p className="text-lg font-black text-gray-900 leading-none">
-                      {member.name}{" "}
-                      {member.userId === currentUserId && "(You)"}
+                      {member.name} {member.userId === currentUserId && "(You)"}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <span
@@ -242,75 +235,80 @@ export function MemberManagement({
                     </div>
                   </div>
                 </div>
-
                 {/* Controls only visible to the group leader, and only for other members */}
-                {member.userId !== currentUserId && isCurrentUserLeader && (
-                  <div className="flex items-center gap-3">
-                    {processingId === member.userId ? (
-                      <Loader2
-                        size={20}
-                        className="animate-spin text-gray-400"
-                      />
-                    ) : (
-                      <>
-                        <button
-                          onClick={() =>
-                            handleRoleAction(
-                              member.userId,
-                              "TOGGLE_ROLE",
-                              member.role === "Admin" ? "Viewer" : "Admin",
-                            )
-                          }
-                          className="p-3 bg-white hover:bg-blue-50 rounded-2xl transition-all border border-gray-100 hover:border-blue-200 text-gray-400 hover:text-blue-600 shadow-sm"
-                          title={
-                            member.role === "Admin"
-                              ? "Demote to Viewer"
-                              : "Promote to Admin"
-                          }
-                        >
-                          {member.role === "Admin" ? (
-                            <ShieldCheck size={22} />
-                          ) : (
-                            <Shield size={22} />
-                          )}
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `Transfer leadership to ${member.name}? You will become an Admin.`,
-                              )
-                            ) {
+                {member.userId !== currentUserId &&
+                  (isCurrentUserLeader || currentUserRole === "Admin") && (
+                    <div className="flex items-center gap-3">
+                      {processingId === member.userId ? (
+                        <Loader2
+                          size={20}
+                          className="animate-spin text-gray-400"
+                        />
+                      ) : (
+                        <>
+                          <button
+                            onClick={() =>
                               handleRoleAction(
                                 member.userId,
-                                "TRANSFER_LEADERSHIP",
-                              );
+                                "TOGGLE_ROLE",
+                                member.role === "Admin" ? "Viewer" : "Admin",
+                              )
                             }
-                          }}
-                          className="p-3 bg-white hover:bg-amber-50 rounded-2xl transition-all border border-gray-100 hover:border-amber-200 text-gray-400 hover:text-amber-500 shadow-sm"
-                          title="Transfer Leadership"
-                        >
-                          <Crown size={22} />
-                        </button>
+                            disabled={member.role === "Leader"}
+                            className="p-3 bg-white hover:bg-blue-50 rounded-2xl transition-all border border-gray-100 hover:border-blue-200 text-gray-400 hover:text-blue-600 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={
+                              member.role === "Admin"
+                                ? "Demote to Viewer"
+                                : "Promote to Admin"
+                            }
+                          >
+                            {member.role === "Admin" ? (
+                              <ShieldCheck size={22} />
+                            ) : (
+                              <Shield size={22} />
+                            )}
+                          </button>
 
-                        <button
-                          onClick={() =>
-                            confirmAndRemove(
-                              member.userId,
-                              member.name,
-                              false,
-                            )
-                          }
-                          className="p-3 bg-white hover:bg-red-50 rounded-2xl transition-all border border-gray-100 hover:border-red-200 text-gray-400 hover:text-red-500 shadow-sm"
-                          title="Remove from Group"
-                        >
-                          <Trash2 size={22} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                          {isCurrentUserLeader && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Transfer leadership to ${member.name}? You will become an Admin.`,
+                                  )
+                                ) {
+                                  handleRoleAction(
+                                    member.userId,
+                                    "TRANSFER_LEADERSHIP",
+                                  );
+                                }
+                              }}
+                              className="p-3 bg-white hover:bg-amber-50 rounded-2xl transition-all border border-gray-100 hover:border-amber-200 text-gray-400 hover:text-amber-500 shadow-sm"
+                              title="Transfer Leadership"
+                            >
+                              <Crown size={22} />
+                            </button>
+                          )}
+
+                          {isCurrentUserLeader && (
+                            <button
+                              onClick={() =>
+                                confirmAndRemove(
+                                  member.userId,
+                                  member.name,
+                                  false,
+                                )
+                              }
+                              className="p-3 bg-white hover:bg-red-50 rounded-2xl transition-all border border-gray-100 hover:border-red-200 text-gray-400 hover:text-red-500 shadow-sm"
+                              title="Remove from Group"
+                            >
+                              <Trash2 size={22} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
               </div>
             ))
           ) : (

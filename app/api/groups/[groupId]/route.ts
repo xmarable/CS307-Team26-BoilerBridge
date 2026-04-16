@@ -23,22 +23,17 @@ export async function GET(
     const { groupId } = await context.params;
     await dbConnect();
 
-    // validate the uuid format to prevent mongoose errors
     let binaryGroupId;
     try {
-      // strip hyphens if they exist to get clean hex
       const cleanHex = groupId.replace(/-/g, "");
       binaryGroupId = mongoose.Types.UUID.createFromHexString(cleanHex);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
-      // fallback just in case the string is already formatted
       binaryGroupId = new (mongoose.Types as any).UUID(groupId);
     }
 
-    // query using both the id and membership to verify it exists for this user
+    // query by groupID only, membership check is done separately below
     const groupDoc = await TravelGroup.findOne({
       groupID: binaryGroupId,
-      "membersList.userId": userId,
     }).lean();
 
     if (!groupDoc) {
@@ -46,7 +41,7 @@ export async function GET(
       return NextResponse.json({ error: "group not found" }, { status: 404 });
     }
 
-    // compare userIds as strings to avoid objectid vs uuid comparison issues
+    // now check membership separately so non-members get 403 not 404
     const isMember = groupDoc.membersList.some(
       (m: any) => m.userId.toString() === userId.toString(),
     );
@@ -131,7 +126,7 @@ export async function DELETE(
 
     const { groupId } = await context.params;
     const { searchParams } = new URL(req.url);
-    const scope = searchParams.get("scope"); // "trip" | "group"
+    const scope = searchParams.get("scope");
 
     await dbConnect();
 
@@ -151,7 +146,6 @@ export async function DELETE(
     }
 
     if (scope === "trip") {
-      // Delete the Trip document and all calendar events, keep the group
       await Promise.all([
         Trip.deleteOne({ groupID: groupId }),
         CalendarEvent.deleteMany({ groupId }),
@@ -159,7 +153,6 @@ export async function DELETE(
       return NextResponse.json({ ok: true, deleted: "trip" });
     }
 
-    // Delete the group, its Trip document, and all calendar events
     await Promise.all([
       Trip.deleteOne({ groupID: groupId }),
       CalendarEvent.deleteMany({ groupId }),

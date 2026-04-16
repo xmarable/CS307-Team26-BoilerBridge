@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,17 +9,21 @@ import Link from "next/link";
 
 const NotificationSchema = z.object({
   topic: z.string().min(1, "A topic is required"),
-  content: z.string().min(1, "Message content is required")
-})
+  content: z.string().min(1, "Message content is required"),
+});
 
 type FormData = z.infer<typeof NotificationSchema>;
 
 type GroupSummary = {
   groupID: string;
   groupName: string;
-}
+};
 
-export default function GroupNotification({ activeGroup }: { activeGroup: GroupSummary | null }) {
+export default function GroupNotification({
+  activeGroup,
+}: {
+  activeGroup: GroupSummary | null;
+}) {
   const [topic, setTopic] = useState("");
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +32,7 @@ export default function GroupNotification({ activeGroup }: { activeGroup: GroupS
   const validateFormData = (): FormData | null => {
     const parsed = NotificationSchema.safeParse({
       content: content,
-      topic: topic
+      topic: topic,
     });
 
     if (!parsed.success) {
@@ -37,7 +41,7 @@ export default function GroupNotification({ activeGroup }: { activeGroup: GroupS
     }
 
     return parsed.data;
-  }
+  };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,7 +56,8 @@ export default function GroupNotification({ activeGroup }: { activeGroup: GroupS
 
     const res = await fetch(`/api/groups/${activeGroup?.groupID}/notify`, {
       method: "POST",
-      body: JSON.stringify({ topic: topic, content: content })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: topic, content: content }),
     });
     if (!res.ok) {
       setError("Invalid Message");
