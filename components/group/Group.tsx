@@ -55,6 +55,8 @@ import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
 import { GroupBoard } from "@/components/GroupBoard";
 import { ActivityVoting } from "./ActivityVoting";
+import { SheetTitle } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 type GroupState = {
   _id: string;
@@ -325,7 +327,7 @@ export default function GroupDashboard() {
                 align="start"
                 sideOffset={8}
                 avoidCollisions={false}
-                className="w-52 rounded-2xl p-2 shadow-lg border border-bb-border"
+                className="w-52 rounded-2xl p-2 shadow-lg border border-bb-border bg-white"
               >
                 <DropdownMenuItem
                   disabled={!tripActive}
@@ -367,6 +369,11 @@ export default function GroupDashboard() {
             side="right"
             className="bg-bb-surface border-l border-bb-border p-0 flex flex-col w-160 max-w-md rounded-2xl"
           >
+            <VisuallyHidden>
+              <SheetTitle>
+                {deleteScope === "group" ? "Delete Group" : "Delete Trip"}
+              </SheetTitle>
+            </VisuallyHidden>
             <div
               className={`px-8 pt-10 pb-7 ${
                 deleteScope === "group" ? "bg-bb-danger-sub" : "bg-amber-50"
