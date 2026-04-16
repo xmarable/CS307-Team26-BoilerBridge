@@ -92,7 +92,6 @@ export async function GET(
   }
 
   const url = new URL(req.url);
-  const limit = 50;
 
   const before = url.searchParams.get("before");
   const logs = info.group.chatLogs ?? [];

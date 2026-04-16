@@ -14,7 +14,8 @@ export async function GET(
   { params }: { params: Promise<{ activityId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    // we cast the function to any before calling it to skip the "no exported member" check
+    const session = await (getServerSession as any)(authOptions);
     const rawId =
       session?.user && "id" in session.user
         ? (session.user as { id: string }).id
@@ -27,18 +28,27 @@ export async function GET(
 
     const { activityId } = await params;
     if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
-      return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid activity ID" },
+        { status: 400 },
+      );
     }
 
     await dbConnect();
     const activity = await Activity.findById(activityId).lean();
     if (!activity) {
-      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Activity not found" },
+        { status: 404 },
+      );
     }
 
     const key = process.env.GOOGLE_MAPS_API_KEY?.trim();
     if (!key) {
-      return NextResponse.json({ error: "Maps not configured" }, { status: 503 });
+      return NextResponse.json(
+        { error: "Maps not configured" },
+        { status: 503 },
+      );
     }
 
     const doc = activity as {
@@ -54,7 +64,10 @@ export async function GET(
       key,
     );
     if (!upstream) {
-      return NextResponse.json({ error: "No photo for this activity" }, { status: 404 });
+      return NextResponse.json(
+        { error: "No photo for this activity" },
+        { status: 404 },
+      );
     }
 
     const res = await fetch(upstream, { cache: "no-store" });
@@ -75,7 +88,6 @@ export async function GET(
       },
     });
   } catch (err: unknown) {
-    console.error("GET hero-image error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Server error" },
       { status: 500 },

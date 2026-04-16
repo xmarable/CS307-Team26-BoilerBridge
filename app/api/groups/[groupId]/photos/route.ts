@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ gro
             const url = await uploadImage(image.image);
 
             image.image = url;
-        } catch(e) {
+        } catch {
             return NextResponse.json(
                 { error: "Image upload failed"},
                 { status: 500 }

@@ -3,7 +3,6 @@ import { authOptions } from "@/lib/auth";
 import { getUserGroups } from "@/lib/user";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { NextResponse } from "next/server";
 
 export default async function MessagesPage() {
   const session = await getServerSession(authOptions);

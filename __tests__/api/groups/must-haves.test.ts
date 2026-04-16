@@ -42,7 +42,7 @@ await jest.unstable_mockModule("@/lib/itinerary/generateFull", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));

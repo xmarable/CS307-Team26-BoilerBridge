@@ -14,7 +14,6 @@ import {
   Group,
   Globe2,
 } from "lucide-react";
-import { base64 } from "zod";
 
 const navItems = [
   { name: "My Trips", href: "/dashboard", icon: Map },

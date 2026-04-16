@@ -9,7 +9,7 @@ let User: any,
   SharedCost: any,
   dbConnect: any,
   bcrypt: any;
-let mockGetServerSession: jest.MockedFunction<any>;
+let mockGetServerSession: jest.Mock<any>;
 
 let groupId: string, leaderId: string, memberId: string, outsiderId: string;
 
@@ -25,7 +25,7 @@ beforeAll(async () => {
   // 1. clear cache so modules don't remember prod
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));

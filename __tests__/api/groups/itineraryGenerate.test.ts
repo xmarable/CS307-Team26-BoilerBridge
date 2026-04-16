@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
 process.env.OLLAMA_SKIP = "1";
+let mockGetServerSession: jest.Mock<any>;
 
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
@@ -21,10 +22,6 @@ const { default: Trip } = await import("@/models/Trip");
 const { default: CalendarEvent } = await import("@/models/CalendarEvent");
 const { default: MustHave } = await import("@/models/MustHave");
 
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
-
 let POSTGenerate: (
   req: Request,
   ctx: { params: Promise<{ groupId: string }> },
@@ -34,7 +31,11 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
-  const gen = await import("@/app/api/groups/[groupId]/itinerary/generate/route");
+
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession as any;
+  const gen =
+    await import("@/app/api/groups/[groupId]/itinerary/generate/route");
   POSTGenerate = gen.POST as any;
 });
 

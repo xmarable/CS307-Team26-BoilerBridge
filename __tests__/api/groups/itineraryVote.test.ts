@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 let GET: any, POST: any, DELETE: any;
 let User: any, TravelGroup: any, Vote: any, dbConnect: any, bcrypt: any;
-let mockGetServerSession: jest.MockedFunction<any>;
+let mockGetServerSession: jest.Mock<any>;
 
 let groupUUID: string, leaderId: string, memberId: string, outsiderId: string;
 
@@ -17,9 +17,9 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 }));
 
 // ── Mock Pusher so POST/DELETE don't need real credentials ──────────────────
-await jest.unstable_mockModule("pusher", () => ({
+jest.unstable_mockModule("pusher", () => ({
   default: jest.fn().mockImplementation(() => ({
-    trigger: jest.fn().mockResolvedValue(undefined),
+    trigger: (jest.fn() as any).mockResolvedValue(undefined),
   })),
 }));
 
@@ -27,7 +27,7 @@ await jest.unstable_mockModule("pusher", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -112,12 +112,8 @@ const ACTIVITY_A = "activity-aaa-001";
 const ACTIVITY_B = "activity-bbb-002";
 
 function makeGetRequest(gId: string, activityIds: string[]) {
-  const qs = activityIds.length
-    ? `?activityIds=${activityIds.join(",")}`
-    : "";
-  return new Request(
-    `http://localhost/api/groups/${gId}/itinerary/vote${qs}`,
-  );
+  const qs = activityIds.length ? `?activityIds=${activityIds.join(",")}` : "";
+  return new Request(`http://localhost/api/groups/${gId}/itinerary/vote${qs}`);
 }
 
 function makePostRequest(gId: string, body: object) {
@@ -141,7 +137,7 @@ function makeDeleteRequest(gId: string, body: object) {
 describe("GET /api/groups/:groupId/itinerary/vote", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
-    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]), {
+    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]) as any, {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(401);
@@ -152,7 +148,7 @@ describe("GET /api/groups/:groupId/itinerary/vote", () => {
       user: { userId: outsiderId },
       expires: "9999",
     });
-    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]), {
+    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]) as any, {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(403);
@@ -163,7 +159,7 @@ describe("GET /api/groups/:groupId/itinerary/vote", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await GET(makeGetRequest(groupUUID, []), {
+    const res = await GET(makeGetRequest(groupUUID, []) as any, {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(200);
@@ -176,7 +172,7 @@ describe("GET /api/groups/:groupId/itinerary/vote", () => {
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]), {
+    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]) as any, {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(200);
@@ -190,14 +186,24 @@ describe("GET /api/groups/:groupId/itinerary/vote", () => {
 
   it("returns correct counts and userVote after votes are cast", async () => {
     // Seed: leader upvotes, member downvotes
-    await Vote.create({ activityId: ACTIVITY_A, groupId: groupUUID, userId: leaderId, type: "up" });
-    await Vote.create({ activityId: ACTIVITY_A, groupId: groupUUID, userId: memberId, type: "down" });
+    await Vote.create({
+      activityId: ACTIVITY_A,
+      groupId: groupUUID,
+      userId: leaderId,
+      type: "up",
+    });
+    await Vote.create({
+      activityId: ACTIVITY_A,
+      groupId: groupUUID,
+      userId: memberId,
+      type: "down",
+    });
 
     mockGetServerSession.mockResolvedValue({
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]), {
+    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]) as any, {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(200);
@@ -210,16 +216,29 @@ describe("GET /api/groups/:groupId/itinerary/vote", () => {
   });
 
   it("returns data for multiple activityIds in one call", async () => {
-    await Vote.create({ activityId: ACTIVITY_A, groupId: groupUUID, userId: leaderId, type: "up" });
-    await Vote.create({ activityId: ACTIVITY_B, groupId: groupUUID, userId: leaderId, type: "down" });
+    await Vote.create({
+      activityId: ACTIVITY_A,
+      groupId: groupUUID,
+      userId: leaderId,
+      type: "up",
+    });
+    await Vote.create({
+      activityId: ACTIVITY_B,
+      groupId: groupUUID,
+      userId: leaderId,
+      type: "down",
+    });
 
     mockGetServerSession.mockResolvedValue({
       user: { userId: leaderId },
       expires: "9999",
     });
-    const res = await GET(makeGetRequest(groupUUID, [ACTIVITY_A, ACTIVITY_B]), {
-      params: Promise.resolve({ groupId: groupUUID }),
-    });
+    const res = await GET(
+      makeGetRequest(groupUUID, [ACTIVITY_A, ACTIVITY_B]) as any,
+      {
+        params: Promise.resolve({ groupId: groupUUID }),
+      },
+    );
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.votes[ACTIVITY_A].userVote).toBe("up");
@@ -233,7 +252,7 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(401);
@@ -245,7 +264,7 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
       expires: "9999",
     });
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(403);
@@ -257,7 +276,7 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
       expires: "9999",
     });
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(200);
@@ -273,7 +292,10 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
       expires: "9999",
     });
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "down" }),
+      makePostRequest(groupUUID, {
+        activityId: ACTIVITY_A,
+        type: "down",
+      }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(200);
@@ -289,13 +311,16 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
 
     // First vote: up
     await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
 
     // Change vote: down
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "down" }),
+      makePostRequest(groupUUID, {
+        activityId: ACTIVITY_A,
+        type: "down",
+      }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(200);
@@ -314,15 +339,21 @@ describe("POST /api/groups/:groupId/itinerary/vote", () => {
 
   it("tallies correctly when multiple users vote on the same activity", async () => {
     // leader up, member up
-    mockGetServerSession.mockResolvedValue({ user: { userId: leaderId }, expires: "9999" });
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
     await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
 
-    mockGetServerSession.mockResolvedValue({ user: { userId: memberId }, expires: "9999" });
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
     const res = await POST(
-      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
 
@@ -339,7 +370,7 @@ describe("DELETE /api/groups/:groupId/itinerary/vote", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetServerSession.mockResolvedValue(null);
     const res = await DELETE(
-      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }),
+      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(401);
@@ -351,7 +382,7 @@ describe("DELETE /api/groups/:groupId/itinerary/vote", () => {
       expires: "9999",
     });
     const res = await DELETE(
-      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }),
+      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(403);
@@ -359,14 +390,19 @@ describe("DELETE /api/groups/:groupId/itinerary/vote", () => {
 
   it("retracts a vote and decreases the tally", async () => {
     // Seed an upvote
-    await Vote.create({ activityId: ACTIVITY_A, groupId: groupUUID, userId: leaderId, type: "up" });
+    await Vote.create({
+      activityId: ACTIVITY_A,
+      groupId: groupUUID,
+      userId: leaderId,
+      type: "up",
+    });
 
     mockGetServerSession.mockResolvedValue({
       user: { userId: leaderId },
       expires: "9999",
     });
     const res = await DELETE(
-      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }),
+      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(200);
@@ -385,14 +421,19 @@ describe("DELETE /api/groups/:groupId/itinerary/vote", () => {
 
   it("deleting a non-existent vote is harmless and returns updated counts", async () => {
     // Seed another user's vote so the activity has at least one
-    await Vote.create({ activityId: ACTIVITY_A, groupId: groupUUID, userId: memberId, type: "up" });
+    await Vote.create({
+      activityId: ACTIVITY_A,
+      groupId: groupUUID,
+      userId: memberId,
+      type: "up",
+    });
 
     mockGetServerSession.mockResolvedValue({
       user: { userId: leaderId },
       expires: "9999",
     });
     const res = await DELETE(
-      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }),
+      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }) as any,
       { params: Promise.resolve({ groupId: groupUUID }) },
     );
     expect(res.status).toBe(200);
@@ -405,92 +446,61 @@ describe("DELETE /api/groups/:groupId/itinerary/vote", () => {
 // ── Acceptance Criteria ───────────────────────────────────────────────────────
 
 describe("Acceptance Criteria", () => {
-  /**
-   * AC 1
-   * Given a list of generated activities,
-   * When I click the vote button,
-   * Then the vote count increases globally for everyone in the group.
-   */
-  it(
-    "Given a list of generated activities, When I click the vote button, Then the vote count increases globally for everyone in the group.",
-    async () => {
-      // User A (leader) casts an upvote
-      mockGetServerSession.mockResolvedValue({
-        user: { userId: leaderId },
-        expires: "9999",
-      });
-      const postRes = await POST(
-        makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
-        { params: Promise.resolve({ groupId: groupUUID }) },
-      );
-      expect(postRes.status).toBe(200);
-      const postData = await postRes.json();
-      expect(postData.upvotes).toBe(1);
+  it("Given a list of generated activities, When I click the vote button, Then the vote count increases globally for everyone in the group.", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+    const postRes = await POST(
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(postRes.status).toBe(200);
+    const postData = await postRes.json();
+    expect(postData.upvotes).toBe(1);
 
-      // User B (member) queries the vote — they see the same global count
-      mockGetServerSession.mockResolvedValue({
-        user: { userId: memberId },
-        expires: "9999",
-      });
-      const getRes = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]), {
-        params: Promise.resolve({ groupId: groupUUID }),
-      });
-      expect(getRes.status).toBe(200);
-      const getData = await getRes.json();
-      expect(getData.votes[ACTIVITY_A].upvotes).toBe(1);
-    },
-  );
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: memberId },
+      expires: "9999",
+    });
+    const getRes = await GET(makeGetRequest(groupUUID, [ACTIVITY_A]) as any, {
+      params: Promise.resolve({ groupId: groupUUID }),
+    });
+    expect(getRes.status).toBe(200);
+    const getData = await getRes.json();
+    expect(getData.votes[ACTIVITY_A].upvotes).toBe(1);
+  });
 
-  /**
-   * AC 2
-   * Given I have already voted on an activity,
-   * When I click the vote button again,
-   * Then my previous vote is retracted and the tally decreases.
-   */
-  it(
-    "Given I have already voted on an activity, When I click the vote button again, Then my previous vote is retracted and the tally decreases.",
-    async () => {
-      mockGetServerSession.mockResolvedValue({
-        user: { userId: leaderId },
-        expires: "9999",
-      });
+  it("Given I have already voted on an activity, When I click the vote button again, Then my previous vote is retracted and the tally decreases.", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
 
-      // Cast initial upvote
-      await POST(
-        makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
-        { params: Promise.resolve({ groupId: groupUUID }) },
-      );
+    await POST(
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
 
-      // Retract by clicking vote again (DELETE)
-      const retractRes = await DELETE(
-        makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }),
-        { params: Promise.resolve({ groupId: groupUUID }) },
-      );
-      expect(retractRes.status).toBe(200);
-      const retractData = await retractRes.json();
-      expect(retractData.upvotes).toBe(0);
-      expect(retractData.downvotes).toBe(0);
-    },
-  );
+    const retractRes = await DELETE(
+      makeDeleteRequest(groupUUID, { activityId: ACTIVITY_A }) as any,
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(retractRes.status).toBe(200);
+    const retractData = await retractRes.json();
+    expect(retractData.upvotes).toBe(0);
+    expect(retractData.downvotes).toBe(0);
+  });
 
-  /**
-   * AC 3
-   * Given a user is not a member of the travel group,
-   * When they attempt to hit the voting API endpoint,
-   * Then the server rejects the request with a 403 error.
-   */
-  it(
-    "Given a user is not a member of the travel group, When they attempt to hit the voting API endpoint, Then the server rejects the request with a 403 error.",
-    async () => {
-      mockGetServerSession.mockResolvedValue({
-        user: { userId: outsiderId },
-        expires: "9999",
-      });
-      const res = await POST(
-        makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }),
-        { params: Promise.resolve({ groupId: groupUUID }) },
-      );
-      expect(res.status).toBe(403);
-    },
-  );
+  it("Given a user is not a member of the travel group, When they attempt to hit the voting API endpoint, Then the server rejects the request with a 403 error.", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: outsiderId },
+      expires: "9999",
+    });
+    const res = await POST(
+      makePostRequest(groupUUID, { activityId: ACTIVITY_A, type: "up" }) as any,
+      { params: Promise.resolve({ groupId: groupUUID }) },
+    );
+    expect(res.status).toBe(403);
+  });
 });

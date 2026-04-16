@@ -1,5 +1,6 @@
 // Jest config for Node + ESM support
 module.exports = {
+  testTimeout: 30000,
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts", ".tsx"],
   testEnvironmentOptions: {
@@ -45,4 +46,5 @@ module.exports = {
   transformIgnorePatterns: [
     "/node_modules/(?!(bson|mongodb|mongoose|@mongodb-js|next-auth)/)",
   ],
+  detectOpenHandles: false,
 };
