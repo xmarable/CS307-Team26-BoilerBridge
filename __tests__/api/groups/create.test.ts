@@ -21,7 +21,7 @@ beforeAll(async () => {
   jest.resetModules();
 
   // 2. dynamic imports inside beforeAll so they see TEST_MONGODB_URI
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));

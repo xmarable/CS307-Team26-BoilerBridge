@@ -8,7 +8,7 @@ interface HeaderProps {
   readonly user?: any;
 }
 
-export async function Header(user: HeaderProps) {
+export async function Header() {
   const session = await getServerSession(authOptions);
   const isAuthed = !!session;
 

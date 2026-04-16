@@ -13,9 +13,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 }));
 
 const nextAuth = await import("next-auth");
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
+let mockGetServerSession: jest.MockedFunction<any>;
 
 const { default: dbConnect } = await import("@/lib/dbConnect");
 const { default: User } = await import("@/models/User");
@@ -24,12 +22,8 @@ const { default: Trip } = await import("@/models/Trip");
 const { default: CalendarEvent } = await import("@/models/CalendarEvent");
 const { default: PublicItinerary } = await import("@/models/PublicItinerary");
 
-let POSTPublish: (
-  req: NextRequest,
-) => Promise<Response>;
-let PATCHPublish: (
-  req: NextRequest,
-) => Promise<Response>;
+let POSTPublish: (req: NextRequest) => Promise<Response>;
+let PATCHPublish: (req: NextRequest) => Promise<Response>;
 let GETPublicList: (req: NextRequest) => Promise<Response>;
 let POSTView: (
   req: NextRequest,
@@ -44,14 +38,17 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession as any;
+
   const pub = await import("@/app/api/itineraries/publish/route");
   POSTPublish = pub.POST as typeof POSTPublish;
   PATCHPublish = pub.PATCH as typeof PATCHPublish;
   const list = await import("@/app/api/itineraries/public/route");
   GETPublicList = list.GET as typeof GETPublicList;
-  const view = await import(
-    "@/app/api/itineraries/public/[publicId]/view/route"
-  );
+  const view =
+    await import("@/app/api/itineraries/public/[publicId]/view/route");
   POSTView = view.POST as typeof POSTView;
   const detail = await import("@/app/api/itineraries/public/[publicId]/route");
   GETPublicDetail = detail.GET as typeof GETPublicDetail;
@@ -301,15 +298,17 @@ describe("Public itineraries API", () => {
     expect(publicItineraryId).toBeTruthy();
 
     const list1 = await GETPublicList(
-      new NextRequest("http://localhost/api/itineraries/public?page=1&limit=20"),
+      new NextRequest(
+        "http://localhost/api/itineraries/public?page=1&limit=20",
+      ),
     );
     expect(list1.status).toBe(200);
     const j1 = await list1.json();
     const items1 = j1.items as { publicItineraryId: string }[] | undefined;
     expect(Array.isArray(items1)).toBe(true);
-    expect(
-      items1!.some((x) => x.publicItineraryId === publicItineraryId),
-    ).toBe(true);
+    expect(items1!.some((x) => x.publicItineraryId === publicItineraryId)).toBe(
+      true,
+    );
 
     await PATCHPublish(
       new NextRequest("http://localhost/api/itineraries/publish", {
@@ -328,11 +327,14 @@ describe("Public itineraries API", () => {
       expires: "9999",
     });
     const list2 = await GETPublicList(
-      new NextRequest("http://localhost/api/itineraries/public?page=1&limit=50"),
+      new NextRequest(
+        "http://localhost/api/itineraries/public?page=1&limit=50",
+      ),
     );
     expect(list2.status).toBe(200);
     const j2 = await list2.json();
-    const items2 = (j2.items as { publicItineraryId: string }[] | undefined) ?? [];
+    const items2 =
+      (j2.items as { publicItineraryId: string }[] | undefined) ?? [];
     const still = items2.some((x) => x.publicItineraryId === publicItineraryId);
     expect(still).toBe(false);
   });

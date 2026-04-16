@@ -8,7 +8,7 @@ let User: any,
   CalendarEvent: any,
   dbConnect: any,
   bcrypt: any;
-let mockGetServerSession: jest.MockedFunction<any>;
+let mockGetServerSession: jest.Mock<any>;
 
 // Use the UUID groupID field (what the routes use to find groups), not MongoDB _id
 let groupUUID: string, leaderId: string, memberId: string, outsiderId: string;
@@ -25,7 +25,7 @@ beforeAll(async () => {
   // 1. wipe cache
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));

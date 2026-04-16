@@ -106,7 +106,6 @@ export async function POST(
       return NextResponse.json({ error: "group not found" }, { status: 404 });
     }
 
-    // logic: test expects 403 if not leader
     if (group.leaderID.toString() !== sessionUserId.toString()) {
       return NextResponse.json(
         { error: "only the leader can invite" },
@@ -122,7 +121,6 @@ export async function POST(
       return NextResponse.json({ error: "user not found" }, { status: 404 });
     }
 
-    // logic: test expects 400 if user is already a member
     const alreadyMember = group.membersList.some(
       (m: any) => m.userId.toString() === targetUser.userId.toString(),
     );
@@ -133,9 +131,17 @@ export async function POST(
       );
     }
 
-    // update group state lol
-    group.pendingRequests.push({ email: targetUser.email, sentAt: new Date() });
-    group.membersList.push({ userId: targetUser.userId, role: "Viewer" });
+    // only track as pending, don't add to membersList until they accept
+    const alreadyPending = group.pendingRequests.some(
+      (r: any) => r.email.toLowerCase() === email.toLowerCase().trim(),
+    );
+    if (!alreadyPending) {
+      group.pendingRequests.push({
+        email: targetUser.email,
+        sentAt: new Date(),
+      });
+    }
+
     await group.save();
 
     return NextResponse.json(
@@ -161,20 +167,83 @@ export async function PATCH(
 ) {
   try {
     const { groupId } = await context.params;
-    const { targetUserId, newRole } = await req.json();
     await dbConnect();
+
+    const session = await getServerSession(authOptions);
+    const sessionUserId = (session?.user as any)?.userId;
+
+    if (!sessionUserId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
     const group = await TravelGroup.findOne({ groupID: binaryGroupId });
-    if (group) {
+
+    if (!group) {
+      return NextResponse.json({ error: "group not found" }, { status: 404 });
+    }
+
+    const isMember = group.membersList.some(
+      (m: any) => m.userId.toString() === sessionUserId.toString(),
+    );
+    if (!isMember) {
+      return NextResponse.json(
+        { error: "you must be a member to invite others" },
+        { status: 403 },
+      );
+    }
+    const { targetUserId, newRole, action } = await req.json();
+
+    if (!targetUserId || (!newRole && action !== "TRANSFER_LEADERSHIP")) {
+      return NextResponse.json(
+        { error: "targetUserId and newRole are required" },
+        { status: 400 },
+      );
+    }
+
+    if (action === "TRANSFER_LEADERSHIP") {
+      if (group.leaderID.toString() !== sessionUserId.toString()) {
+        return NextResponse.json(
+          { error: "only the leader can transfer leadership" },
+          { status: 403 },
+        );
+      }
+      const currentLeader = group.membersList.find(
+        (m: any) => m.userId.toString() === sessionUserId.toString(),
+      );
+      const newLeader = group.membersList.find(
+        (m: any) => m.userId.toString() === targetUserId.toString(),
+      );
+      if (!newLeader) {
+        return NextResponse.json(
+          { error: "target member not found" },
+          { status: 404 },
+        );
+      }
+      if (currentLeader) currentLeader.role = "Admin";
+      newLeader.role = "Leader";
+      group.leaderID = newLeader.userId;
+    } else {
       const member = group.membersList.find(
         (m: any) => m.userId.toString() === targetUserId.toString(),
       );
+      if (member && member.role === "Leader") {
+        return NextResponse.json(
+          {
+            error:
+              "Cannot change the leader's role directly. Use transfer leadership.",
+          },
+          { status: 400 },
+        );
+      }
       if (member) member.role = newRole;
-      await group.save();
     }
+
+    await group.save();
     return NextResponse.json({ message: "updated" });
   } catch (err) {
-    return NextResponse.json({ error: "server error" }, { status: 500 });
+    console.error("PATCH members error:", err);
+    return NextResponse.json({ error: "SERVER error" }, { status: 500 });
   }
 }
 
@@ -183,17 +252,58 @@ export async function DELETE(
   context: { params: Promise<{ groupId: string }> },
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    const sessionUserId = (session?.user as any)?.userId;
+
+    if (!sessionUserId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const { groupId } = await context.params;
-    const { userId } = await req.json();
     await dbConnect();
+
     const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
     const group = await TravelGroup.findOne({ groupID: binaryGroupId });
-    if (group) {
+
+    if (!group) {
+      return NextResponse.json({ error: "group not found" }, { status: 404 });
+    }
+
+    // only the leader can remove members or cancel invitations
+    if (group.leaderID.toString() !== sessionUserId.toString()) {
+      return NextResponse.json(
+        { error: "only the leader can perform this action" },
+        { status: 403 },
+      );
+    }
+
+    const body = await req.json();
+    const { userId, email } = body;
+
+    if (email) {
+      // cancel a pending invitation — remove from pendingRequests and membersList
+      const lowerEmail = (email as string).toLowerCase().trim();
+      group.pendingRequests = group.pendingRequests.filter(
+        (r: any) => r.email.toLowerCase() !== lowerEmail,
+      );
+      const targetUser = await User.findOne({ email: lowerEmail });
+      if (targetUser) {
+        group.membersList = group.membersList.filter(
+          (m: any) => m.userId.toString() !== targetUser.userId.toString(),
+        );
+      }
+    } else if (userId) {
       group.membersList = group.membersList.filter(
         (m: any) => m.userId.toString() !== userId.toString(),
       );
-      await group.save();
+    } else {
+      return NextResponse.json(
+        { error: "userId or email required" },
+        { status: 400 },
+      );
     }
+
+    await group.save();
     return NextResponse.json({ message: "removed" });
   } catch (err) {
     return NextResponse.json({ error: "server error" }, { status: 500 });

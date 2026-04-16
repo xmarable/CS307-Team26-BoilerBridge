@@ -3,7 +3,11 @@ import { sanitizeHttpsUrl } from "@/lib/safeExternalUrl";
 import { geocodeCityCenter } from "@/lib/travel/geocodeCityCenter";
 import { fetchGooglePlaceEnrichment } from "./googlePlaces";
 import { resolveExpediaBookingUrl } from "./expediaRapid";
-import { buildBookingPlan, deriveHintTags, type BookingPlan } from "./bookingIntel";
+import {
+  buildBookingPlan,
+  deriveHintTags,
+  type BookingPlan,
+} from "./bookingIntel";
 
 export type GooglePlacePayload = {
   placeId: string;
@@ -56,7 +60,10 @@ function formatPriceLevel(n: number | undefined | null): string | undefined {
   return "$".repeat(n);
 }
 
-function shortSummaryFromDescription(text: string | undefined, max = 200): string | undefined {
+function shortSummaryFromDescription(
+  text: string | undefined,
+  max = 200,
+): string | undefined {
   const t = text?.trim();
   if (!t) return undefined;
   if (t.length <= max) return t;
@@ -67,9 +74,11 @@ function shortSummaryFromDescription(text: string | undefined, max = 200): strin
  * Merge Google Places (US15) and Expedia Rapid / search fallback (US16)
  * into the payload returned by GET /api/activities/[activityId].
  */
-export async function enrichActivityForApi(activity: ActivityLeanForEnrichment) {
+export async function enrichActivityForApi(
+  activity: ActivityLeanForEnrichment,
+) {
   const googleKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
-  let google = null;
+  let google: any = null;
   if (googleKey) {
     try {
       const dest = activity.destinationCity?.trim();
@@ -119,13 +128,16 @@ export async function enrichActivityForApi(activity: ActivityLeanForEnrichment) 
   }
 
   const referenceLinks = [...(activity.referenceLinks ?? [])];
-  const mapsUri = google?.googleMapsUri?.trim() || activity.googleMapsUri?.trim();
+  const mapsUri =
+    google?.googleMapsUri?.trim() || activity.googleMapsUri?.trim();
   if (mapsUri && !referenceLinks.some((r) => r.url === mapsUri)) {
     referenceLinks.push({ title: "Google Maps", url: mapsUri });
   }
 
   const description =
-    activity.description?.trim() || google?.editorialSummary?.trim() || undefined;
+    activity.description?.trim() ||
+    google?.editorialSummary?.trim() ||
+    undefined;
   const address =
     activity.address?.trim() || google?.formattedAddress?.trim() || undefined;
   const infoUrl =
@@ -185,14 +197,17 @@ export async function enrichActivityForApi(activity: ActivityLeanForEnrichment) 
   const openingHoursLines =
     google?.weekdayDescriptions?.length && google.weekdayDescriptions
       ? google.weekdayDescriptions
-      : activity.openingHoursSummary?.split("\n").filter((l) => l.trim()) ?? [];
+      : (activity.openingHoursSummary?.split("\n").filter((l) => l.trim()) ??
+        []);
 
   const displayRating =
-    typeof google?.rating === "number" ? google.rating : activity.rating ?? null;
+    typeof google?.rating === "number"
+      ? google.rating
+      : (activity.rating ?? null);
   const displayReviewCount =
     typeof google?.userRatingCount === "number"
       ? google.userRatingCount
-      : activity.reviewCount ?? 0;
+      : (activity.reviewCount ?? 0);
 
   const googlePlace: GooglePlacePayload | undefined = google
     ? {
@@ -224,11 +239,11 @@ export async function enrichActivityForApi(activity: ActivityLeanForEnrichment) 
   const hasHeroPhoto = hasMongoId
     ? Boolean(
         activity.googlePhotoMediaResource?.trim() ||
-          activity.googlePhotoReference?.trim(),
+        activity.googlePhotoReference?.trim(),
       )
     : Boolean(
         google?.googlePhotoMediaResource?.trim() ||
-          google?.googlePhotoReference?.trim(),
+        google?.googlePhotoReference?.trim(),
       );
 
   const effectivePlaceId =

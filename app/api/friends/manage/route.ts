@@ -26,7 +26,7 @@ export async function GET() {
       .lean();
 
     return NextResponse.json(friends);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
@@ -25,10 +25,10 @@ export async function GET() {
       .lean();
 
     const payload = groups.map((g: any) => ({
-      groupID: g.groupID,
+      groupID: g.groupID.toString(),
       groupName: g.groupName,
       description: g.description,
-      leaderID: g.leaderID,
+      leaderID: g.leaderID.toString(),
       membersList: g.membersList,
       createdAt: g.createdAt,
     }));
@@ -77,10 +77,10 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         group: {
-          groupID: newGroup.groupID,
+          groupID: newGroup.groupID.toString(),
           groupName: newGroup.groupName,
           description: newGroup.description,
-          leaderID: newGroup.leaderID,
+          leaderID: newGroup.leaderID.toString(),
           membersList: newGroup.membersList,
           createdAt: newGroup.createdAt,
         },

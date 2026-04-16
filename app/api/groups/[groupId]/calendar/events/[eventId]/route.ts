@@ -55,6 +55,7 @@ export async function PUT(
     // we need the full group document (not lean) because we might save reminders to it
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
+      console.log("Group not found for id:", groupId);
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 

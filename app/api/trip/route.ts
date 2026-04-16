@@ -169,31 +169,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const sanitizedRainyDayItinerary =
-      sanitizeRainyDayItinerary(rainyDayItinerary);
-    const { primary, rainyDay } = await createInitialItinerary(
-      new Date(fromDate),
-      new Date(toDate),
-      sanitizedRainyDayItinerary,
-    );
+    const existing = await Trip.findOne({ groupID });
 
-    const trip = await Trip.create({
-      userId,
-      groupID,
-      fromCity,
-      toCity,
-      fromDate: new Date(fromDate),
-      toDate: new Date(toDate),
-      mode,
-      budget: Number(budget),
-      tripConfirmed: tripConfirmed ?? false,
-      primaryItinerary: primary,
-      rainyDayItinerary: rainyDay,
-      ...(avoidActivities != null && { avoidActivities }),
-      ...(avoidLocations != null && { avoidLocations }),
-      ...(budgetMin != null && { budgetMin }),
-      ...(budgetMax != null && { budgetMax }),
-    });
+    let primary: unknown;
+    let rainyDay: unknown;
+
+    if (existing) {
+      primary = existing.primaryItinerary;
+      rainyDay = existing.rainyDayItinerary;
+    } else {
+      const sanitizedRainyDayItinerary =
+        sanitizeRainyDayItinerary(rainyDayItinerary);
+      const created = await createInitialItinerary(
+        new Date(fromDate),
+        new Date(toDate),
+        sanitizedRainyDayItinerary,
+      );
+      primary = created.primary;
+      rainyDay = created.rainyDay;
+    }
+
+    const trip = await Trip.findOneAndUpdate(
+      { groupID },
+      {
+        $set: {
+          userId,
+          groupID,
+          fromCity,
+          toCity,
+          fromDate: new Date(fromDate),
+          toDate: new Date(toDate),
+          mode,
+          budget: Number(budget),
+          tripConfirmed: tripConfirmed ?? false,
+          primaryItinerary: primary,
+          rainyDayItinerary: rainyDay,
+          ...(avoidActivities != null && { avoidActivities }),
+          ...(avoidLocations != null && { avoidLocations }),
+          ...(budgetMin != null && { budgetMin }),
+          ...(budgetMax != null && { budgetMax }),
+        },
+      },
+      { upsert: true, new: true },
+    );
 
     const sanitizedMustHaves =
       mustHaves
@@ -236,7 +254,7 @@ export async function POST(req: NextRequest) {
         budgetMin: t.budgetMin,
         budgetMax: t.budgetMax,
       },
-      { status: 201 },
+      { status: existing != null ? 200 : 201 },
     );
   } catch (err: any) {
     console.error("POST /api/trip error:", err);

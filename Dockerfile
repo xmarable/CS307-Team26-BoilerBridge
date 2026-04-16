@@ -1,11 +1,12 @@
 # stage 1 deps
 FROM node:22-alpine AS deps
-# keep these if npm ci messes up with native modules
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --legacy-peer-deps
 
 # stage 2 builder
 FROM node:22-alpine AS builder

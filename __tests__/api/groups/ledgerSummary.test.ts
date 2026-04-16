@@ -15,9 +15,7 @@ const { default: dbConnect } = await import("@/lib/dbConnect");
 const { default: User } = await import("@/models/User");
 const { default: TravelGroup } = await import("@/models/TravelGroup");
 
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
+let mockGetServerSession: jest.MockedFunction<any>;
 
 let GETLedgerSummary: (
   req: Request,
@@ -28,9 +26,11 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
-  const route = await import(
-    "@/app/api/groups/[groupId]/ledger/summary/route"
-  );
+
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  const route = await import("@/app/api/groups/[groupId]/ledger/summary/route");
   GETLedgerSummary = route.GET;
 });
 
@@ -52,7 +52,11 @@ describe("GET /api/groups/[groupId]/ledger/summary", () => {
     mockGetServerSession.mockResolvedValue(null);
     const res = await GETLedgerSummary(
       new Request("http://localhost/api/x/ledger/summary"),
-      { params: Promise.resolve({ groupId: "00000000-0000-4000-8000-000000000001" }) },
+      {
+        params: Promise.resolve({
+          groupId: "00000000-0000-4000-8000-000000000001",
+        }),
+      },
     );
     expect(res.status).toBe(401);
   });
@@ -160,9 +164,7 @@ describe("GET /api/groups/[groupId]/ledger/summary", () => {
     });
 
     const res = await GETLedgerSummary(
-      new Request(
-        "http://localhost/api/x/ledger/summary?expenseFilter=active",
-      ),
+      new Request("http://localhost/api/x/ledger/summary?expenseFilter=active"),
       { params: Promise.resolve({ groupId: String(group.groupID) }) },
     );
     expect(res.status).toBe(200);

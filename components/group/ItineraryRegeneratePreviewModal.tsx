@@ -79,7 +79,7 @@ export default function ItineraryRegeneratePreviewModal({
               Original
             </h4>
             <div className="space-y-3">
-              {originals.map((o, i) => (
+              {originals.map((o,) => (
                 <div
                   key={o._id}
                   className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 text-left"

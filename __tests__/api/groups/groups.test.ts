@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 let GET: any, POST: any;
 let User: any, TravelGroup: any, dbConnect: any, bcrypt: any;
-let mockGetServerSession: jest.MockedFunction<any>;
+let mockGetServerSession: jest.Mock<any>;
 
 let userId: string, otherUserId: string;
 
@@ -18,7 +18,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));

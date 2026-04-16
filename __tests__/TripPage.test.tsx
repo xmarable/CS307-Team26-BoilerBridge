@@ -38,9 +38,8 @@ await import("@/components/Navbar");
 
 // 5. Dynamic import of the component
 // logic: ensured this path matches your actual file structure to avoid import failures
-const TripPage = (
-  await import("@/app/dashboard/groups/[groupId]/trip/page")
-).default;
+const TripPage = (await import("@/app/dashboard/groups/[groupId]/trip/page"))
+  .default;
 
 describe("TripPage", () => {
   // Now, inside your tests, you can even re-mock the return value if needed:

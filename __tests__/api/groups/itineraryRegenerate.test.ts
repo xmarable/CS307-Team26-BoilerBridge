@@ -24,9 +24,7 @@ const { default: Trip } = await import("@/models/Trip");
 const { default: CalendarEvent } = await import("@/models/CalendarEvent");
 const { default: MustHave } = await import("@/models/MustHave");
 
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
+let mockGetServerSession: jest.MockedFunction<any>;
 
 const mockGeneratePartialItinerary =
   generatePartial.generatePartialItinerary as jest.MockedFunction<
@@ -42,14 +40,17 @@ let POSTApply: (
   ctx: { params: Promise<{ groupId: string }> },
 ) => Promise<Response>;
 
-let lastGenerateInput: Parameters<
-  typeof generatePartial.generatePartialItinerary
->[0] | null;
+let lastGenerateInput:
+  | Parameters<typeof generatePartial.generatePartialItinerary>[0]
+  | null;
 
 const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
+
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession as any;
 
   mockGeneratePartialItinerary.mockImplementation(async (input) => {
     lastGenerateInput = input;
@@ -68,11 +69,11 @@ beforeAll(async () => {
     });
   });
 
-  const reg = await import("@/app/api/groups/[groupId]/itinerary/regenerate/route");
+  const reg =
+    await import("@/app/api/groups/[groupId]/itinerary/regenerate/route");
   POSTRegenerate = reg.POST as any;
-  const app = await import(
-    "@/app/api/groups/[groupId]/itinerary/regenerate/apply/route"
-  );
+  const app =
+    await import("@/app/api/groups/[groupId]/itinerary/regenerate/apply/route");
   POSTApply = app.POST as any;
 });
 
@@ -311,9 +312,11 @@ describe("POST /api/groups/[groupId]/itinerary/regenerate", () => {
     const after = await CalendarEvent.countDocuments({ groupId: groupID });
     expect(after).toBe(before);
 
-    expect(lastGenerateInput?.approvedMustHaves.some((m) => m.name === "Approved Museum")).toBe(
-      true,
-    );
+    expect(
+      lastGenerateInput?.approvedMustHaves.some(
+        (m) => m.name === "Approved Museum",
+      ),
+    ).toBe(true);
 
     await CalendarEvent.deleteMany({ groupId: groupID });
     await MustHave.deleteMany({ groupId: groupID as never });

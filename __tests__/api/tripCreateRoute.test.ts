@@ -1,7 +1,8 @@
 import { jest } from "@jest/globals";
 
 const mockGenerateRainyDayPlan = jest.fn();
-const mockTripCreate = jest.fn();
+const mockTripFindOne = jest.fn();
+const mockTripFindOneAndUpdate = jest.fn();
 const mockMustHaveInsertMany = jest.fn();
 const mockGetServerSession = jest.fn();
 const mockGetMemberPermissions = jest.fn();
@@ -29,7 +30,11 @@ await jest.unstable_mockModule("@/lib/roles", () => ({
 
 await jest.unstable_mockModule("@/models/Trip", () => ({
   __esModule: true,
-  default: { create: mockTripCreate, find: jest.fn() },
+  default: {
+    find: jest.fn(),
+    findOne: mockTripFindOne,
+    findOneAndUpdate: mockTripFindOneAndUpdate,
+  },
 }));
 
 await jest.unstable_mockModule("@/models/MustHave", () => ({
@@ -69,10 +74,13 @@ describe("POST /api/trip rainy-day sanitization", () => {
       },
     ]);
 
-    mockTripCreate.mockImplementation(async (doc) => ({
-      _id: "trip-id",
-      ...doc,
-    }));
+    mockTripFindOne.mockResolvedValue(null);
+    mockTripFindOneAndUpdate.mockImplementation(
+      async (_filter: unknown, update: { $set: Record<string, unknown> }) => ({
+        _id: "trip-id",
+        ...update.$set,
+      }),
+    );
     mockMustHaveInsertMany.mockResolvedValue([]);
   });
 
@@ -87,9 +95,9 @@ describe("POST /api/trip rainy-day sanitization", () => {
     expect(res.status).toBe(201);
 
     expect(mockGenerateRainyDayPlan).toHaveBeenCalledTimes(1);
-    expect(mockTripCreate).toHaveBeenCalledTimes(1);
+    expect(mockTripFindOneAndUpdate).toHaveBeenCalledTimes(1);
 
-    const createdDoc = mockTripCreate.mock.calls[0][0];
+    const createdDoc = mockTripFindOneAndUpdate.mock.calls[0][1].$set;
     expect(Array.isArray(createdDoc.rainyDayItinerary)).toBe(true);
     expect(createdDoc.rainyDayItinerary).toHaveLength(1);
     expect(createdDoc.rainyDayItinerary[0].name).toBe("Museum Visit");
@@ -109,7 +117,7 @@ describe("POST /api/trip rainy-day sanitization", () => {
     expect(res.status).toBe(201);
 
     expect(mockGenerateRainyDayPlan).toHaveBeenCalledTimes(1);
-    const createdDoc = mockTripCreate.mock.calls[0][0];
+    const createdDoc = mockTripFindOneAndUpdate.mock.calls[0][1].$set;
     expect(createdDoc.rainyDayItinerary).toHaveLength(1);
     expect(createdDoc.rainyDayItinerary[0].activityId).toBe("rainy-1");
   });
@@ -138,7 +146,7 @@ describe("POST /api/trip rainy-day sanitization", () => {
     expect(res.status).toBe(201);
 
     expect(mockGenerateRainyDayPlan).not.toHaveBeenCalled();
-    const createdDoc = mockTripCreate.mock.calls[0][0];
+    const createdDoc = mockTripFindOneAndUpdate.mock.calls[0][1].$set;
     expect(createdDoc.rainyDayItinerary).toHaveLength(1);
     expect(createdDoc.rainyDayItinerary[0]).toMatchObject({
       activityId: "manual-1",
