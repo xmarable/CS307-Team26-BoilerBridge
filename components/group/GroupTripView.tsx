@@ -97,6 +97,7 @@ export function GroupTripView({ initialData }: { initialData: any }) {
                   canPublishItinerary={
                     userRole === "Leader" || userRole === "Admin"
                   }
+                  isLeader={userRole === "Leader"}
                 />
               </div>
 

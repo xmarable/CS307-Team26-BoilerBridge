@@ -6,9 +6,11 @@ import CalendarEventsPanel from "./CalendarEventsPanel";
 export function TimelineSection({
   groupId,
   canPublishItinerary = false,
+  isLeader = false,
 }: {
   groupId: string;
   canPublishItinerary?: boolean;
+  isLeader?: boolean;
 }) {
   return (
     <section className="space-y-6 flex-1 min-w-0">
@@ -24,6 +26,7 @@ export function TimelineSection({
         <CalendarEventsPanel
           groupId={groupId}
           canPublishItinerary={canPublishItinerary}
+          isLeader={isLeader}
         />
       </div>
     </section>

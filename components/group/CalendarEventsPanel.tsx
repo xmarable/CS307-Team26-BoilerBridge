@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import ItineraryRegeneratePreviewModal, {
   type PreviewProposedRow,
 } from "@/components/group/ItineraryRegeneratePreviewModal";
 import { ActivityVoting } from "@/components/group/ActivityVoting";
+import { OptionGroupVoting } from "@/components/group/OptionGroupVoting";
 import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
 import { buildCalendarActivityDetailHref } from "@/lib/calendarActivityDetailLink";
 
@@ -61,6 +63,8 @@ type CalendarEvent = {
   linkedActivityId?: string;
   linkedPlaceId?: string;
   itineraryDestinationCity?: string;
+  itineraryOptionStatus?: "candidate" | "removed" | "final";
+  optionGroupId?: string;
 };
 
 type GroupTripOption = {
@@ -74,6 +78,8 @@ type GroupTripOption = {
 type Props = {
   groupId: string;
   canPublishItinerary?: boolean;
+  /** Leader-only: finalize option-group polls */
+  isLeader?: boolean;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -130,10 +136,17 @@ function formatScheduleConflictMessage(data: {
   return `${base} Conflicts with “${c.title}” (${startLabel}–${endLabel}).`;
 }
 
+function isDismissibleCandidate(ev: CalendarEvent): boolean {
+  if (ev.source !== "itinerary") return false;
+  const s = ev.itineraryOptionStatus;
+  return s === "candidate" || s === undefined;
+}
+
 /* ---------- Main Component ---------- */
 export default function CalendarEventsPanel({
   groupId,
   canPublishItinerary = false,
+  isLeader = false,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -199,6 +212,25 @@ export default function CalendarEventsPanel({
       { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
     >
   >({});
+  const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
+  const [finalizingGroupId, setFinalizingGroupId] = useState<string | null>(
+    null,
+  );
+
+  const { data: pollsData, mutate: mutatePolls } = useSWR(
+    groupId ? `/api/groups/${groupId}/itinerary/votes` : null,
+    async (url: string) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Failed to load polls");
+      return r.json() as Promise<{
+        polls: Record<
+          string,
+          import("@/components/group/OptionGroupVoting").PollData
+        >;
+      }>;
+    },
+  );
+  const polls = pollsData?.polls ?? {};
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -245,6 +277,20 @@ export default function CalendarEventsPanel({
       map.set(k, arr);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [events]);
+
+  const firstEventIdByOptionGroup = useMemo(() => {
+    const sorted = [...events].sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
+    const m = new Map<string, string>();
+    for (const e of sorted) {
+      const og = e.optionGroupId?.trim();
+      if (!og) continue;
+      if (!m.has(og)) m.set(og, e._id);
+    }
+    return m;
   }, [events]);
 
   /* ---------- API Calls ---------- */
@@ -376,6 +422,7 @@ export default function CalendarEventsPanel({
           setPopupMsg(data?.message || "Itinerary sparked successfully.");
           setShowSuccessPopup(true);
           await fetchEvents();
+          await mutatePolls();
         }
       }
     } catch (e: any) {
@@ -438,8 +485,71 @@ export default function CalendarEventsPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
       await fetchEvents();
+      await mutatePolls();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete event.");
+    }
+  }
+
+  async function handleDismissCandidate(ev: CalendarEvent) {
+    const prev = events;
+    setEvents((list) => list.filter((x) => x._id !== ev._id));
+    try {
+      setErr(null);
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/options/${ev._id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "dismiss" }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setEvents(prev);
+        throw new Error(data?.error || "Failed to dismiss option.");
+      }
+      await mutatePolls();
+      await fetchEvents();
+    } catch (e: unknown) {
+      setEvents(prev);
+      setErr(e instanceof Error ? e.message : "Failed to dismiss option.");
+    }
+  }
+
+  async function handleOptionGroupVote(optionGroupId: string, optionId: string) {
+    try {
+      setVotingOptionId(optionId);
+      const res = await fetch(`/api/groups/${groupId}/itinerary/votes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionGroupId, optionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Vote failed");
+      await mutatePolls();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Vote failed");
+    } finally {
+      setVotingOptionId(null);
+    }
+  }
+
+  async function handleFinalizePoll(optionGroupId: string) {
+    try {
+      setFinalizingGroupId(optionGroupId);
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/votes/${optionGroupId}/finalize`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Finalize failed");
+      await mutatePolls();
+      await fetchEvents();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Finalize failed");
+    } finally {
+      setFinalizingGroupId(null);
     }
   }
 
@@ -488,6 +598,7 @@ export default function CalendarEventsPanel({
       setPreviewProposed([]);
       setSelectedIds(new Set());
       await fetchEvents();
+      await mutatePolls();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to apply changes";
       setErr(msg);
@@ -994,13 +1105,46 @@ export default function CalendarEventsPanel({
                     )}
 
                     <div className="mt-2">
-                      <ActivityVoting
-                        activityId={ev._id}
-                        groupId={groupId}
-                        initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
-                        initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
-                        userVote={voteData[ev._id]?.userVote ?? null}
-                      />
+                      {ev.optionGroupId && isDismissibleCandidate(ev) ? (
+                        <OptionGroupVoting
+                          eventId={ev._id}
+                          optionGroupId={ev.optionGroupId}
+                          poll={
+                            polls[ev.optionGroupId] ?? {
+                              optionGroupId: ev.optionGroupId,
+                              tallies: {},
+                              myVote: null,
+                              candidates: [],
+                            }
+                          }
+                          voting={votingOptionId === ev._id}
+                          onPick={() =>
+                            void handleOptionGroupVote(
+                              ev.optionGroupId!,
+                              ev._id,
+                            )
+                          }
+                          showFinalize={
+                            isLeader &&
+                            firstEventIdByOptionGroup.get(ev.optionGroupId!) ===
+                              ev._id
+                          }
+                          finalizing={
+                            finalizingGroupId === ev.optionGroupId
+                          }
+                          onFinalize={() =>
+                            void handleFinalizePoll(ev.optionGroupId!)
+                          }
+                        />
+                      ) : (
+                        <ActivityVoting
+                          activityId={ev._id}
+                          groupId={groupId}
+                          initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+                          initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+                          userVote={voteData[ev._id]?.userVote ?? null}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -1015,16 +1159,30 @@ export default function CalendarEventsPanel({
                       <Edit3 size={16} />
                       Edit
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(ev._id)}
-                      className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
-                    >
-                      <Trash2 size={16} className="inline mr-1" />
-                      Remove
-                    </Button>
+                    {canPublishItinerary &&
+                      (isDismissibleCandidate(ev) ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleDismissCandidate(ev)}
+                          className="rounded-xl text-amber-800 hover:text-amber-900 hover:bg-amber-50 font-semibold h-9"
+                        >
+                          <Trash2 size={16} className="inline mr-1" />
+                          Dismiss
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(ev._id)}
+                          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
+                        >
+                          <Trash2 size={16} className="inline mr-1" />
+                          Remove
+                        </Button>
+                      ))}
                   </div>
                 </div>
                     );
