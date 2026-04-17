@@ -77,6 +77,7 @@ export async function POST(
       );
     }
 
+    const src = data.source ?? "manual";
     const created = await CalendarEvent.create({
       title: data.title,
       description: data.description,
@@ -86,9 +87,10 @@ export async function POST(
       eventType: data.eventType ?? "general",
       createdBy: userMongoId,
       groupId: groupId,
-      source: data.source ?? "manual",
+      source: src,
       externalId: data.externalId,
       timezone: data.timezone ?? "UTC",
+      itineraryOptionStatus: src === "manual" ? "final" : "candidate",
     });
 
     return NextResponse.json({ event: created }, { status: 201 });
@@ -150,6 +152,7 @@ export async function GET(
       groupId,
       startTime: { $lt: to },
       endTime: { $gt: from },
+      itineraryOptionStatus: { $ne: "removed" },
     }).sort({ startTime: 1 });
 
     return NextResponse.json({ events }, { status: 200 });

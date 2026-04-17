@@ -21,6 +21,7 @@ export async function findCalendarEventOverlap(
     groupId,
     startTime: { $lt: window.end },
     endTime: { $gt: window.start },
+    itineraryOptionStatus: { $ne: "removed" },
   };
 
   if (
