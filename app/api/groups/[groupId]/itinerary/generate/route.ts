@@ -13,8 +13,10 @@ import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTime
 import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import { assignOptionGroupIds } from "@/lib/itinerary/clusterOptionGroups";
 
 import CalendarEvent from "@/models/CalendarEvent";
+import ItineraryOptionVote from "@/models/ItineraryOptionVote";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
 
@@ -139,10 +141,13 @@ export async function POST(
       );
     }
 
+    await ItineraryOptionVote.deleteMany({ groupId } as never);
     await CalendarEvent.deleteMany({
       groupId: groupId as never,
       source: "itinerary",
     } as never);
+
+    const optionGroupIds = assignOptionGroupIds(proposed);
 
     let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
     linkRows = await augmentResolvedLinksWithTextSearch(proposed, linkRows, {
@@ -163,6 +168,8 @@ export async function POST(
       groupId,
       source: "itinerary" as const,
       timezone: ev.timezone ?? "UTC",
+      itineraryOptionStatus: "candidate" as const,
+      ...(optionGroupIds[i] ? { optionGroupId: optionGroupIds[i] } : {}),
       ...(destCity ? { itineraryDestinationCity: destCity } : {}),
       ...(linkRows[i]?.linkedActivityId
         ? { linkedActivityId: linkRows[i]!.linkedActivityId }

@@ -7,6 +7,7 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import CalendarEvent from "@/models/CalendarEvent";
+import ItineraryOptionVote from "@/models/ItineraryOptionVote";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
 import { ProposedEventSchema } from "@/lib/itinerary/schemas";
@@ -14,6 +15,8 @@ import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationC
 import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import { assignOptionGroupIds } from "@/lib/itinerary/clusterOptionGroups";
+import type { ProposedEventInput } from "@/lib/itinerary/schemas";
 
 const ApplyBodySchema = z.object({
   replaceEventIds: z.array(z.string().min(1)).min(1),
@@ -128,6 +131,20 @@ export async function POST(
       );
     }
 
+    const touchedGroupIds = [
+      ...new Set(
+        existing
+          .map((e) => (e as { optionGroupId?: string }).optionGroupId)
+          .filter((g): g is string => typeof g === "string" && g.length > 0),
+      ),
+    ];
+    if (touchedGroupIds.length > 0) {
+      await ItineraryOptionVote.deleteMany({
+        groupId,
+        optionGroupId: { $in: touchedGroupIds },
+      } as never);
+    }
+
     const del = await CalendarEvent.deleteMany({
       _id: { $in: replaceEventIds },
       groupId,
@@ -138,6 +155,8 @@ export async function POST(
         { status: 409 },
       );
     }
+
+    const optionGroupIds = assignOptionGroupIds(proposedEvents as ProposedEventInput[]);
 
     const docs = proposedEvents.map((ev, i) => ({
       title: ev.title,
@@ -150,6 +169,8 @@ export async function POST(
       groupId,
       source: "itinerary" as const,
       timezone: ev.timezone ?? "UTC",
+      itineraryOptionStatus: "candidate" as const,
+      ...(optionGroupIds[i] ? { optionGroupId: optionGroupIds[i] } : {}),
       ...(destCity ? { itineraryDestinationCity: destCity } : {}),
       ...(linkRows[i]?.linkedActivityId
         ? { linkedActivityId: linkRows[i]!.linkedActivityId }
