@@ -139,8 +139,6 @@ export default function GroupDashboard() {
       if (data?.group) {
         setGroup(data.group);
       }
-      const data = await res.json();
-      if (data?.group) setGroup(data.group);
     } catch {
       setError("Failed to load group.");
     } finally {
@@ -200,7 +198,7 @@ export default function GroupDashboard() {
     try {
       const res = await fetch(`/api/groups/${groupId}/itenerary/options`, {
         method: "PATCH",
-        body: JSON.stringify({ allowShare: allowIteneraryShare })
+        body: JSON.stringify({ allowShare: allowIteneraryShare }),
       });
 
       setAllowIteneraryShare(!allowIteneraryShare);
@@ -568,18 +566,20 @@ export default function GroupDashboard() {
                         Create Trip
                       </Link>
                       <div className="flex flex-l">
-                        <p className="text-sm text-amber-700">
-                          Allow Share: 
-                        </p>
+                        <p className="text-sm text-amber-700">Allow Share:</p>
                         <button
                           type="button"
                           onClick={() => handleToggle()}
-                          className={`relative h-5 w-8 rounded-full transition-all ${allowIteneraryShare ? "bg-amber-500" : "bg-gray-200"
-                            }`}
+                          className={`relative h-5 w-8 rounded-full transition-all ${
+                            allowIteneraryShare ? "bg-amber-500" : "bg-gray-200"
+                          }`}
                         >
                           <span
-                            className={`absolute left-0 top-1 h-3 w-3 rounded-full bg-white shadow transition-transform ${allowIteneraryShare ? "translate-x-4" : "translate-x-1"
-                              }`}
+                            className={`absolute left-0 top-1 h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                              allowIteneraryShare
+                                ? "translate-x-4"
+                                : "translate-x-1"
+                            }`}
                           />
                         </button>
                       </div>
