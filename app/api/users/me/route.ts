@@ -6,11 +6,16 @@ import User from "@/models/User";
 import z from "zod";
 import bcrypt from "bcryptjs"
 
+const NotificationSettingsSchema = z.object({
+  inApp: z.boolean().optional(),
+  email: z.boolean().optional()
+})
+
 const SettingsSchema = z.object({
-  tripReminders: z.boolean().optional(),
-  friendRequests: z.boolean().optional(),
-  groupInvites: z.boolean().optional(),
-  groupNotifications: z.boolean().optional(),
+  tripReminders: NotificationSettingsSchema.optional(),
+  friendRequests: NotificationSettingsSchema.optional(),
+  groupInvites: NotificationSettingsSchema.optional(),
+  groupNotifications: NotificationSettingsSchema.optional(),
   newPassword: z.string().min(8).max(64).optional(),
   deleteAccount: z.boolean().optional(),
   deletionReason: z.string().optional()
@@ -79,19 +84,23 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (tripReminders !== undefined) {
-    user.settings.notifications.tripReminders = tripReminders;
+    user.settings.notifications.tripReminders.inApp = tripReminders.inApp;
+    user.settings.notifications.tripReminders.email = tripReminders.email;
   }
 
   if (friendRequests !== undefined) {
-    user.settings.notifications.friendRequests = friendRequests;
+    user.settings.notifications.friendRequests.inApp = friendRequests.inApp;
+    user.settings.notifications.friendRequests.email = friendRequests.inApp;
   }
 
   if (groupInvites !== undefined) {
-    user.settings.notifications.groupInvites = groupInvites;
+    user.settings.notifications.groupInvites.inApp = groupInvites.inApp;
+    user.settings.notifications.groupInvites.email = groupInvites.email;
   }
 
   if (groupNotifications !== undefined) {
-    user.settings.notifications.groupNotifications = groupNotifications;
+    user.settings.notifications.groupNotifications.inApp = groupNotifications.inApp;
+    user.settings.notifications.groupNotifications.email = groupNotifications.email;
   }
 
   if (newPassword !== undefined) {

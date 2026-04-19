@@ -108,6 +108,8 @@ export default function GroupDashboard() {
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
+  const [allowIteneraryShare, setAllowIteneraryShare] = useState(false);
+
   const [expensesTab, setExpensesTab] = useState<
     "summary" | "ledger" | "splits"
   >("summary");
@@ -131,6 +133,11 @@ export default function GroupDashboard() {
       if (res.status === 403 || res.status === 404) {
         router.push("/dashboard");
         return;
+      }
+
+      const data = await res.json();
+      if (data?.group) {
+        setGroup(data.group);
       }
       const data = await res.json();
       if (data?.group) setGroup(data.group);
@@ -187,6 +194,17 @@ export default function GroupDashboard() {
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const handleToggle = async () => {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/itenerary/options`, {
+        method: "PATCH",
+        body: JSON.stringify({ allowShare: allowIteneraryShare })
+      });
+
+      setAllowIteneraryShare(!allowIteneraryShare);
+    } catch (e) {}
   };
 
   const handleDelete = async () => {
@@ -541,16 +559,31 @@ export default function GroupDashboard() {
                       Timeline
                     </h2>
                   </div>
-                  {groupId && isLeader && !tripActive && (
-                    <Link href={`/dashboard/groups/${groupId}/trip`}>
-                      <Button
-                        size="sm"
-                        className="bg-linear-to-r from-bb-brand to-bb-brand-to text-white font-bold rounded-xl px-4 shadow-md shadow-amber-100 hover:opacity-90 transition-all active:scale-95"
+                  {groupId && (
+                    <div className="flex flex-l space-x-3 items-center">
+                      <Link
+                        href={`/dashboard/groups/${groupId}/trip`}
+                        className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
                       >
-                        <Plus size={15} className="mr-1" />
                         Create Trip
-                      </Button>
-                    </Link>
+                      </Link>
+                      <div className="flex flex-l">
+                        <p className="text-sm text-amber-700">
+                          Allow Share: 
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle()}
+                          className={`relative h-5 w-8 rounded-full transition-all ${allowIteneraryShare ? "bg-amber-500" : "bg-gray-200"
+                            }`}
+                        >
+                          <span
+                            className={`absolute left-0 top-1 h-3 w-3 rounded-full bg-white shadow transition-transform ${allowIteneraryShare ? "translate-x-4" : "translate-x-1"
+                              }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">

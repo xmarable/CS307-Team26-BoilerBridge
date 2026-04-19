@@ -33,10 +33,22 @@ export default async function MePage() {
   };
 
   const settingsData = {
-    tripReminders: dbUser.settings.notifications.tripReminders,
-    friendRequests: dbUser.settings.notifications.friendRequests,
-    groupInvites: dbUser.settings.notifications.groupInvites,
-    groupNotifications: dbUser.settings.notifications.groupNotifications,
+    tripReminders: {
+      inApp: dbUser.settings.notifications.tripReminders.inApp ?? false,
+      email: dbUser.settings.notifications.tripReminders.email ?? false
+    },
+    friendRequests: {
+      inApp: dbUser.settings.notifications.friendRequests.inApp ?? false,
+      email: dbUser.settings.notifications.friendRequests.email ?? false
+    },
+    groupInvites: {
+      inApp: dbUser.settings.notifications.groupInvites.inApp ?? false,
+      email: dbUser.settings.notifications.groupInvites.email ?? false
+    },
+    groupNotifications: {
+      inApp: dbUser.settings.notifications.groupNotifications.inApp ?? false,
+      email: dbUser.settings.notifications.groupNotifications.email ?? false
+    },
   }
 
   return (
