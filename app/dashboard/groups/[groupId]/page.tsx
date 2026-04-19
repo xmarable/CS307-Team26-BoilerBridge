@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   Calendar,
+  CalendarDays,
   DollarSign,
   MessageSquare,
   Users,
@@ -37,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+import ExternalCalendarPanel from "@/components/calendar/ExternalCalendarPanel";
 
 type GroupSummary = {
   groupID: string;
@@ -288,6 +290,12 @@ export default function GroupDashboard() {
               icon={<DollarSign size={22} />}
               label="Expenses"
             />
+            <SidebarButton
+              active={activeSection === "calendar"}
+              onClick={() => setActiveSection("calendar")}
+              icon={<CalendarDays size={22} />}
+              label="Calendar"
+            />
           </div>
         </aside>
 
@@ -510,6 +518,12 @@ export default function GroupDashboard() {
               />
             </div>
           )}
+          {activeSection === "calendar" && (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <ExternalCalendarPanel groupId={groupId!} />
+            </div>
+          )}
+
           {activeSection === "expenses" && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex gap-3 px-1">
