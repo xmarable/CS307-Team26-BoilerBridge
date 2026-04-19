@@ -69,7 +69,7 @@ export async function PATCH(req: Request) {
     if (profileImage && profileImage.startsWith("data:image")) {
       try {
         updateData.image = await uploadImage(profileImage);
-      } catch (err) {
+      } catch {
         return NextResponse.json(
           { error: "Image upload failed" },
           { status: 500 },

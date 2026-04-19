@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
 
 const ActivitySchema = new mongoose.Schema({
-  activityId: { type: String, required: true },
-  name: { type: String, required: true },
-  startTime: { type: Date, required: true },
-  endTime: { type: Date, required: true },
+  activityId: { type: String, required: false },
+  name: { type: String, required: false },
+  startTime: { type: Date, required: false },
+  endTime: { type: Date, required: false },
   isOutdoor: { type: Boolean, default: false },
   category: { type: String },
   location: { type: String },

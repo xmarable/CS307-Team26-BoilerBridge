@@ -106,7 +106,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
       setEndsAt("");
       setNewChoices(["", ""]);
       setShowCreatePoll(false);
-    } catch (e) {
+    } catch {
       alert("Failed to create poll");
     }
   };
@@ -148,7 +148,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
         delete updated[pollId];
         return updated;
       });
-    } catch (e) {
+    } catch {
       alert("Failed to submit vote");
     }
   };
@@ -163,7 +163,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
       if (!res.ok) return;
 
       setPolls((prev) => prev.filter((poll) => poll.pollId !== pollId))
-    } catch (e) {
+    } catch {
 
     }
   };
@@ -184,7 +184,7 @@ export default function GroupPollsPanel({ activeGroup, userId, isLeader }: { act
         if (!res.ok) return;
 
         setPolls(data.polls ?? []);
-      } catch (e) {
+      } catch {
 
       } finally {
         setLoadingPolls(false);

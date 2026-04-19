@@ -1,10 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
 import ProfilePage from "@/components/ProfilePage";
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
-import { Sidebar } from "@/components/Sidebar";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import SettingsPage from "@/components/SettingsPage";

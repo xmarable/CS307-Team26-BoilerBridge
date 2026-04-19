@@ -54,7 +54,7 @@ jest.unstable_mockModule("@/lib/roles", () => ({
   getMemberPermissions: jest.fn(),
 }));
 
-const { getServerSession } = await import("next-auth");
+const { getServerSession } = (await import("next-auth")) as any;
 const { getMemberPermissions } = await import("@/lib/roles");
 const { default: TravelGroup } = await import("@/models/TravelGroup");
 const { default: User } = await import("@/models/User");

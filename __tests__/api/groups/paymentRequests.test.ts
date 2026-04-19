@@ -17,9 +17,7 @@ const { default: User } = await import("@/models/User");
 const { default: TravelGroup } = await import("@/models/TravelGroup");
 const { default: Notification } = await import("@/models/Notification");
 
-const mockGetServerSession = nextAuth.getServerSession as jest.MockedFunction<
-  typeof nextAuth.getServerSession
->;
+let mockGetServerSession: jest.MockedFunction<any>;
 
 let POSTPaymentRequests: (
   req: Request,
@@ -47,22 +45,22 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 
 beforeAll(async () => {
   await dbConnect();
-  const postGet = await import(
-    "@/app/api/groups/[groupId]/payment-requests/route"
-  );
+
+  const nextAuth = (await import("next-auth")) as any;
+  mockGetServerSession = nextAuth.getServerSession as any;
+
+  const postGet =
+    await import("@/app/api/groups/[groupId]/payment-requests/route");
   POSTPaymentRequests = postGet.POST;
   GETPaymentRequests = postGet.GET;
-  const patch = await import(
-    "@/app/api/groups/[groupId]/payment-requests/[requestId]/route"
-  );
+  const patch =
+    await import("@/app/api/groups/[groupId]/payment-requests/[requestId]/route");
   PATCHPaymentRequest = patch.PATCH;
-  const confirm = await import(
-    "@/app/api/groups/[groupId]/payment-requests/[requestId]/confirm/route"
-  );
+  const confirm =
+    await import("@/app/api/groups/[groupId]/payment-requests/[requestId]/confirm/route");
   POSTConfirmPayment = confirm.POST;
-  const notifRead = await import(
-    "@/app/api/notifications/[notificationId]/read/route"
-  );
+  const notifRead =
+    await import("@/app/api/notifications/[notificationId]/read/route");
   PATCHNotificationRead = notifRead.PATCH;
   const notifGet = await import("@/app/api/notifications/route");
   GETNotifications = notifGet.GET;
@@ -133,7 +131,11 @@ describe("POST /api/groups/[groupId]/payment-requests", () => {
           amount: 10,
         }),
       }),
-      { params: Promise.resolve({ groupId: "00000000-0000-4000-8000-000000000001" }) },
+      {
+        params: Promise.resolve({
+          groupId: "00000000-0000-4000-8000-000000000001",
+        }),
+      },
     );
     expect(res.status).toBe(401);
   });
@@ -232,8 +234,11 @@ describe("POST /api/groups/[groupId]/payment-requests", () => {
     });
     expect(data.paymentRequest.requestID).toBeTruthy();
 
-    const updated = await TravelGroup.findOne({ groupID: group.groupID }).lean();
-    const prs = (updated as { paymentRequests?: unknown[] }).paymentRequests ?? [];
+    const updated = await TravelGroup.findOne({
+      groupID: group.groupID,
+    }).lean();
+    const prs =
+      (updated as { paymentRequests?: unknown[] }).paymentRequests ?? [];
     expect(prs).toHaveLength(1);
     const row = prs[0] as Record<string, unknown>;
     expect(String(row.status)).toBe("pending");
@@ -350,8 +355,11 @@ describe("PATCH /api/groups/[groupId]/payment-requests/[requestId]", () => {
     expect(out.paymentRequest.status).toBe("declined");
     expect(out.paymentRequest.declineReason).toBe("Paid cash already");
 
-    const updated = await TravelGroup.findOne({ groupID: group.groupID }).lean();
-    const prs = (updated as { paymentRequests?: unknown[] }).paymentRequests ?? [];
+    const updated = await TravelGroup.findOne({
+      groupID: group.groupID,
+    }).lean();
+    const prs =
+      (updated as { paymentRequests?: unknown[] }).paymentRequests ?? [];
     expect(String((prs[0] as { status: string }).status)).toBe("declined");
   });
 });
@@ -379,9 +387,7 @@ describe("GET /api/groups/[groupId]/payment-requests", () => {
     );
 
     const res = await GETPaymentRequests(
-      new Request(
-        `http://localhost/api/x/payment-requests?filter=sent`,
-      ),
+      new Request(`http://localhost/api/x/payment-requests?filter=sent`),
       { params: Promise.resolve({ groupId: String(group.groupID) }) },
     );
     expect(res.status).toBe(200);
@@ -417,9 +423,7 @@ describe("GET /api/groups/[groupId]/payment-requests", () => {
     });
 
     const res = await GETPaymentRequests(
-      new Request(
-        "http://localhost/api/x/payment-requests?filter=received",
-      ),
+      new Request("http://localhost/api/x/payment-requests?filter=received"),
       { params: Promise.resolve({ groupId: String(group.groupID) }) },
     );
     expect(res.status).toBe(200);
@@ -574,8 +578,11 @@ describe("POST /api/groups/.../payment-requests/.../confirm", () => {
     expect(String(notif!.paymentRequestID)).toBe(requestID);
     expect(String(notif!.message)).toContain("has confirmed payment");
 
-    const updated = await TravelGroup.findOne({ groupID: group.groupID }).lean();
-    const ledger = (updated as { ledger?: { isSettled?: boolean }[] }).ledger ?? [];
+    const updated = await TravelGroup.findOne({
+      groupID: group.groupID,
+    }).lean();
+    const ledger =
+      (updated as { ledger?: { isSettled?: boolean }[] }).ledger ?? [];
     expect(ledger[0]?.isSettled).toBe(true);
   });
 

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
-import { uploadImage } from "@/lib/cloudinary";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
 import z from "zod";

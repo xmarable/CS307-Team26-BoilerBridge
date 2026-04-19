@@ -3,16 +3,8 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 
-const AllowedUpdatesSchema = z.object({
-  "settings.notifications.tripReminders": z.boolean().optional(),
-  "settings.notifications.friendRequests": z.boolean().optional(),
-  "settings.notifications.groupInvites": z.boolean().optional(),
-  "settings.deletion.requested": z.boolean().optional(),
-  "settings.deletion.reason": z.string().max(500).optional()
-}).strict();
-
 // Temporary placeholder to satisfy TypeScript/Next.js build
-export async function PATCH(req: NextRequest) {
+export async function PATCH() {
   const session = getServerSession(authOptions);
 
   if (!session) {

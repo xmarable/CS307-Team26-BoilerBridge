@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquare, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";

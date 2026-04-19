@@ -18,7 +18,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -72,14 +72,13 @@ afterAll(async () => {
 
 beforeEach(() => jest.clearAllMocks());
 
-async function freshGroup(extraMembers: { userId: string; role: string }[] = []) {
+async function freshGroup(
+  extraMembers: { userId: string; role: string }[] = [],
+) {
   const group = await TravelGroup.create({
     groupName: "Leave Test Group",
     leaderID: leaderId,
-    membersList: [
-      { userId: leaderId, role: "Leader" },
-      ...extraMembers,
-    ],
+    membersList: [{ userId: leaderId, role: "Leader" }, ...extraMembers],
   });
   return group.groupID.toString();
 }

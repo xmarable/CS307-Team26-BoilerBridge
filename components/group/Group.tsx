@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
+// import your global styles here
+import "@/app/globals.css";
+
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,10 +27,20 @@ import {
   X,
   Image,
   AlignEndHorizontal,
+  Trash2,
+  CalendarX,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { MemberManagement } from "@/components/MemberManagement";
 import MustHavesPanel from "@/components/group/MustHavesPanel";
 import CalendarEventsPanel from "@/components/group/CalendarEventsPanel";
@@ -42,6 +55,8 @@ import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
 import { GroupBoard } from "@/components/GroupBoard";
 import { ActivityVoting } from "./ActivityVoting";
+import { SheetTitle } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 type GroupState = {
   _id: string;
@@ -103,6 +118,11 @@ export default function GroupDashboard() {
   const [isInviting, setIsInviting] = useState(false);
   const [friendSearch, setFriendSearch] = useState("");
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"trip" | "group" | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [tripActive, setTripActive] = useState(false);
+
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
     try {
@@ -119,6 +139,8 @@ export default function GroupDashboard() {
       if (data?.group) {
         setGroup(data.group);
       }
+      const data = await res.json();
+      if (data?.group) setGroup(data.group);
     } catch {
       setError("Failed to load group.");
     } finally {
@@ -139,12 +161,20 @@ export default function GroupDashboard() {
   useEffect(() => {
     fetchGroup();
     fetchFriends();
-  }, [fetchGroup, fetchFriends]);
+    if (groupId) {
+      fetch(`/api/trip`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          const trips = Array.isArray(data) ? data : [];
+          setTripActive(trips.some((t) => t.groupID === groupId));
+        })
+        .catch(() => {});
+    }
+  }, [fetchGroup, fetchFriends, groupId]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
     if (!targetEmail || isInviting) return;
-
     setIsInviting(true);
     try {
       const res = await fetch(`/api/groups/${groupId}/members`, {
@@ -152,7 +182,6 @@ export default function GroupDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: targetEmail }),
       });
-
       const data = await res.json();
       if (res.ok) {
         setInvitationEmail("");
@@ -160,7 +189,7 @@ export default function GroupDashboard() {
       } else {
         alert(data.error || "failed to send invitation");
       }
-    } catch (err) {
+    } catch {
       alert("something went wrong");
     } finally {
       setIsInviting(false);
@@ -175,8 +204,34 @@ export default function GroupDashboard() {
       });
 
       setAllowIteneraryShare(!allowIteneraryShare);
-    } catch (e) {
+    } catch (e) {}
+  };
 
+  const handleDelete = async () => {
+    if (!deleteScope || !groupId) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}?scope=${deleteScope}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Delete failed");
+        return;
+      }
+      if (deleteScope === "group") {
+        router.push("/dashboard/groups");
+      } else {
+        setTripActive(false);
+        setDeleteDialogOpen(false);
+        setDeleteScope(null);
+        await fetchGroup();
+      }
+    } catch {
+      alert("Something went wrong");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -194,23 +249,23 @@ export default function GroupDashboard() {
         const data = await res.json();
         alert(data.error || "failed to cancel invitation");
       }
-    } catch (err) {
+    } catch {
       alert("something went wrong");
     }
   };
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin text-amber-500" size={40} />
+      <div className="min-h-screen flex items-center justify-center bg-bb-surface-subtle">
+        <Loader2 className="animate-spin text-bb-brand" size={40} />
       </div>
     );
 
   if (error || !group)
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 text-center bg-gray-50">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-sm max-w-md w-full">
-          <p className="text-red-600 font-bold mb-6">
+      <div className="min-h-screen flex items-center justify-center p-4 text-center bg-bb-surface-subtle">
+        <div className="bg-bb-surface p-8 rounded-[2.5rem] border border-bb-border shadow-sm max-w-md w-full">
+          <p className="text-bb-danger font-bold mb-6">
             {error || "Group not found"}
           </p>
           <Link href="/dashboard">
@@ -242,13 +297,13 @@ export default function GroupDashboard() {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full h-12 w-12 hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 transition-all"
+              className="rounded-full h-12 w-12 hover:bg-bb-surface hover:shadow-sm border border-transparent hover:border-bb-border transition-all"
             >
-              <ChevronLeft size={28} className="text-gray-600" />
+              <ChevronLeft size={28} className="text-bb-text-sub" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-4xl font-black text-bb-text tracking-tight">
               {group.groupName}
             </h1>
             <div className="flex items-center gap-2 mt-1">
@@ -256,7 +311,7 @@ export default function GroupDashboard() {
                 {userRole}
               </span>
               {isViewer && (
-                <span className="flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-100 px-2 py-1 rounded-md uppercase">
+                <span className="flex items-center gap-1 text-[10px] font-black text-bb-text-muted bg-bb-surface-inset px-2 py-1 rounded-md uppercase">
                   <Lock size={12} /> Read Only
                 </span>
               )}
@@ -265,74 +320,221 @@ export default function GroupDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white border border-gray-100 px-5 py-2.5 rounded-2xl shadow-sm">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm font-bold text-gray-600">Trip Active</span>
+          <div className="flex items-center gap-2 bg-bb-surface border border-bb-border px-5 py-2.5 rounded-2xl shadow-sm">
+            <div
+              className={`h-2 w-2 rounded-full ${
+                tripActive ? "bg-green-500 animate-pulse" : "bg-bb-placeholder"
+              }`}
+            />
+            <span className="text-sm font-bold text-bb-text-sub">
+              {tripActive ? "Trip Active" : "No Trip Planned"}
+            </span>
           </div>
-          <Button
-            variant="outline"
-            className="rounded-2xl border-gray-200 bg-white hover:bg-gray-50"
-          >
-            <MoreVertical size={20} className="text-gray-400" />
-          </Button>
+          {isLeader && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-2xl border-bb-border-input bg-bb-surface hover:bg-bb-surface-subtle"
+                >
+                  <MoreVertical size={20} className="text-bb-text-muted" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="bottom"
+                align="start"
+                sideOffset={8}
+                avoidCollisions={false}
+                className="w-52 rounded-2xl p-2 shadow-lg border border-bb-border bg-white"
+              >
+                <DropdownMenuItem
+                  disabled={!tripActive}
+                  className="flex items-center gap-2 rounded-xl px-4 py-3 font-bold text-amber-600 cursor-pointer hover:bg-amber-50 hover:text-amber-700 disabled:text-bb-placeholder disabled:cursor-not-allowed"
+                  onSelect={() => {
+                    setDeleteScope("trip");
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <CalendarX size={16} className="text-bb-brand" />
+                  Delete Trip
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="flex items-center gap-2 rounded-xl px-4 py-3 font-bold text-bb-danger cursor-pointer hover:bg-bb-danger-sub"
+                  onSelect={() => {
+                    setDeleteScope("group");
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Delete Group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {!isLeader && (
+            <Button
+              variant="outline"
+              className="rounded-2xl border-bb-border-input bg-bb-surface hover:bg-bb-surface-subtle"
+            >
+              <MoreVertical size={20} className="text-bb-text-muted" />
+            </Button>
+          )}
         </div>
+
+        <Sheet open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <SheetContent
+            side="right"
+            className="bg-bb-surface border-l border-bb-border p-0 flex flex-col w-160 max-w-md rounded-2xl"
+          >
+            <VisuallyHidden>
+              <SheetTitle>
+                {deleteScope === "group" ? "Delete Group" : "Delete Trip"}
+              </SheetTitle>
+            </VisuallyHidden>
+            <div
+              className={`px-8 pt-10 pb-7 ${
+                deleteScope === "group" ? "bg-bb-danger-sub" : "bg-amber-50"
+              }`}
+            >
+              <div
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${
+                  deleteScope === "group" ? "bg-red-100" : "bg-amber-100"
+                }`}
+              >
+                {deleteScope === "group" ? (
+                  <Trash2 size={24} className="text-bb-danger" />
+                ) : (
+                  <CalendarX size={24} className="text-bb-brand" />
+                )}
+              </div>
+              <h2 className="text-2xl font-black text-bb-text tracking-tight">
+                {deleteScope === "group" ? "Delete Group?" : "Delete Trip?"}
+              </h2>
+              <p
+                className={`text-sm font-semibold mt-1 ${
+                  deleteScope === "group" ? "text-red-400" : "text-amber-500"
+                }`}
+              >
+                {deleteScope === "group"
+                  ? "This cannot be undone."
+                  : "Trip data will be removed."}
+              </p>
+            </div>
+
+            <div className="px-8 py-7 flex-1">
+              <p className="text-bb-text-muted leading-relaxed font-medium">
+                {deleteScope === "group" ? (
+                  <>
+                    This will permanently delete{" "}
+                    <span className="font-bold text-bb-text">
+                      {group.groupName}
+                    </span>{" "}
+                    and everything inside — itinerary, expenses, messages,
+                    photos, and all members.
+                  </>
+                ) : (
+                  <>
+                    This will permanently delete the trip and all calendar
+                    events for{" "}
+                    <span className="font-bold text-bb-text">
+                      {group.groupName}
+                    </span>
+                    . The group and its members will remain intact.
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div className="px-8 pb-10 flex flex-col gap-3">
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className={`h-14 rounded-2xl font-bold text-base text-white w-full transition-all active:scale-[0.98] ${
+                  deleteScope === "group"
+                    ? "bg-bb-danger hover:bg-red-600 shadow-lg shadow-red-100"
+                    : "bg-linear-to-r from-bb-brand to-bb-brand-to hover:opacity-90 shadow-lg shadow-amber-100"
+                }`}
+              >
+                {isDeleting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" /> Deleting…
+                  </span>
+                ) : deleteScope === "group" ? (
+                  "Delete Group"
+                ) : (
+                  "Delete Trip"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-14 rounded-2xl border-bb-border-input font-bold text-bb-text-sub w-full hover:bg-bb-surface-subtle"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeleteScope(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-10">
-        <aside className="w-full lg:w-70 shrink-0">
-          <div className="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-2 sticky top-10 border border-gray-50">
-            <SidebarButton
-              active={activeSection === "overview"}
-              onClick={() => setActiveSection("overview")}
-              icon={<LayoutGrid size={22} />}
-              label="Overview"
+      <div className="flex flex-col gap-6">
+        <nav className="bg-bb-surface border border-bb-border rounded-4xl p-2 flex gap-1 shadow-sm w-full">
+          <TabButton
+            active={activeSection === "overview"}
+            onClick={() => setActiveSection("overview")}
+            icon={<LayoutGrid size={18} />}
+            label="Overview"
+          />
+          <TabButton
+            active={activeSection === "itinerary"}
+            onClick={() => setActiveSection("itinerary")}
+            icon={<Calendar size={18} />}
+            label="Itinerary"
+          />
+          <TabButton
+            active={activeSection === "polls"}
+            onClick={() => setActiveSection("polls")}
+            icon={<AlignEndHorizontal size={18} />}
+            label="Polls"
+          />
+          {isLeader && (
+            <TabButton
+              active={activeSection === "notify"}
+              onClick={() => setActiveSection("notify")}
+              icon={<MessageSquare size={18} />}
+              label="Notify"
             />
-            <SidebarButton
-              active={activeSection === "itinerary"}
-              onClick={() => setActiveSection("itinerary")}
-              icon={<Calendar size={22} />}
-              label="Itinerary"
-            />
-            <SidebarButton
-              active={activeSection === "polls"}
-              onClick={() => setActiveSection("polls")}
-              icon={<AlignEndHorizontal size={22} />}
-              label="Polls"
-            />
-            {isLeader && (
-              <SidebarButton
-                active={activeSection === "notify"}
-                onClick={() => setActiveSection("notify")}
-                icon={<MessageSquare size={22} />}
-                label="Notify"
-              />
-            )}
-            <SidebarButton
-              active={activeSection === "messages"}
-              onClick={() => setActiveSection("messages")}
-              icon={<MessageSquare size={22} />}
-              label="Messages"
-            />
-            <SidebarButton
-              active={activeSection === "photos"}
-              onClick={() => setActiveSection("photos")}
-              icon={<Image size={22} />}
-              label="Photos"
-            />
-            <SidebarButton
-              active={activeSection === "members"}
-              onClick={() => setActiveSection("members")}
-              icon={<Users size={22} />}
-              label="Members"
-            />
-            <SidebarButton
-              active={activeSection === "expenses"}
-              onClick={() => setActiveSection("expenses")}
-              icon={<DollarSign size={22} />}
-              label="Expenses"
-            />
-          </div>
-        </aside>
+          )}
+          <TabButton
+            active={activeSection === "messages"}
+            onClick={() => setActiveSection("messages")}
+            icon={<MessageSquare size={18} />}
+            label="Messages"
+          />
+          <TabButton
+            active={activeSection === "photos"}
+            onClick={() => setActiveSection("photos")}
+            icon={<Image size={18} />}
+            label="Photos"
+          />
+          <TabButton
+            active={activeSection === "members"}
+            onClick={() => setActiveSection("members")}
+            icon={<Users size={18} />}
+            label="Members"
+          />
+          <TabButton
+            active={activeSection === "expenses"}
+            onClick={() => setActiveSection("expenses")}
+            icon={<DollarSign size={18} />}
+            label="Expenses"
+          />
+        </nav>
 
         <main className="flex-1 min-w-0">
           {activeSection === "overview" && (
@@ -353,7 +555,7 @@ export default function GroupDashboard() {
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
                       <Calendar size={24} />
                     </div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                    <h2 className="text-3xl font-black text-bb-text tracking-tight">
                       Timeline
                     </h2>
                   </div>
@@ -363,7 +565,7 @@ export default function GroupDashboard() {
                         href={`/dashboard/groups/${groupId}/trip`}
                         className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
                       >
-                        Trip settings
+                        Create Trip
                       </Link>
                       <div className="flex flex-l">
                         <p className="text-sm text-amber-700">
@@ -384,7 +586,7 @@ export default function GroupDashboard() {
                     </div>
                   )}
                 </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
+                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
                   <CalendarEventsPanel
                     groupId={groupId!}
                     canPublishItinerary={
@@ -399,11 +601,11 @@ export default function GroupDashboard() {
                   <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
                     <Heart size={24} />
                   </div>
-                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+                  <h2 className="text-3xl font-black text-bb-text tracking-tight">
                     Must-Haves
                   </h2>
                 </div>
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-fit min-h-125">
+                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
                   <MustHavesPanel groupId={groupId!} />
                 </div>
               </section>
@@ -412,7 +614,6 @@ export default function GroupDashboard() {
 
           {activeSection === "polls" && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-              {/* Polls UI */}
               <GroupPollsPanel
                 activeGroup={{
                   groupID: group.groupID,
@@ -425,7 +626,7 @@ export default function GroupDashboard() {
           )}
 
           {activeSection === "messages" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
               <GroupMessagesPanel
                 activeGroup={{
                   groupID: group.groupID,
@@ -437,7 +638,7 @@ export default function GroupDashboard() {
           )}
 
           {activeSection === "photos" && (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm overflow-hidden h-[70vh] animate-in fade-in slide-in-from-bottom-4 duration-500">
               <GroupPhotosPanel
                 activeGroup={{
                   groupID: group.groupID,
@@ -451,7 +652,7 @@ export default function GroupDashboard() {
 
           {activeSection === "members" && (
             <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full min-h-40">
+              <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full min-h-40">
                 <MemberManagement
                   groupId={groupId!}
                   currentUserId={group.currentUserId || ""}
@@ -462,24 +663,24 @@ export default function GroupDashboard() {
               {isLeader &&
                 group.pendingRequests &&
                 group.pendingRequests.length > 0 && (
-                  <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 w-full">
-                    <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                      <Clock size={20} className="text-amber-500" /> Pending
+                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full">
+                    <h3 className="text-xl font-black text-bb-text mb-6 flex items-center gap-2">
+                      <Clock size={20} className="text-bb-brand" /> Pending
                       Invitations
                     </h3>
                     <div className="space-y-3">
                       {group.pendingRequests.map((req, i) => (
                         <div
                           key={i}
-                          className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100"
+                          className="flex items-center justify-between p-4 bg-bb-surface-subtle rounded-2xl border border-bb-border"
                         >
-                          <span className="font-bold text-gray-700">
+                          <span className="font-bold text-bb-text-sub">
                             {req.email}
                           </span>
                           <div className="flex items-center gap-4">
                             <Badge
                               variant="outline"
-                              className="text-gray-400 border-gray-200"
+                              className="text-bb-text-muted border-bb-border-input"
                             >
                               Sent {new Date(req.sentAt).toLocaleDateString()}
                             </Badge>
@@ -487,7 +688,7 @@ export default function GroupDashboard() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleCancelInvite(req.email)}
-                              className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              className="h-8 w-8 text-bb-text-muted hover:text-bb-danger hover:bg-bb-danger-sub rounded-lg transition-colors"
                             >
                               <X size={16} />
                             </Button>
@@ -499,7 +700,7 @@ export default function GroupDashboard() {
                 )}
 
               {isLeader && (
-                <div className="bg-linear-to-br from-amber-500 to-orange-600 rounded-[2.5rem] p-10 text-white shadow-xl shadow-amber-100 w-full">
+                <div className="bg-linear-to-br from-bb-brand to-bb-brand-to rounded-[2.5rem] p-10 text-white shadow-xl shadow-amber-100 w-full">
                   <h3 className="text-2xl font-black mb-2 tracking-tight text-white">
                     Invite your squad
                   </h3>
@@ -590,16 +791,17 @@ export default function GroupDashboard() {
                   <button
                     key={tab}
                     onClick={() => setExpensesTab(tab)}
-                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${expensesTab === tab
-                      ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-100"
-                      : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
-                      }`}
+                    className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+                      expensesTab === tab
+                        ? "bg-linear-to-r from-bb-brand to-bb-brand-to text-white shadow-lg shadow-amber-100"
+                        : "bg-bb-surface text-bb-text-muted border border-bb-border hover:bg-bb-surface-subtle"
+                    }`}
                   >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
                   </button>
                 ))}
               </div>
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 min-w-0">
+              <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 min-w-0">
                 {expensesTab === "summary" ? (
                   <ExpenseSummaryPanel
                     groupId={groupId!}
@@ -648,7 +850,7 @@ export default function GroupDashboard() {
   );
 }
 
-function SidebarButton({
+function TabButton({
   active,
   onClick,
   icon,
@@ -662,23 +864,14 @@ function SidebarButton({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl transition-all duration-300 group ${active
-        ? "bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-xl shadow-amber-200"
-        : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-        }`}
+      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl transition-all duration-200 font-bold text-sm ${
+        active
+          ? "bg-linear-to-r from-bb-brand to-bb-brand-to text-white shadow-lg shadow-amber-100"
+          : "text-bb-text-muted hover:bg-bb-surface-subtle hover:text-bb-text-sub"
+      }`}
     >
-      <span
-        className={`${active ? "text-white" : "text-gray-300 group-hover:text-amber-500"} transition-colors`}
-      >
-        {icon}
-      </span>
-      <span className="font-bold text-lg tracking-tight">{label}</span>
-      {active && (
-        <ArrowRight
-          size={18}
-          className="ml-auto animate-in slide-in-from-left-2"
-        />
-      )}
+      <span>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }

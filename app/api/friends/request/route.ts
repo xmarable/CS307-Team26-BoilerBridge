@@ -39,7 +39,7 @@ export async function GET() {
         return NextResponse.json(formattedRequests, { status: 200 });
       }
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },
@@ -139,11 +139,6 @@ export async function POST(req: Request) {
               { status: 400 },
             );
           } else {
-            const newRequest = await FriendRequest.create({
-              requesterId: requesterUUID,
-              recipientId: recipientId,
-              status: "pending",
-            });
 
             /* console.log(
               "SUCCESS: Created FriendRequest with ID:",
@@ -192,7 +187,7 @@ export async function DELETE(req: Request) {
         { status: 200 },
       );
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

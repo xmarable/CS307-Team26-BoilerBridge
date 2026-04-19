@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Trip from "@/models/Trip";
+import MustHave from "@/models/MustHave";
 import dbConnect from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -7,7 +8,21 @@ import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
 
-const createInitialItinerary = (fromDate: Date, toDate: Date) => {
+type ItineraryActivityInput = {
+  activityId: string;
+  name: string;
+  startTime: Date;
+  endTime: Date;
+  isOutdoor?: boolean;
+  category?: string;
+  location?: string;
+};
+
+const createInitialItinerary = async (
+  fromDate: Date,
+  toDate: Date,
+  rainyDayItinerary?: ItineraryActivityInput[],
+) => {
   const MOCK_ACTIVITIES = [
     { name: "Morning Park Walk", category: "Nature", isOutdoor: true },
     { name: "Downtown Sightseeing", category: "Tourism", isOutdoor: true },
@@ -33,9 +48,36 @@ const createInitialItinerary = (fromDate: Date, toDate: Date) => {
     };
   });
 
-  const rainyDay = generateRainyDayPlan(primary);
+  const rainyDay =
+    rainyDayItinerary && rainyDayItinerary.length > 0
+      ? rainyDayItinerary
+      : await generateRainyDayPlan(primary);
   return { primary, rainyDay };
 };
+
+const itineraryActivitySchema = z.object({
+  activityId: z.string().min(1),
+  name: z.string().min(1),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+  isOutdoor: z.boolean().optional(),
+  category: z.string().optional(),
+  location: z.string().optional(),
+});
+
+const rainyDayItinerarySchema = z
+  .array(itineraryActivitySchema.partial())
+  .optional();
+
+function sanitizeRainyDayItinerary(
+  rainyDayItinerary?: Array<Partial<ItineraryActivityInput>>,
+): ItineraryActivityInput[] {
+  if (!Array.isArray(rainyDayItinerary)) return [];
+  return rainyDayItinerary
+    .map((item) => itineraryActivitySchema.safeParse(item))
+    .filter((parsed) => parsed.success)
+    .map((parsed) => parsed.data);
+}
 
 const tripSchema = z.object({
   groupId: z.string().uuid().optional(),
@@ -51,6 +93,15 @@ const tripSchema = z.object({
   avoidLocations: z.array(z.string()).optional(),
   budgetMin: z.coerce.number().optional(),
   budgetMax: z.coerce.number().optional(),
+  mustHaves: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        address: z.string().optional(),
+      }),
+    )
+    .optional(),
+  rainyDayItinerary: rainyDayItinerarySchema,
 });
 
 export async function POST(req: NextRequest) {
@@ -95,6 +146,8 @@ export async function POST(req: NextRequest) {
       avoidLocations,
       budgetMin,
       budgetMax,
+      mustHaves,
+      rainyDayItinerary,
     } = result.data;
 
     const permissionResult = (await getMemberPermissions(
@@ -116,28 +169,70 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { primary, rainyDay } = createInitialItinerary(
-      new Date(fromDate),
-      new Date(toDate),
+    const existing = await Trip.findOne({ groupID });
+
+    let primary: unknown;
+    let rainyDay: unknown;
+
+    if (existing) {
+      primary = existing.primaryItinerary;
+      rainyDay = existing.rainyDayItinerary;
+    } else {
+      const sanitizedRainyDayItinerary =
+        sanitizeRainyDayItinerary(rainyDayItinerary);
+      const created = await createInitialItinerary(
+        new Date(fromDate),
+        new Date(toDate),
+        sanitizedRainyDayItinerary,
+      );
+      primary = created.primary;
+      rainyDay = created.rainyDay;
+    }
+
+    const trip = await Trip.findOneAndUpdate(
+      { groupID },
+      {
+        $set: {
+          userId,
+          groupID,
+          fromCity,
+          toCity,
+          fromDate: new Date(fromDate),
+          toDate: new Date(toDate),
+          mode,
+          budget: Number(budget),
+          tripConfirmed: tripConfirmed ?? false,
+          primaryItinerary: primary,
+          rainyDayItinerary: rainyDay,
+          ...(avoidActivities != null && { avoidActivities }),
+          ...(avoidLocations != null && { avoidLocations }),
+          ...(budgetMin != null && { budgetMin }),
+          ...(budgetMax != null && { budgetMax }),
+        },
+      },
+      { upsert: true, new: true },
     );
 
-    const trip = await Trip.create({
-      userId,
-      groupID,
-      fromCity,
-      toCity,
-      fromDate: new Date(fromDate),
-      toDate: new Date(toDate),
-      mode,
-      budget: Number(budget),
-      tripConfirmed: tripConfirmed ?? false,
-      primaryItinerary: primary,
-      rainyDayItinerary: rainyDay,
-      ...(avoidActivities != null && { avoidActivities }),
-      ...(avoidLocations != null && { avoidLocations }),
-      ...(budgetMin != null && { budgetMin }),
-      ...(budgetMax != null && { budgetMax }),
-    });
+    const sanitizedMustHaves =
+      mustHaves
+        ?.map((item) => ({
+          name: item.name.trim(),
+          address: item.address?.trim() || undefined,
+        }))
+        .filter((item) => item.name.length > 0) ?? [];
+
+    if (sanitizedMustHaves.length > 0) {
+      await MustHave.insertMany(
+        sanitizedMustHaves.map((item) => ({
+          groupId: groupID,
+          name: item.name,
+          address: item.address,
+          addedBy: userId,
+          status: "approved" as const,
+          priority: 3,
+        })),
+      );
+    }
 
     const t = trip as Record<string, unknown>;
     return NextResponse.json(
@@ -159,7 +254,7 @@ export async function POST(req: NextRequest) {
         budgetMin: t.budgetMin,
         budgetMax: t.budgetMax,
       },
-      { status: 201 },
+      { status: existing != null ? 200 : 201 },
     );
   } catch (err: any) {
     console.error("POST /api/trip error:", err);
