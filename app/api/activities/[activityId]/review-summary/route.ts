@@ -14,8 +14,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? (session.user as { id: string }).id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any).userId;
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
