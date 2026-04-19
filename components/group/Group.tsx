@@ -136,10 +136,6 @@ export default function GroupDashboard() {
       }
 
       const data = await res.json();
-      if (data?.group) {
-        setGroup(data.group);
-      }
-      const data = await res.json();
       if (data?.group) setGroup(data.group);
     } catch {
       setError("Failed to load group.");

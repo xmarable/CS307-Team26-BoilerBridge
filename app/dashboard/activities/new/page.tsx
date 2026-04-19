@@ -66,7 +66,7 @@ function AddActivityPageInner() {
         return;
       }
 
-      const activityId = data?.activity?._id;
+      const activityId = data?.activity?.activityId;
       if (activityId) {
         router.push(`/dashboard/activities/${activityId}`);
       } else {

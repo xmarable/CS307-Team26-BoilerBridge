@@ -21,14 +21,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { activityId } = await params;
-    if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
-      return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
-    }
-
+    const { activityId } = await params
     await dbConnect();
 
-    const activity = await Activity.findById(activityId);
+    const activity = await Activity.findOne({ activityId: activityId });
     if (!activity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
