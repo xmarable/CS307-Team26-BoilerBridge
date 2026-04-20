@@ -592,6 +592,7 @@ export default function GroupDashboard() {
                     canPublishItinerary={
                       userRole === "Leader" || userRole === "Admin"
                     }
+                    canEdit={userRole === "Leader" || userRole === "Admin"}
                   />
                 </div>
               </section>

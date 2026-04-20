@@ -1,10 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import ProfilePage from "@/components/ProfilePage";
 import { redirect } from "next/navigation";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
-import SettingsPage from "@/components/SettingsPage";
+import ProfileSettingsLayout from "@/components/ProfileSettingsLayout";
 
 export default async function MePage() {
   await dbConnect();
@@ -55,8 +54,7 @@ export default async function MePage() {
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="flex flex-1 overflow-hidden">
         <main className="gap-8 flex-1 overflow-y-auto p-8 md:p-12 flex justify-center items-start">
-          <ProfilePage initialData={profileData} />
-          <SettingsPage initialData={settingsData} />
+          <ProfileSettingsLayout profileData={profileData} settingsData={settingsData} />
         </main>
       </div>
     </div>

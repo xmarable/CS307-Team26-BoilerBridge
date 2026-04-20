@@ -1,21 +1,18 @@
 @import "tailwindcss";
+@import "./components.dark.css";
 
 /* @source and @theme are Tailwind v4 rules */
 @source "../app/**/*.{js,ts,jsx,tsx}";
 @source "../components/**/*.{js,ts,jsx,tsx}";
+
+/* Class-based dark mode: dark: utilities apply when .dark is an ancestor */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
   --foreground: #111827;
   --font-geist-sans: "Geist Sans", sans-serif;
   --font-geist-mono: "Geist Mono", monospace;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 
   /* Brand gradient anchors */
   --color-bb-brand: #f59e0b;
@@ -26,7 +23,7 @@
   --color-bb-surface-subtle: #f9fafb;
   --color-bb-surface-inset: #f3f4f6;
 
-  /* Text - explicit hex for black to ensure no ghosting */
+  /* Text */
   --color-bb-text: #111827;
   --color-bb-text-sub: #4b5563;
   --color-bb-text-muted: #9ca3af;
@@ -42,20 +39,72 @@
   --color-bb-danger-sub: #fef2f2;
 }
 
+/* ── Dark mode token overrides ───────────────────────────────────
+   All bb-* utilities (bg-bb-surface, text-bb-text, etc.) flip
+   automatically when .dark is on an ancestor element.
+────────────────────────────────────────────────────────────────── */
+.dark {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+
+  --color-bb-surface: #161b22;
+  --color-bb-surface-subtle: #0d1117;
+  --color-bb-surface-inset: #21262d;
+
+  --color-bb-text: #e6edf3;
+  --color-bb-text-sub: #8b949e;
+  --color-bb-text-muted: #6e7681;
+  --color-bb-placeholder: #484f58;
+
+  --color-bb-border: #21262d;
+  --color-bb-border-input: #30363d;
+  --color-bb-ring: #fbbf24;
+
+  --color-bb-danger: #f85149;
+  --color-bb-danger-sub: #2d1317;
+}
+
+/*
+ * @theme inline registers Tailwind design tokens.
+ * These reference the :root vars above (different names → no circular refs).
+ * The .dark block overrides the :root vars, which these tokens then pick up.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-bb-brand: var(--color-bb-brand);
+  --color-bb-brand-to: var(--color-bb-brand-to);
+
+  --color-bb-surface: var(--color-bb-surface);
+  --color-bb-surface-subtle: var(--color-bb-surface-subtle);
+  --color-bb-surface-inset: var(--color-bb-surface-inset);
+
+  --color-bb-text: var(--color-bb-text);
+  --color-bb-text-sub: var(--color-bb-text-sub);
+  --color-bb-text-muted: var(--color-bb-text-muted);
+  --color-bb-placeholder: var(--color-bb-placeholder);
+
+  --color-bb-border: var(--color-bb-border);
+  --color-bb-border-input: var(--color-bb-border-input);
+  --color-bb-ring: var(--color-bb-ring);
+
+  --color-bb-danger: var(--color-bb-danger);
+  --color-bb-danger-sub: var(--color-bb-danger-sub);
+}
+
 /* ── Global Placeholders ──────────────────────────────────────────
-   Only targets the hint text. Forces visibility and light gray.
-   Using :where() reduces specificity so it doesn't fight your classes.
+   Using :where() reduces specificity so it doesn't fight existing classes.
 ────────────────────────────────────────────────────────────────── */
 :where(input, textarea)::placeholder {
   color: #d1d5db !important;
   opacity: 1 !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark :where(input, textarea)::placeholder {
+  color: #484f58 !important;
 }
 
 body {
@@ -66,6 +115,10 @@ body {
   padding: 0;
 }
 
-input {
+.dark input {
+  color: #e6edf3 !important;
+}
+
+input:not(.dark *) {
   color: #111827 !important;
 }
