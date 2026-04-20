@@ -50,6 +50,7 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
+import { RainyDayToggle, type RainyDayTripInput } from "@/components/RainyDayToggle";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
@@ -122,6 +123,9 @@ export default function GroupDashboard() {
   const [deleteScope, setDeleteScope] = useState<"trip" | "group" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [tripActive, setTripActive] = useState(false);
+  const [groupTripDetail, setGroupTripDetail] = useState<
+    (RainyDayTripInput & { _id: string }) | null
+  >(null);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -169,6 +173,49 @@ export default function GroupDashboard() {
         .catch(() => {});
     }
   }, [fetchGroup, fetchFriends, groupId]);
+
+  useEffect(() => {
+    if (!groupId || !tripActive || activeSection !== "itinerary") {
+      setGroupTripDetail(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const listRes = await fetch("/api/trip", { credentials: "include" });
+        if (!listRes.ok) return;
+        const trips = await listRes.json();
+        if (!Array.isArray(trips)) return;
+        const mine = trips.find(
+          (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
+        );
+        const id = mine?.tripID;
+        if (!id || typeof id !== "string") return;
+        const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
+        if (!dRes.ok) return;
+        const d = await dRes.json();
+        if (
+          !cancelled &&
+          d?._id &&
+          Array.isArray(d.primaryItinerary) &&
+          Array.isArray(d.rainyDayItinerary)
+        ) {
+          setGroupTripDetail({
+            _id: String(d._id),
+            primaryItinerary: d.primaryItinerary,
+            rainyDayItinerary: d.rainyDayItinerary,
+            itineraryVersion:
+              typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, tripActive, activeSection]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -610,6 +657,38 @@ export default function GroupDashboard() {
                   <MustHavesPanel groupId={groupId!} />
                 </div>
               </section>
+
+              {tripActive && groupTripDetail ? (
+                <section className="col-span-full w-full space-y-4 mt-6">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+                      <MapPin size={24} />
+                    </div>
+                    <h2 className="text-3xl font-black text-bb-text tracking-tight">
+                      Trip plan
+                    </h2>
+                  </div>
+                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full">
+                    <RainyDayToggle
+                      trip={groupTripDetail}
+                      tripId={groupTripDetail._id}
+                      canEdit={!isViewer}
+                      onItinerarySynced={(payload) => {
+                        setGroupTripDetail((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                primaryItinerary: payload.primaryItinerary,
+                                rainyDayItinerary: payload.rainyDayItinerary,
+                                itineraryVersion: payload.itineraryVersion,
+                              }
+                            : prev,
+                        );
+                      }}
+                    />
+                  </div>
+                </section>
+              ) : null}
             </div>
           )}
 
