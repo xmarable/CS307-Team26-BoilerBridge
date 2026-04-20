@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     )
 
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const url = `${baseUrl}/shared/itenerary/${shared.token}`;
+    const url = `${baseUrl}/shared/itinerary/${shared.token}`;
     trip.shareLink = url;
     await trip.save();
 
@@ -112,10 +112,9 @@ export async function GET(req: NextRequest) {
 
     const userId = session.user.userId;
     const groupId = req.nextUrl.searchParams.get("groupId");
-
     const group = await TravelGroup.findOne({ groupID: groupId, "membersList.userId": userId });
     if (!group) {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
+        return NextResponse.json({ error: "Group Not found" }, { status: 404 });
     }
 
     const shared = await SharedItineraryLink.findOne(
