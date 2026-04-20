@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
 
 type ItineraryActivityInput = {
   activityId: string;
@@ -188,6 +189,15 @@ export async function POST(req: NextRequest) {
       primary = created.primary;
       rainyDay = created.rainyDay;
     }
+
+    const ensuredPrimary = ensureItinerarySectionIds(
+      (primary ?? []) as Parameters<typeof ensureItinerarySectionIds>[0],
+    );
+    const ensuredRainy = ensureItinerarySectionIds(
+      (rainyDay ?? []) as Parameters<typeof ensureItinerarySectionIds>[0],
+    );
+    primary = ensuredPrimary.next;
+    rainyDay = ensuredRainy.next;
 
     const trip = await Trip.findOneAndUpdate(
       { groupID },
