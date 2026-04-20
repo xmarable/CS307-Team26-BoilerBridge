@@ -78,7 +78,7 @@ export default function SettingsPage({ initialData, embedded }: { initialData: S
     });
 
     if (!res.ok) {
-      alert("Failed to update settings")
+      setLoading(false);
       return;
     }
 

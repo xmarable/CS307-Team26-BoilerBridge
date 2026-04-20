@@ -175,24 +175,24 @@ export default function ProfilePage({ initialData, embedded, headerAction }: Pro
 
   const inner = (
     <div>
-      <div className="mb-8 flex justify-between items-start">
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-          <p className="text-gray-500 text-sm">
-            Update your public profile and verification status.
-          </p>
+      <div className="mb-8">
+        <div className="flex justify-between items-start">
+          <div className="text-left">
+            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+            <p className="text-gray-500 text-sm">
+              Update your public profile and verification status.
+            </p>
+          </div>
+          {headerAction && <div>{headerAction}</div>}
         </div>
-        <div className="flex items-start gap-2">
-          {headerAction}
-          {isVerified && (
-            <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
-              <CheckCircle2 size={16} />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                Verified Student
-              </span>
-            </div>
-          )}
-        </div>
+        {!embedded && isVerified && (
+          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full border border-green-200 dark:border-green-800">
+            <CheckCircle2 size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider">
+              Verified Student
+            </span>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

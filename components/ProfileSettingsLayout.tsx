@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, X } from "lucide-react";
+import { Settings, X, CheckCircle2 } from "lucide-react";
 import ProfilePage from "@/components/ProfilePage";
 import SettingsPage from "@/components/SettingsPage";
 
@@ -28,11 +28,22 @@ export default function ProfileSettingsLayout({ profileData, settingsData }: Pro
     <div className="flex items-stretch w-full max-w-5xl">
       {/* Profile card — right border merges with settings panel when open */}
       <div
-        className={`w-full max-w-2xl shrink-0 bg-white dark:bg-[#161b22] shadow-sm border border-gray-200 dark:border-[#21262d] p-8 transition-[border-radius] duration-300 ${
+        className={`relative w-full max-w-2xl shrink-0 bg-white dark:bg-[#161b22] shadow-sm border border-gray-200 dark:border-[#21262d] p-8 transition-[border-radius] duration-300 ${
           open ? "rounded-l-2xl rounded-r-none border-r-0" : "rounded-2xl"
         }`}
       >
-        <ProfilePage initialData={profileData} embedded headerAction={settingsToggle} />
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {profileData?.isStudentVerified && (
+            <div className="inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full border border-green-200 dark:border-green-800">
+              <CheckCircle2 size={14} />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Verified Student
+              </span>
+            </div>
+          )}
+          {settingsToggle}
+        </div>
+        <ProfilePage initialData={profileData} embedded />
       </div>
 
       {/* Settings panel — slides in flush with the profile card */}

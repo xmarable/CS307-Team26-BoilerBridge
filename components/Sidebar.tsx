@@ -25,7 +25,7 @@ const navItems = [
   },
   { name: "All Trips", href: "/dashboard/alltrips", icon: List },
   {
-    name: "Public feed",
+    name: "Public Feed",
     href: "/dashboard/public-itineraries",
     icon: Globe2,
   },
@@ -59,8 +59,7 @@ export function Sidebar() {
           const Icon = item.icon;
           const isActive =
             item.href === "/dashboard/public-itineraries"
-              ? pathname === item.href ||
-                pathname.startsWith(`${item.href}/`)
+              ? pathname === item.href || pathname.startsWith(`${item.href}/`)
               : pathname === item.href;
           const isSOS = item.href === "#sos";
 

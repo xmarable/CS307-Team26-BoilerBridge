@@ -887,9 +887,9 @@ export default function CalendarEventsPanel({
       {/*  Baseline itinerary generator (spark button)       */}
       {/* ====================================================== */}
       <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-3 text-center md:text-left">
-            <h3 className="text-2xl font-black tracking-tighter flex items-center justify-center md:justify-start gap-2 uppercase">
+        <div className="flex flex-col gap-6">
+          <div className="space-y-3">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2 uppercase">
               <Zap className="text-amber-400 fill-amber-400" size={24} />
               spark itinerary
             </h3>
@@ -960,7 +960,7 @@ export default function CalendarEventsPanel({
           <Button
             onClick={handleGenerate}
             disabled={generating || loadingTrips || !selectedTripId}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest"
+            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest w-full md:w-auto"
           >
             {generating ? (
               <RefreshCw className="animate-spin mr-2" size={20} />

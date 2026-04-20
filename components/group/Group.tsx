@@ -50,7 +50,10 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
-import { RainyDayToggle, type RainyDayTripInput } from "@/components/RainyDayToggle";
+import {
+  RainyDayToggle,
+  type RainyDayTripInput,
+} from "@/components/RainyDayToggle";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
@@ -592,6 +595,7 @@ export default function GroupDashboard() {
             </div>
           )}
 
+          {/* ITINERARY SECTION */}
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">

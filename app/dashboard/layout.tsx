@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { SOSButton } from "@/components/SOSButton";
 import { Toaster } from "sonner";
 import { DashboardWarmer } from "@/components/DashboardWarmer";
+import { FetchErrorInterceptor } from "@/components/FetchErrorInterceptor";
 
 export default async function DashboardLayout({
   children,
@@ -82,6 +83,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <SOSButton />
+      <FetchErrorInterceptor />
       <Toaster richColors position="top-center" />
     </div>
   );
