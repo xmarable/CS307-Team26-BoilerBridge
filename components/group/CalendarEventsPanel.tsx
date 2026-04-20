@@ -23,6 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Calendar,
   Plus,
   Clock,
@@ -34,7 +39,24 @@ import {
   Zap,
   Wand2,
   SlidersHorizontal,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "@/components/ui/checkbox";
 import ItineraryRegeneratePreviewModal, {
   type PreviewOriginalRow,
@@ -61,6 +83,7 @@ type CalendarEvent = {
   linkedActivityId?: string;
   linkedPlaceId?: string;
   itineraryDestinationCity?: string;
+  displayOrder?: number;
 };
 
 type GroupTripOption = {
@@ -71,9 +94,15 @@ type GroupTripOption = {
   toDate?: string;
 };
 
+type VoteData = Record<
+  string,
+  { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
+>;
+
 type Props = {
   groupId: string;
   canPublishItinerary?: boolean;
+  canEdit?: boolean;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -130,10 +159,206 @@ function formatScheduleConflictMessage(data: {
   return `${base} Conflicts with “${c.title}” (${startLabel}–${endLabel}).`;
 }
 
+/* ---------- Sortable Event Card ---------- */
+type SortableEventCardProps = {
+  ev: CalendarEvent;
+  canEdit: boolean;
+  groupId: string;
+  selectedIds: Set<string>;
+  voteData: VoteData;
+  onToggleSelect: (id: string) => void;
+  onEdit: (ev: CalendarEvent) => void;
+  onDelete: (id: string) => void;
+};
+
+function SortableEventCard({
+  ev,
+  canEdit,
+  groupId,
+  selectedIds,
+  voteData,
+  onToggleSelect,
+  onEdit,
+  onDelete,
+}: SortableEventCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: ev._id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const detailHref = buildCalendarActivityDetailHref(ev);
+  const linkableClass =
+    "flex-1 min-w-0 block rounded-2xl -mx-1 px-1 py-0.5 outline-offset-2 hover:bg-amber-50/50 focus-visible:ring-2 focus-visible:ring-amber-300/80 transition-colors group/link";
+
+  const detailBlock = (
+    <div className="min-w-0">
+      <div className="flex items-start gap-2 mb-1 flex-wrap">
+        <h4
+          className={`font-black text-gray-900 text-lg leading-snug flex-1 min-w-0 ${
+            detailHref
+              ? "underline-offset-2 group-hover/link:underline decoration-amber-200/80"
+              : ""
+          }`}
+        >
+          {ev.title}
+        </h4>
+        <Badge
+          variant="outline"
+          className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold shrink-0"
+        >
+          {ev.eventType}
+        </Badge>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">
+        <span className="flex items-center gap-1.5 tabular-nums">
+          <Clock size={14} className="text-amber-500 shrink-0" />
+          <span>
+            {new Date(ev.startTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <span className="text-gray-400 font-black">→</span>
+          <span>
+            {new Date(ev.endTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </span>
+        {ev.location && (
+          <span className="flex items-start gap-1.5 text-gray-700 min-w-0">
+            <MapPin size={14} className="text-amber-500 shrink-0 mt-0.5" />
+            <span className="wrap-break-word font-semibold">{ev.location}</span>
+          </span>
+        )}
+      </div>
+
+      {ev.description && (
+        <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+          {ev.description}
+        </p>
+      )}
+    </div>
+  );
+
+  const dragHandle = canEdit ? (
+    <button
+      {...attributes}
+      {...listeners}
+      type="button"
+      aria-label="Drag to reorder"
+      className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-400 transition-colors shrink-0 touch-none p-1 -ml-1 rounded"
+    >
+      <GripVertical size={20} />
+    </button>
+  ) : (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-not-allowed text-gray-200 shrink-0 p-1 -ml-1">
+          <GripVertical size={20} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        Viewers cannot reorder activities
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-start gap-4"
+    >
+      {/* Drag handle */}
+      <div className="flex items-center shrink-0 self-start md:self-center pt-1 md:pt-0">
+        {dragHandle}
+      </div>
+
+      {/* Checkbox + date badge */}
+      <div className="flex items-start gap-3 shrink-0 md:items-center">
+        <Checkbox
+          checked={selectedIds.has(ev._id)}
+          onCheckedChange={() => onToggleSelect(ev._id)}
+          className="mt-1 md:mt-0"
+          aria-label={`Select ${ev.title}`}
+        />
+        <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
+          <span className="text-xs font-black text-amber-600 uppercase">
+            {new Date(ev.startTime).toLocaleString("default", {
+              month: "short",
+            })}
+          </span>
+          <span className="text-xl font-black text-amber-700 leading-none">
+            {new Date(ev.startTime).getDate()}
+          </span>
+        </div>
+      </div>
+
+      {/* Main event info */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        {detailHref ? (
+          <Link href={detailHref} className={linkableClass}>
+            {detailBlock}
+          </Link>
+        ) : (
+          <div className="flex-1 min-w-0">{detailBlock}</div>
+        )}
+
+        <div className="mt-2">
+          <ActivityVoting
+            activityId={ev._id}
+            groupId={groupId}
+            initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+            initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+            userVote={voteData[ev._id]?.userVote ?? null}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-row md:flex-col gap-2 shrink-0 md:items-end md:ml-auto pt-1">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => onEdit(ev)}
+          className="rounded-xl border border-amber-100 bg-amber-50/90 text-amber-950 shadow-none hover:bg-amber-100/90 font-semibold gap-1.5 h-9 px-3 dark:bg-amber-50 dark:text-amber-950 dark:border-amber-200 dark:hover:bg-amber-100"
+        >
+          <Edit3 size={16} />
+          Edit
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(ev._id)}
+          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
+        >
+          <Trash2 size={16} className="inline mr-1" />
+          Remove
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Main Component ---------- */
 export default function CalendarEventsPanel({
   groupId,
   canPublishItinerary = false,
+  canEdit = false,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -193,12 +418,7 @@ export default function CalendarEventsPanel({
   const [tripOptions, setTripOptions] = useState<GroupTripOption[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
-  const [voteData, setVoteData] = useState<
-    Record<
-      string,
-      { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
-    >
-  >({});
+  const [voteData, setVoteData] = useState<VoteData>({});
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -231,12 +451,15 @@ export default function CalendarEventsPanel({
   );
 
   const eventsGroupedByDay = useMemo(() => {
-    const sorted = events
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
+    const sorted = events.slice().sort((a, b) => {
+      const dayA = calendarDayKey(a.startTime);
+      const dayB = calendarDayKey(b.startTime);
+      if (dayA !== dayB) return dayA.localeCompare(dayB);
+      // Within the same day, respect explicit displayOrder; fall back to startTime
+      const orderA = a.displayOrder ?? new Date(a.startTime).getTime();
+      const orderB = b.displayOrder ?? new Date(b.startTime).getTime();
+      return orderA - orderB;
+    });
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of sorted) {
       const k = calendarDayKey(ev.startTime);
@@ -254,8 +477,10 @@ export default function CalendarEventsPanel({
       setErr(null);
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events${rangeQuery}`,
+        { credentials: "include" },
       );
       const data = await res.json();
+      console.log("[fetchEvents] status:", res.status, "| data:", data);
       if (!res.ok) throw new Error(data?.error || "Failed to load events.");
       const loaded: CalendarEvent[] = data.events ?? data.calendarEvents ?? [];
       setEvents(loaded);
@@ -366,7 +591,9 @@ export default function CalendarEventsPanel({
         setShowErrorPopup(true);
       } else {
         const generatedCount =
-          typeof data?.count === "number" ? data.count : Number(data?.count ?? 0);
+          typeof data?.count === "number"
+            ? data.count
+            : Number(data?.count ?? 0);
         if (!Number.isFinite(generatedCount) || generatedCount <= 0) {
           setPopupMsg(
             "Spark finished but returned no itinerary events. Add or approve must-haves, then try again.",
@@ -525,6 +752,57 @@ export default function CalendarEventsPanel({
       }
       return next;
     });
+  }
+
+  /* ---------- Drag-and-Drop ---------- */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  async function handleDragEnd(dragEvent: DragEndEvent) {
+    const { active, over } = dragEvent;
+    if (!over || active.id === over.id) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    const dayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
+      dayEvents.some((e) => e._id === activeId),
+    );
+    if (!dayEntry) return;
+
+    const [, dayEvents] = dayEntry;
+    const oldIndex = dayEvents.findIndex((e) => e._id === activeId);
+    const newIndex = dayEvents.findIndex((e) => e._id === overId);
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+    const reordered = arrayMove(dayEvents, oldIndex, newIndex);
+
+    // Optimistic update
+    setEvents((prev) => {
+      const next = [...prev];
+      reordered.forEach((ev, idx) => {
+        const i = next.findIndex((e) => e._id === ev._id);
+        if (i !== -1) next[i] = { ...next[i], displayOrder: idx };
+      });
+      return next;
+    });
+
+    try {
+      await fetch(`/api/groups/${groupId}/calendar/events/reorder`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orders: reordered.map((ev, idx) => ({
+            eventId: ev._id,
+            displayOrder: idx,
+          })),
+        }),
+      });
+    } catch {
+      await fetchEvents();
+    }
   }
 
   /* ---------- Effects ---------- */
@@ -880,160 +1158,55 @@ export default function CalendarEventsPanel({
             </p>
           </div>
         ) : (
-          <div className="space-y-10">
-            {eventsGroupedByDay.map(([dayKey, dayEvents]) => {
-              const dayHeading = new Date(
-                dayEvents[0]!.startTime,
-              ).toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              });
-              return (
-                <section key={dayKey} className="space-y-4">
-                  <div className="flex items-center gap-3 px-1">
-                    <div className="h-px flex-1 bg-gray-200" />
-                    <span className="text-xs font-black uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-100 px-4 py-1.5 rounded-full">
-                      {dayHeading}
-                    </span>
-                    <div className="h-px flex-1 bg-gray-200" />
-                  </div>
-                  <div className="grid gap-4">
-                    {dayEvents.map((ev) => {
-                      const detailHref = buildCalendarActivityDetailHref(ev);
-                      const linkableClass =
-                        "flex-1 min-w-0 block rounded-2xl -mx-1 px-1 py-0.5 outline-offset-2 hover:bg-amber-50/50 focus-visible:ring-2 focus-visible:ring-amber-300/80 transition-colors group/link";
-
-                      const detailBlock = (
-                        <div className="min-w-0">
-                          <div className="flex items-start gap-2 mb-1 flex-wrap">
-                            <h4
-                              className={`font-black text-gray-900 text-lg leading-snug flex-1 min-w-0 ${
-                                detailHref
-                                  ? "underline-offset-2 group-hover/link:underline decoration-amber-200/80"
-                                  : ""
-                              }`}
-                            >
-                              {ev.title}
-                            </h4>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold shrink-0"
-                            >
-                              {ev.eventType}
-                            </Badge>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">
-                            <span className="flex items-center gap-1.5 tabular-nums">
-                              <Clock size={14} className="text-amber-500 shrink-0" />
-                              <span>
-                                {new Date(ev.startTime).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </span>
-                              <span className="text-gray-400 font-black">→</span>
-                              <span>
-                                {new Date(ev.endTime).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </span>
-                            </span>
-                            {ev.location && (
-                              <span className="flex items-start gap-1.5 text-gray-700 min-w-0">
-                                <MapPin size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                                <span className="break-words font-semibold">{ev.location}</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {ev.description && (
-                            <p className="mt-2 text-sm text-gray-600 line-clamp-2">
-                              {ev.description}
-                            </p>
-                          )}
-                        </div>
-                      );
-
-                      return (
-                <div
-                  key={ev._id}
-                  className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-start gap-4"
-                >
-                  {/* Checkbox + date badge */}
-                  <div className="flex items-start gap-3 shrink-0 md:items-center">
-                    <Checkbox
-                      checked={selectedIds.has(ev._id)}
-                      onCheckedChange={() => toggleSelected(ev._id)}
-                      className="mt-1 md:mt-0"
-                      aria-label={`Select ${ev.title}`}
-                    />
-                    <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
-                      <span className="text-xs font-black text-amber-600 uppercase">
-                        {new Date(ev.startTime).toLocaleString("default", {
-                          month: "short",
-                        })}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <div className="space-y-10">
+              {eventsGroupedByDay.map(([dayKey, dayEvents]) => {
+                const dayHeading = new Date(
+                  dayEvents[0]!.startTime,
+                ).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                return (
+                  <section key={dayKey} className="space-y-4">
+                    <div className="flex items-center gap-3 px-1">
+                      <div className="h-px flex-1 bg-gray-200" />
+                      <span className="text-xs font-black uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-100 px-4 py-1.5 rounded-full">
+                        {dayHeading}
                       </span>
-                      <span className="text-xl font-black text-amber-700 leading-none">
-                        {new Date(ev.startTime).getDate()}
-                      </span>
+                      <div className="h-px flex-1 bg-gray-200" />
                     </div>
-                  </div>
-
-                  {/* Main event info (clickable when linked to an activity / place) */}
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    {detailHref ? (
-                      <Link href={detailHref} className={linkableClass}>
-                        {detailBlock}
-                      </Link>
-                    ) : (
-                      <div className="flex-1 min-w-0">{detailBlock}</div>
-                    )}
-
-                    <div className="mt-2">
-                      <ActivityVoting
-                        activityId={ev._id}
-                        groupId={groupId}
-                        initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
-                        initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
-                        userVote={voteData[ev._id]?.userVote ?? null}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-row md:flex-col gap-2 shrink-0 md:items-end md:ml-auto pt-1">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openEdit(ev)}
-                      className="rounded-xl border border-amber-100 bg-amber-50/90 text-amber-950 shadow-none hover:bg-amber-100/90 font-semibold gap-1.5 h-9 px-3 dark:bg-amber-50 dark:text-amber-950 dark:border-amber-200 dark:hover:bg-amber-100"
+                    <SortableContext
+                      items={dayEvents.map((e) => e._id)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      <Edit3 size={16} />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(ev._id)}
-                      className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
-                    >
-                      <Trash2 size={16} className="inline mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-                    );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+                      <div className="grid gap-4">
+                        {dayEvents.map((ev) => (
+                          <SortableEventCard
+                            key={ev._id}
+                            ev={ev}
+                            canEdit={canEdit}
+                            groupId={groupId}
+                            selectedIds={selectedIds}
+                            voteData={voteData}
+                            onToggleSelect={toggleSelected}
+                            onEdit={openEdit}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </section>
+                );
+              })}
+            </div>
+          </DndContext>
         )}
       </div>
 
@@ -1123,7 +1296,7 @@ export default function CalendarEventsPanel({
                 }}
                 rows={3}
                 placeholder="Optional details for your group"
-                className="rounded-2xl border-gray-200 bg-white text-gray-900 resize-none min-h-[88px]"
+                className="rounded-2xl border-gray-200 bg-white text-gray-900 resize-none min-h-22"
               />
             </div>
 
