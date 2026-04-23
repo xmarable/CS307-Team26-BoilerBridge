@@ -6,7 +6,7 @@ import "@/app/globals.css";
 
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -55,6 +55,11 @@ import { RainyDayToggle } from "@/components/RainyDayToggle";
 import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
 import { ItineraryOfflineControls } from "@/components/offline/ItineraryOfflineControls";
 import { setGroupTripPresence } from "@/lib/offline/groupTripPresence";
+import {
+  cacheGroupShell,
+  clearGroupShell,
+  readGroupShell,
+} from "@/lib/offline/groupShellCache";
 import {
   deleteTripItineraryCache,
   getTripIdForGroup,
@@ -169,12 +174,17 @@ export default function GroupDashboard() {
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/groups/${groupId}`, {
         credentials: "include",
       });
       if (res.status === 401) return setError("Please log in.");
       if (res.status === 403 || res.status === 404) {
+        clearGroupShell(groupId);
         router.push("/dashboard");
         return;
       }
@@ -182,6 +192,7 @@ export default function GroupDashboard() {
       const data = await res.json();
       if (data?.group) {
         setGroup(data.group);
+        cacheGroupShell(groupId, data.group);
       }
     } catch {
       setError("Failed to load group.");
@@ -190,7 +201,30 @@ export default function GroupDashboard() {
     }
   }, [groupId, router]);
 
+  useLayoutEffect(() => {
+    if (!groupId || typeof navigator === "undefined") return;
+    if (navigator.onLine !== false) return;
+    const cached = readGroupShell<GroupState>(groupId);
+    if (
+      cached &&
+      typeof cached === "object" &&
+      typeof cached.groupID === "string"
+    ) {
+      setGroup(cached);
+      setError(null);
+    } else {
+      setGroup(null);
+      setError(
+        "You're offline. Open this group once while online so it can load here without internet.",
+      );
+    }
+    setLoading(false);
+  }, [groupId]);
+
   const fetchFriends = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return;
+    }
     try {
       const res = await fetch("/api/friends", { credentials: "include" });
       const data = await res.json();
@@ -201,6 +235,13 @@ export default function GroupDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!groupId) {
+      setLoading(false);
+      return;
+    }
+    if (typeof navigator !== "undefined" && navigator.onLine !== false) {
+      setLoading(true);
+    }
     setToggleState();
     fetchGroup();
     fetchFriends();
@@ -265,6 +306,7 @@ export default function GroupDashboard() {
         return;
       }
       if (deleteScope === "group") {
+        clearGroupShell(groupId);
         router.push("/dashboard/groups");
       } else {
         const tid = groupTripDetail?._id ?? (await getTripIdForGroup(groupId));
