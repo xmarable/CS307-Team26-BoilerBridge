@@ -4,6 +4,7 @@
 // import your global styles here
 import "@/app/globals.css";
 
+
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -50,6 +51,10 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
+import {
+  RainyDayToggle,
+  type RainyDayTripInput,
+} from "@/components/RainyDayToggle";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
@@ -108,6 +113,8 @@ export default function GroupDashboard() {
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
+  const [allowIteneraryShare, setAllowIteneraryShare] = useState(false);
+
   const [expensesTab, setExpensesTab] = useState<
     "summary" | "ledger" | "splits"
   >("summary");
@@ -120,6 +127,9 @@ export default function GroupDashboard() {
   const [deleteScope, setDeleteScope] = useState<"trip" | "group" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [tripActive, setTripActive] = useState(false);
+  const [groupTripDetail, setGroupTripDetail] = useState<
+    (RainyDayTripInput & { _id: string }) | null
+  >(null);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -132,8 +142,11 @@ export default function GroupDashboard() {
         router.push("/dashboard");
         return;
       }
+
       const data = await res.json();
-      if (data?.group) setGroup(data.group);
+      if (data?.group) {
+        setGroup(data.group);
+      }
     } catch {
       setError("Failed to load group.");
     } finally {
@@ -152,6 +165,7 @@ export default function GroupDashboard() {
   }, []);
 
   useEffect(() => {
+    setToggleState();
     fetchGroup();
     fetchFriends();
     if (groupId) {
@@ -164,6 +178,49 @@ export default function GroupDashboard() {
         .catch(() => {});
     }
   }, [fetchGroup, fetchFriends, groupId]);
+
+  useEffect(() => {
+    if (!groupId || !tripActive || activeSection !== "itinerary") {
+      setGroupTripDetail(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const listRes = await fetch("/api/trip", { credentials: "include" });
+        if (!listRes.ok) return;
+        const trips = await listRes.json();
+        if (!Array.isArray(trips)) return;
+        const mine = trips.find(
+          (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
+        );
+        const id = mine?.tripID;
+        if (!id || typeof id !== "string") return;
+        const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
+        if (!dRes.ok) return;
+        const d = await dRes.json();
+        if (
+          !cancelled &&
+          d?._id &&
+          Array.isArray(d.primaryItinerary) &&
+          Array.isArray(d.rainyDayItinerary)
+        ) {
+          setGroupTripDetail({
+            _id: String(d._id),
+            primaryItinerary: d.primaryItinerary,
+            rainyDayItinerary: d.rainyDayItinerary,
+            itineraryVersion:
+              typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, tripActive, activeSection]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -187,6 +244,27 @@ export default function GroupDashboard() {
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const setToggleState = async () => {
+    const res = await fetch(`/api/itineraries/share?groupId=${groupId}`);
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    console.log(data.isActive);
+    setAllowIteneraryShare(data.isActive);
+  };
+
+  const handleToggle = async () => {
+    try {
+      const nextToggle = !allowIteneraryShare;
+      setAllowIteneraryShare(nextToggle);
+      const res = await fetch(`/api/itineraries/share`, {
+        method: "PATCH",
+        body: JSON.stringify({ groupId: groupId, isActive: nextToggle })
+      });
+    } catch (e) {}
   };
 
   const handleDelete = async () => {
@@ -235,6 +313,18 @@ export default function GroupDashboard() {
       alert("something went wrong");
     }
   };
+
+  const handleGetShareLink = async () => {
+    const res = await fetch(`/api/itineraries/share`, {
+      method: "POST",
+      body: JSON.stringify({ groupId: groupId })
+    });
+
+    if (!res.ok) return;
+    const data = await res.json();
+
+    await navigator.clipboard.writeText(data.shareURL);
+  }
 
   if (loading)
     return (
@@ -529,6 +619,7 @@ export default function GroupDashboard() {
             </div>
           )}
 
+          {/* ITINERARY SECTION */}
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">
@@ -541,16 +632,36 @@ export default function GroupDashboard() {
                       Timeline
                     </h2>
                   </div>
-                  {groupId && isLeader && !tripActive && (
-                    <Link href={`/dashboard/groups/${groupId}/trip`}>
-                      <Button
-                        size="sm"
-                        className="bg-linear-to-r from-bb-brand to-bb-brand-to text-white font-bold rounded-xl px-4 shadow-md shadow-amber-100 hover:opacity-90 transition-all active:scale-95"
+                  {groupId && (
+                    <div className="flex flex-l space-x-3 items-center">
+                      <Link
+                        href={`/dashboard/groups/${groupId}/trip`}
+                        className="text-sm font-bold text-amber-700 hover:text-amber-800 underline-offset-2 hover:underline"
                       >
-                        <Plus size={15} className="mr-1" />
                         Create Trip
-                      </Button>
-                    </Link>
+                      </Link>
+                      <div className="flex flex-l gap-4">
+                        <button className="text-amber-700 text-sm" onClick={() => handleGetShareLink()}>Copy Share Link</button>
+                        <p className="text-sm text-amber-700">
+                          Allow Share: 
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle()}
+                          className={`relative h-5 w-8 rounded-full transition-all ${
+                            allowIteneraryShare ? "bg-amber-500" : "bg-gray-200"
+                          }`}
+                        >
+                          <span
+                            className={`absolute left-0 top-1 h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                              allowIteneraryShare
+                                ? "translate-x-4"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
@@ -560,6 +671,7 @@ export default function GroupDashboard() {
                     canPublishItinerary={
                       userRole === "Leader" || userRole === "Admin"
                     }
+                    canEdit={userRole === "Leader" || userRole === "Admin"}
                     isLeader={isLeader}
                   />
                 </div>
@@ -578,6 +690,38 @@ export default function GroupDashboard() {
                   <MustHavesPanel groupId={groupId!} />
                 </div>
               </section>
+
+              {tripActive && groupTripDetail ? (
+                <section className="col-span-full w-full space-y-4 mt-6">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+                      <MapPin size={24} />
+                    </div>
+                    <h2 className="text-3xl font-black text-bb-text tracking-tight">
+                      Trip plan
+                    </h2>
+                  </div>
+                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full">
+                    <RainyDayToggle
+                      trip={groupTripDetail}
+                      tripId={groupTripDetail._id}
+                      canEdit={!isViewer}
+                      onItinerarySynced={(payload) => {
+                        setGroupTripDetail((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                primaryItinerary: payload.primaryItinerary,
+                                rainyDayItinerary: payload.rainyDayItinerary,
+                                itineraryVersion: payload.itineraryVersion,
+                              }
+                            : prev,
+                        );
+                      }}
+                    />
+                  </div>
+                </section>
+              ) : null}
             </div>
           )}
 

@@ -45,6 +45,10 @@
       }
     }
   },
+  "containerEnv": {
+    "EDITOR": "code",
+    "REACT_EDITOR": "code"
+  },
   "forwardPorts": [3000],
   "mounts": [
     "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"

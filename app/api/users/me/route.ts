@@ -6,11 +6,16 @@ import User from "@/models/User";
 import z from "zod";
 import bcrypt from "bcryptjs"
 
+const NotificationSettingsSchema = z.object({
+  inApp: z.boolean().optional(),
+  email: z.boolean().optional()
+})
+
 const SettingsSchema = z.object({
-  tripReminders: z.boolean().optional(),
-  friendRequests: z.boolean().optional(),
-  groupInvites: z.boolean().optional(),
-  groupNotifications: z.boolean().optional(),
+  tripReminders: NotificationSettingsSchema.optional(),
+  friendRequests: NotificationSettingsSchema.optional(),
+  groupInvites: NotificationSettingsSchema.optional(),
+  groupNotifications: NotificationSettingsSchema.optional(),
   newPassword: z.string().min(8).max(64).optional(),
   deleteAccount: z.boolean().optional(),
   deletionReason: z.string().optional()
@@ -39,13 +44,16 @@ export async function DELETE(req: NextRequest) {
   await dbConnect();
   const user = await User.findOne({ email: session.user.email })
   if (!user) {
-    return NextResponse.json({ errror: "User not found" }, { status: 404 });
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   user.settings.deletion = {
     requested: true,
-    reason: deletionReason
-  }
+    requestedAt: new Date(),
+    reason: deletionReason,
+  };
+
+  await user.save();
 
   return NextResponse.json({ message: "Success" }, { status: 200 });
 }
@@ -73,34 +81,51 @@ export async function PATCH(req: NextRequest) {
   } = parsed.data;
 
   await dbConnect();
-  const user = await User.findOne({ email: session.user.email })
-  if (!user) {
-    return NextResponse.json({ errror: "User not found" }, { status: 404 });
-  }
+
+  const $set: Record<string, unknown> = {};
 
   if (tripReminders !== undefined) {
-    user.settings.notifications.tripReminders = tripReminders;
+    $set["settings.notifications.tripReminders"] = {
+      inApp: tripReminders.inApp ?? false,
+      email: tripReminders.email ?? false,
+    };
   }
 
   if (friendRequests !== undefined) {
-    user.settings.notifications.friendRequests = friendRequests;
+    $set["settings.notifications.friendRequests"] = {
+      inApp: friendRequests.inApp ?? false,
+      email: friendRequests.email ?? false,
+    };
   }
 
   if (groupInvites !== undefined) {
-    user.settings.notifications.groupInvites = groupInvites;
+    $set["settings.notifications.groupInvites"] = {
+      inApp: groupInvites.inApp ?? false,
+      email: groupInvites.email ?? false,
+    };
   }
 
   if (groupNotifications !== undefined) {
-    user.settings.notifications.groupNotifications = groupNotifications;
+    $set["settings.notifications.groupNotifications"] = {
+      inApp: groupNotifications.inApp ?? false,
+      email: groupNotifications.email ?? false,
+    };
   }
 
   if (newPassword !== undefined) {
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    user.passwordHash = passwordHash;
-    user.settings.security.passwordLastChanged = new Date();
+    $set["passwordHash"] = await bcrypt.hash(newPassword, 10);
+    $set["settings.security.passwordLastChanged"] = new Date();
   }
 
-  await user.save();
+  const updated = await User.findOneAndUpdate(
+    { email: session.user.email },
+    { $set },
+    { new: true },
+  );
 
-  return NextResponse.json({ messages: "Success" }, { status: 200 });
+  if (!updated) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ message: "Success" }, { status: 200 });
 }

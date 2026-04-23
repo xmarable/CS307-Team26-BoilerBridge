@@ -55,7 +55,12 @@ export async function PUT(
     // we need the full group document (not lean) because we might save reminders to it
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
-      console.log("Group not found for id:", groupId);
+      console.error(
+        "[PUT] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
@@ -65,6 +70,14 @@ export async function PUT(
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
+      console.error(
+        "[PUT] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -190,6 +203,12 @@ export async function DELETE(
 
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
+      console.error(
+        "[DELETE] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
@@ -199,6 +218,14 @@ export async function DELETE(
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
+      console.error(
+        "[DELETE] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 

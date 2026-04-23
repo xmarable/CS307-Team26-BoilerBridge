@@ -26,12 +26,14 @@ export async function GET() {
         const formattedRequests = await Promise.all(
           requests.map(async (req: any) => {
             const sender = await User.findOne({ userId: req.requesterId })
-              .select("username")
+              .select("username email")
               .lean();
             return {
-              id: req.requestId,
-              senderName: sender?.username || "Unknown User",
-              requesterId: req.requesterId,
+              id: req.requestId?.toString(),
+              senderId: req.requesterId?.toString(),
+              senderName: (sender as any)?.username || "Unknown User",
+              senderEmail: (sender as any)?.email || "",
+              createdAt: req.createdAt,
             };
           }),
         );
@@ -139,11 +141,10 @@ export async function POST(req: Request) {
               { status: 400 },
             );
           } else {
-
-            /* console.log(
-              "SUCCESS: Created FriendRequest with ID:",
-              newRequest.requestId,
-            ); debug print statement */
+            await FriendRequest.create({
+              requesterId: requesterUUID,
+              recipientId: recipientId,
+            });
 
             return NextResponse.json(
               { message: "Friend request sent" },

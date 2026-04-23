@@ -1,5 +1,6 @@
 "use client";
 
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,15 +26,15 @@ const navItems = [
   },
   { name: "All Trips", href: "/dashboard/alltrips", icon: List },
   {
-    name: "Public feed",
+    name: "Public Feed",
     href: "/dashboard/public-itineraries",
     icon: Globe2,
   },
   { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/dashboard/discover", icon: TrendingUp },
   {
-    name: "Messages",
-    href: "/dashboard/messages",
+    name: "Activities",
+    href: "/dashboard/activities",
     icon: MessageSquare,
     badge: 11,
   },
@@ -53,14 +54,13 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden lg:block w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] sticky top-18.25">
+    <aside className="hidden lg:block w-64 bg-bb-surface border-r border-bb-border min-h-[calc(100vh-73px)] sticky top-18.25">
       <nav className="p-4 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
             item.href === "/dashboard/public-itineraries"
-              ? pathname === item.href ||
-                pathname.startsWith(`${item.href}/`)
+              ? pathname === item.href || pathname.startsWith(`${item.href}/`)
               : pathname === item.href;
           const isSOS = item.href === "#sos";
 
@@ -74,8 +74,8 @@ export function Sidebar() {
               <div
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors cursor-pointer ${
                   isActive
-                    ? "bg-amber-50 text-amber-700"
-                    : "text-gray-700 hover:bg-gray-50"
+                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
                 <Icon size={20} />

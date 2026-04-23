@@ -18,9 +18,11 @@ interface ProfilePageProps {
     isStudentVerified?: boolean;
     eduEmail?: string | null;
   };
+  embedded?: boolean;
+  headerAction?: React.ReactNode;
 }
 
-export default function ProfilePage({ initialData }: ProfilePageProps) {
+export default function ProfilePage({ initialData, embedded, headerAction }: ProfilePageProps) {
   const { update, data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
@@ -171,17 +173,20 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
   const inputStyles =
     "rounded-xl border-gray-300 text-black font-medium placeholder:text-gray-300 placeholder:font-normal focus:ring-amber-500 focus:border-amber-500 bg-white opacity-100";
 
-  return (
-    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div className="mb-8 flex justify-between items-start">
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-          <p className="text-gray-500 text-sm">
-            Update your public profile and verification status.
-          </p>
+  const inner = (
+    <div>
+      <div className="mb-8">
+        <div className="flex justify-between items-start">
+          <div className="text-left">
+            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+            <p className="text-gray-500 text-sm">
+              Update your public profile and verification status.
+            </p>
+          </div>
+          {headerAction && <div>{headerAction}</div>}
         </div>
-        {isVerified && (
-          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200">
+        {!embedded && isVerified && (
+          <div className="mt-3 inline-flex items-center gap-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-full border border-green-200 dark:border-green-800">
             <CheckCircle2 size={16} />
             <span className="text-xs font-bold uppercase tracking-wider">
               Verified Student
@@ -361,6 +366,14 @@ export default function ProfilePage({ initialData }: ProfilePageProps) {
           )}
         </div>
       </form>
+    </div>
+  );
+
+  if (embedded) return inner;
+
+  return (
+    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      {inner}
     </div>
   );
 }

@@ -1,15 +1,20 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import { useTheme } from "next-themes"
+import { Sun, Moon, Monitor } from "lucide-react"
+
+interface NotificationSettings {
+  inApp: boolean,
+  email: boolean
+}
 
 interface SettingsPageProps {
-  initialData?: {
-    tripReminders?: boolean,
-    friendRequests?: boolean,
-    groupInvites?: boolean,
-    groupNotifications?: boolean,
-    newPassword?: string
-  }
+  tripReminders: NotificationSettings,
+  friendRequests: NotificationSettings,
+  groupInvites: NotificationSettings,
+  groupNotifications: NotificationSettings,
+  newPassword?: NotificationSettings
 }
 
 const settingsConfig = [
@@ -32,26 +37,32 @@ const settingsConfig = [
     key: "groupNotifications",
     title: "Group Notifications",
     description: "Recieve notifications from group updates, messages, etc."
-  }
-]
+  },
+] as const;
 
+type SettingKey = typeof settingsConfig[number]["key"];
+type SettingType = "inApp" | "email";
 
-export default function SettingsPage({ initialData }: SettingsPageProps) {
+export default function SettingsPage({ initialData, embedded }: { initialData: SettingsPageProps; embedded?: boolean }) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
   const [success, setSuccess] = useState(false);
   const [settings, setSettings] = useState({
-    tripReminders: false,
-    friendRequests: false,
-    groupInvites: false,
-    groupNotifications: false
+    tripReminders: { inApp: false, email: false },
+    friendRequests: { inApp: false, email: false },
+    groupInvites: { inApp: false, email: false },
+    groupNotifications: { inApp: false, email: false }
   })
 
   useEffect(() => {
     setSettings({
-      tripReminders: initialData?.tripReminders ?? false,
-      friendRequests: initialData?.friendRequests ?? false,
-      groupInvites: initialData?.groupInvites ?? false,
-      groupNotifications: initialData?.groupNotifications ?? false
+      tripReminders: initialData?.tripReminders ?? { inApp: false, email: false },
+      friendRequests: initialData?.friendRequests ?? { inApp: false, email: false },
+      groupInvites: initialData?.groupInvites ?? { inApp: false, email: false },
+      groupNotifications: initialData?.groupNotifications ?? { inApp: false, email: false }
     })
   }, [initialData]);
 
@@ -67,7 +78,7 @@ export default function SettingsPage({ initialData }: SettingsPageProps) {
     });
 
     if (!res.ok) {
-      alert("Failed to update settings")
+      setLoading(false);
       return;
     }
 
@@ -76,21 +87,59 @@ export default function SettingsPage({ initialData }: SettingsPageProps) {
     setTimeout(() => setSuccess(false), 3000);
   }
 
-  const handleToggle = async (key: string) => {
+  const handleToggle = async (key: SettingKey, type: SettingType) => {
     setSettings((p) => ({
       ...p,
-      [key]: !p[key as keyof typeof p]
+      [key]: {
+        ...p[key],
+        [type]: !p[key][type]
+      }
     }));
   }
 
-  return (
-    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div className="mb-8 flex justify-between items-start">
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-500 text-sm">
-            Update your notification and account settings.
-          </p>
+  const content = (
+    <div>
+      {!embedded && (
+        <div className="mb-8 flex justify-between items-start">
+          <div className="text-left">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Update your notification and account settings.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Appearance ─────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">
+          Appearance
+        </h2>
+        <div className="flex gap-3">
+          {(
+            [
+              { value: "light", label: "Light", Icon: Sun },
+              { value: "system", label: "System", Icon: Monitor },
+              { value: "dark", label: "Dark", Icon: Moon },
+            ] as const
+          ).map(({ value, label, Icon }) => {
+            const active = mounted && theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTheme(value)}
+                className={`flex flex-1 flex-col items-center gap-2 rounded-xl border py-4 text-sm font-semibold transition-all ${
+                  active
+                    ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-900/10"
+                }`}
+              >
+                <Icon size={20} />
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -98,7 +147,7 @@ export default function SettingsPage({ initialData }: SettingsPageProps) {
         <div className="grid grid-cols-1 gap-6">
           {settingsConfig.map((setting) => (
             <div key={setting.key} className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50/50 p-5">
-              <div>
+              <div className="mb-4">
                 <h3 className="text-sm font-bold text-gray-800">
                   {setting.title}
                 </h3>
@@ -107,17 +156,37 @@ export default function SettingsPage({ initialData }: SettingsPageProps) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleToggle(setting.key)}
-                className={`relative h-7 w-12 rounded-full transition-all ${settings[setting.key as keyof typeof settings] ? "bg-amber-500" : "bg-gray-200"
-                  }`}
-              >
-                <span
-                  className={`absolute left-0 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings[setting.key as keyof typeof settings] ? "translate-x-6" : "translate-x-1"
-                    }`}
-                />
-              </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-gray-700 whitespace-nowrap">In-App</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(setting.key, "inApp")}
+                    className={`relative h-7 w-12 rounded-full transition-all ${settings[setting.key].inApp ? "bg-amber-500" : "bg-gray-200"
+                      }`}
+                  >
+                    <span
+                      className={`absolute left-0 top-1 h-5 w-5 rounded-full bg-white dark:bg-gray-200 shadow transition-transform ${settings[setting.key].inApp ? "translate-x-6" : "translate-x-1"
+                        }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-gray-700 whitespace-nowrap">Email</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(setting.key, "email")}
+                    className={`relative h-7 w-12 rounded-full transition-all ${settings[setting.key].email ? "bg-amber-500" : "bg-gray-200"
+                      }`}
+                  >
+                    <span
+                      className={`absolute left-0 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings[setting.key].email ? "translate-x-6" : "translate-x-1"
+                        }`}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -150,6 +219,14 @@ export default function SettingsPage({ initialData }: SettingsPageProps) {
           </div>
         </div>
       </form>
+    </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      {content}
     </div>
   );
 }

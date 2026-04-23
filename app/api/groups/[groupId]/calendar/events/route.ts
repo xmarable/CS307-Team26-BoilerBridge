@@ -36,6 +36,16 @@ export async function POST(
 
     const permissions = await getMemberPermissions(groupId, userMongoId);
     if (permissions.status !== 200) {
+      console.error(
+        "[GET] getMemberPermissions failed — groupId:",
+        groupId,
+        "| userId:",
+        userMongoId,
+        "| status:",
+        permissions.status,
+        "| error:",
+        permissions.error,
+      );
       return NextResponse.json(
         { error: permissions.error },
         { status: permissions.status },
@@ -119,6 +129,16 @@ export async function GET(
 
     const permissions = await getMemberPermissions(groupId, userMongoId);
     if (permissions.status !== 200) {
+      console.error(
+        "[GET] getMemberPermissions failed — groupId:",
+        groupId,
+        "| userId:",
+        userMongoId,
+        "| status:",
+        permissions.status,
+        "| error:",
+        permissions.error,
+      );
       return NextResponse.json(
         { error: permissions.error },
         { status: permissions.status },

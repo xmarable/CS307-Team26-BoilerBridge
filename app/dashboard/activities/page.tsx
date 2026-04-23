@@ -19,8 +19,9 @@ import {
   matchesAccessibilityRequirements,
 } from "@/lib/travel/accessibility";
 
+
 interface BrowseActivity {
-  _id: string;
+  activityId: string;
   name: string;
   address?: string;
   rating?: number;
@@ -401,8 +402,8 @@ export default function ActivitiesPage() {
                 </h2>
                 <ul className="space-y-3">
                   {filteredBrowseActivities.map((a) => (
-                    <li key={a._id}>
-                      <Link href={`/dashboard/activities/${a._id}`}>
+                    <li key={a.activityId}>
+                      <Link href={`/dashboard/activities/${a.activityId}`}>
                         <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-amber-300 hover:shadow-sm transition-all">
                           <div className="flex items-start justify-between gap-2">
                             <div>

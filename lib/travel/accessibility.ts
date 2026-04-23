@@ -32,7 +32,7 @@ export function parseAccessibilityRequirementsFromSearchParams(
 } | {
   ok: false;
   error: string;
-  details: z.typeToFlattenedError<AccessibilityRequirements>;
+  details: ReturnType<NonNullable<ReturnType<typeof AccessibilityQuerySchema.safeParse>["error"]>["flatten"]>;
 } {
   const raw: Record<string, unknown> = {};
   for (const key of ACCESSIBILITY_REQUIREMENT_KEYS) {

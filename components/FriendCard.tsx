@@ -29,7 +29,6 @@ export default function FriendCard({
       return;
     }
 
-    // THE FIX: use session.user.userId (the UUID) instead of session.user.id
     const requesterUserId = (session?.user as any)?.userId;
 
     if (sessionStatus === "loading" || !requesterUserId) {
