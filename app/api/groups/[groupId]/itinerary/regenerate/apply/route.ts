@@ -128,6 +128,19 @@ export async function POST(
       );
     }
 
+    const lockedIds = existing
+      .filter((e) => (e as { isLocked?: boolean }).isLocked)
+      .map((e) => String(e._id));
+    if (lockedIds.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Cannot replace locked events. Unlock them first.",
+          lockedIds,
+        },
+        { status: 409 },
+      );
+    }
+
     const del = await CalendarEvent.deleteMany({
       _id: { $in: replaceEventIds },
       groupId,

@@ -23,6 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Calendar,
   Plus,
   Clock,
@@ -34,7 +39,26 @@ import {
   Zap,
   Wand2,
   SlidersHorizontal,
+  GripVertical,
+  Lock,
+  Unlock,
 } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "@/components/ui/checkbox";
 import ItineraryRegeneratePreviewModal, {
   type PreviewOriginalRow,
@@ -61,6 +85,8 @@ type CalendarEvent = {
   linkedActivityId?: string;
   linkedPlaceId?: string;
   itineraryDestinationCity?: string;
+  displayOrder?: number;
+  isLocked?: boolean;
 };
 
 type GroupTripOption = {
@@ -71,9 +97,15 @@ type GroupTripOption = {
   toDate?: string;
 };
 
+type VoteData = Record<
+  string,
+  { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
+>;
+
 type Props = {
   groupId: string;
   canPublishItinerary?: boolean;
+  canEdit?: boolean;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -130,10 +162,246 @@ function formatScheduleConflictMessage(data: {
   return `${base} Conflicts with “${c.title}” (${startLabel}–${endLabel}).`;
 }
 
+/* ---------- Sortable Event Card ---------- */
+type SortableEventCardProps = {
+  ev: CalendarEvent;
+  canEdit: boolean;
+  groupId: string;
+  selectedIds: Set<string>;
+  voteData: VoteData;
+  onToggleSelect: (id: string) => void;
+  onEdit: (ev: CalendarEvent) => void;
+  onDelete: (id: string) => void;
+  onToggleLock: (ev: CalendarEvent) => void;
+};
+
+function SortableEventCard({
+  ev,
+  canEdit,
+  groupId,
+  selectedIds,
+  voteData,
+  onToggleSelect,
+  onEdit,
+  onDelete,
+  onToggleLock,
+}: SortableEventCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: ev._id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const detailHref = buildCalendarActivityDetailHref(ev);
+  const linkableClass =
+    "flex-1 min-w-0 block rounded-2xl -mx-1 px-1 py-0.5 outline-offset-2 hover:bg-amber-50/50 focus-visible:ring-2 focus-visible:ring-amber-300/80 transition-colors group/link";
+
+  const detailBlock = (
+    <div className="min-w-0">
+      <div className="flex items-start gap-2 mb-1 flex-wrap">
+        <h4
+          className={`font-black text-gray-900 text-lg leading-snug flex-1 min-w-0 ${
+            detailHref
+              ? "underline-offset-2 group-hover/link:underline decoration-amber-200/80"
+              : ""
+          }`}
+        >
+          {ev.title}
+        </h4>
+        {ev.isLocked && (
+          <Badge className="text-[10px] uppercase bg-amber-100 text-amber-700 border-amber-200 font-bold shrink-0 gap-1">
+            <Lock size={10} />
+            Locked
+          </Badge>
+        )}
+        <Badge
+          variant="outline"
+          className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold shrink-0"
+        >
+          {ev.eventType}
+        </Badge>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">
+        <span className="flex items-center gap-1.5 tabular-nums">
+          <Clock size={14} className="text-amber-500 shrink-0" />
+          <span>
+            {new Date(ev.startTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <span className="text-gray-400 font-black">→</span>
+          <span>
+            {new Date(ev.endTime).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        </span>
+        {ev.location && (
+          <span className="flex items-start gap-1.5 text-gray-700 min-w-0">
+            <MapPin size={14} className="text-amber-500 shrink-0 mt-0.5" />
+            <span className="wrap-break-word font-semibold">{ev.location}</span>
+          </span>
+        )}
+      </div>
+
+      {ev.description && (
+        <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+          {ev.description}
+        </p>
+      )}
+    </div>
+  );
+
+  const dragHandle = canEdit ? (
+    <button
+      {...(ev.isLocked ? {} : { ...attributes, ...listeners })}
+      type="button"
+      aria-label={ev.isLocked ? "Activity is locked" : "Drag to reorder"}
+      className={`shrink-0 touch-none p-1 -ml-1 rounded transition-colors ${
+        ev.isLocked
+          ? "cursor-not-allowed text-amber-400"
+          : "cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-400"
+      }`}
+    >
+      {ev.isLocked ? <Lock size={18} /> : <GripVertical size={20} />}
+    </button>
+  ) : (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-not-allowed text-gray-200 shrink-0 p-1 -ml-1">
+          <GripVertical size={20} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        Viewers cannot reorder activities
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group bg-white p-6 rounded-4xl border shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-start gap-4 ${
+        ev.isLocked
+          ? "border-amber-300 bg-amber-50/30 hover:border-amber-400"
+          : "border-gray-100 hover:border-amber-200"
+      }`}
+    >
+      {/* Drag handle */}
+      <div className="flex items-center shrink-0 self-start md:self-center pt-1 md:pt-0">
+        {dragHandle}
+      </div>
+
+      {/* Checkbox + date badge */}
+      <div className="flex items-start gap-3 shrink-0 md:items-center">
+        <Checkbox
+          checked={selectedIds.has(ev._id)}
+          onCheckedChange={() => onToggleSelect(ev._id)}
+          className="mt-1 md:mt-0"
+          aria-label={`Select ${ev.title}`}
+        />
+        <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
+          <span className="text-xs font-black text-amber-600 uppercase">
+            {new Date(ev.startTime).toLocaleString("default", {
+              month: "short",
+            })}
+          </span>
+          <span className="text-xl font-black text-amber-700 leading-none">
+            {new Date(ev.startTime).getDate()}
+          </span>
+        </div>
+      </div>
+
+      {/* Main event info */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        {detailHref ? (
+          <Link href={detailHref} className={linkableClass}>
+            {detailBlock}
+          </Link>
+        ) : (
+          <div className="flex-1 min-w-0">{detailBlock}</div>
+        )}
+
+        <div className="mt-2">
+          <ActivityVoting
+            activityId={ev._id}
+            groupId={groupId}
+            initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+            initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+            userVote={voteData[ev._id]?.userVote ?? null}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-row md:flex-col gap-2 shrink-0 md:items-end md:ml-auto pt-1">
+        {canEdit && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onToggleLock(ev)}
+                className={`rounded-xl font-semibold h-9 px-3 gap-1.5 ${
+                  ev.isLocked
+                    ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50 border border-amber-200"
+                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                }`}
+                aria-label={ev.isLocked ? "Unlock activity" : "Lock activity"}
+              >
+                {ev.isLocked ? <Lock size={15} /> : <Unlock size={15} />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              {ev.isLocked ? "Locked — click to unlock" : "Lock to preserve during regeneration"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => onEdit(ev)}
+          disabled={!canEdit}
+          className="rounded-xl border border-amber-100 bg-amber-50/90 text-amber-950 shadow-none hover:bg-amber-100/90 font-semibold gap-1.5 h-9 px-3 dark:bg-amber-50 dark:text-amber-950 dark:border-amber-200 dark:hover:bg-amber-100"
+        >
+          <Edit3 size={16} />
+          Edit
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(ev._id)}
+          disabled={!canEdit}
+          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
+        >
+          <Trash2 size={16} className="inline mr-1" />
+          Remove
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Main Component ---------- */
 export default function CalendarEventsPanel({
   groupId,
   canPublishItinerary = false,
+  canEdit = false,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -193,12 +461,8 @@ export default function CalendarEventsPanel({
   const [tripOptions, setTripOptions] = useState<GroupTripOption[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
-  const [voteData, setVoteData] = useState<
-    Record<
-      string,
-      { upvotes: number; downvotes: number; userVote: "up" | "down" | null }
-    >
-  >({});
+  const [voteData, setVoteData] = useState<VoteData>({});
+  const [unlockDialogEvent, setUnlockDialogEvent] = useState<CalendarEvent | null>(null);
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -231,12 +495,15 @@ export default function CalendarEventsPanel({
   );
 
   const eventsGroupedByDay = useMemo(() => {
-    const sorted = events
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
+    const sorted = events.slice().sort((a, b) => {
+      const dayA = calendarDayKey(a.startTime);
+      const dayB = calendarDayKey(b.startTime);
+      if (dayA !== dayB) return dayA.localeCompare(dayB);
+      // Within the same day, respect explicit displayOrder; fall back to startTime
+      const orderA = a.displayOrder ?? new Date(a.startTime).getTime();
+      const orderB = b.displayOrder ?? new Date(b.startTime).getTime();
+      return orderA - orderB;
+    });
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of sorted) {
       const k = calendarDayKey(ev.startTime);
@@ -254,8 +521,10 @@ export default function CalendarEventsPanel({
       setErr(null);
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events${rangeQuery}`,
+        { credentials: "include" },
       );
       const data = await res.json();
+      console.log("[fetchEvents] status:", res.status, "| data:", data);
       if (!res.ok) throw new Error(data?.error || "Failed to load events.");
       const loaded: CalendarEvent[] = data.events ?? data.calendarEvents ?? [];
       setEvents(loaded);
@@ -366,7 +635,9 @@ export default function CalendarEventsPanel({
         setShowErrorPopup(true);
       } else {
         const generatedCount =
-          typeof data?.count === "number" ? data.count : Number(data?.count ?? 0);
+          typeof data?.count === "number"
+            ? data.count
+            : Number(data?.count ?? 0);
         if (!Number.isFinite(generatedCount) || generatedCount <= 0) {
           setPopupMsg(
             "Spark finished but returned no itinerary events. Add or approve must-haves, then try again.",
@@ -440,6 +711,32 @@ export default function CalendarEventsPanel({
       await fetchEvents();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete event.");
+    }
+  }
+
+  async function handleToggleLock(ev: CalendarEvent) {
+    if (ev.isLocked) {
+      setUnlockDialogEvent(ev);
+      return;
+    }
+    await doToggleLock(ev._id);
+  }
+
+  async function doToggleLock(eventId: string) {
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/calendar/events/${eventId}`,
+        { method: "PATCH" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to toggle lock.");
+      setEvents((prev) =>
+        prev.map((e) =>
+          e._id === eventId ? { ...e, isLocked: data.event?.isLocked } : e,
+        ),
+      );
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to toggle lock.");
     }
   }
 
@@ -527,6 +824,63 @@ export default function CalendarEventsPanel({
     });
   }
 
+  /* ---------- Drag-and-Drop ---------- */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  async function handleDragEnd(dragEvent: DragEndEvent) {
+    const { active, over } = dragEvent;
+    if (!over || active.id === over.id) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    const draggedEvent = events.find((e) => e._id === activeId);
+    if (draggedEvent?.isLocked) {
+      setUnlockDialogEvent(draggedEvent);
+      return;
+    }
+
+    const dayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
+      dayEvents.some((e) => e._id === activeId),
+    );
+    if (!dayEntry) return;
+
+    const [, dayEvents] = dayEntry;
+    const oldIndex = dayEvents.findIndex((e) => e._id === activeId);
+    const newIndex = dayEvents.findIndex((e) => e._id === overId);
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+    const reordered = arrayMove(dayEvents, oldIndex, newIndex);
+
+    // Optimistic update
+    setEvents((prev) => {
+      const next = [...prev];
+      reordered.forEach((ev, idx) => {
+        const i = next.findIndex((e) => e._id === ev._id);
+        if (i !== -1) next[i] = { ...next[i], displayOrder: idx };
+      });
+      return next;
+    });
+
+    try {
+      await fetch(`/api/groups/${groupId}/calendar/events/reorder`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orders: reordered.map((ev, idx) => ({
+            eventId: ev._id,
+            displayOrder: idx,
+          })),
+        }),
+      });
+    } catch {
+      await fetchEvents();
+    }
+  }
+
   /* ---------- Effects ---------- */
   useEffect(() => {
     fetchEvents();
@@ -609,9 +963,9 @@ export default function CalendarEventsPanel({
       {/*  Baseline itinerary generator (spark button)       */}
       {/* ====================================================== */}
       <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-gray-800">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-3 text-center md:text-left">
-            <h3 className="text-2xl font-black tracking-tighter flex items-center justify-center md:justify-start gap-2 uppercase">
+        <div className="flex flex-col gap-6">
+          <div className="space-y-3">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-2 uppercase">
               <Zap className="text-amber-400 fill-amber-400" size={24} />
               spark itinerary
             </h3>
@@ -682,7 +1036,7 @@ export default function CalendarEventsPanel({
           <Button
             onClick={handleGenerate}
             disabled={generating || loadingTrips || !selectedTripId}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest"
+            className="bg-amber-500 hover:bg-amber-400 text-black font-black px-10 h-14 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest w-full md:w-auto"
           >
             {generating ? (
               <RefreshCw className="animate-spin mr-2" size={20} />
@@ -880,160 +1234,56 @@ export default function CalendarEventsPanel({
             </p>
           </div>
         ) : (
-          <div className="space-y-10">
-            {eventsGroupedByDay.map(([dayKey, dayEvents]) => {
-              const dayHeading = new Date(
-                dayEvents[0]!.startTime,
-              ).toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              });
-              return (
-                <section key={dayKey} className="space-y-4">
-                  <div className="flex items-center gap-3 px-1">
-                    <div className="h-px flex-1 bg-gray-200" />
-                    <span className="text-xs font-black uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-100 px-4 py-1.5 rounded-full">
-                      {dayHeading}
-                    </span>
-                    <div className="h-px flex-1 bg-gray-200" />
-                  </div>
-                  <div className="grid gap-4">
-                    {dayEvents.map((ev) => {
-                      const detailHref = buildCalendarActivityDetailHref(ev);
-                      const linkableClass =
-                        "flex-1 min-w-0 block rounded-2xl -mx-1 px-1 py-0.5 outline-offset-2 hover:bg-amber-50/50 focus-visible:ring-2 focus-visible:ring-amber-300/80 transition-colors group/link";
-
-                      const detailBlock = (
-                        <div className="min-w-0">
-                          <div className="flex items-start gap-2 mb-1 flex-wrap">
-                            <h4
-                              className={`font-black text-gray-900 text-lg leading-snug flex-1 min-w-0 ${
-                                detailHref
-                                  ? "underline-offset-2 group-hover/link:underline decoration-amber-200/80"
-                                  : ""
-                              }`}
-                            >
-                              {ev.title}
-                            </h4>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold shrink-0"
-                            >
-                              {ev.eventType}
-                            </Badge>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">
-                            <span className="flex items-center gap-1.5 tabular-nums">
-                              <Clock size={14} className="text-amber-500 shrink-0" />
-                              <span>
-                                {new Date(ev.startTime).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </span>
-                              <span className="text-gray-400 font-black">→</span>
-                              <span>
-                                {new Date(ev.endTime).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </span>
-                            </span>
-                            {ev.location && (
-                              <span className="flex items-start gap-1.5 text-gray-700 min-w-0">
-                                <MapPin size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                                <span className="break-words font-semibold">{ev.location}</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {ev.description && (
-                            <p className="mt-2 text-sm text-gray-600 line-clamp-2">
-                              {ev.description}
-                            </p>
-                          )}
-                        </div>
-                      );
-
-                      return (
-                <div
-                  key={ev._id}
-                  className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-start gap-4"
-                >
-                  {/* Checkbox + date badge */}
-                  <div className="flex items-start gap-3 shrink-0 md:items-center">
-                    <Checkbox
-                      checked={selectedIds.has(ev._id)}
-                      onCheckedChange={() => toggleSelected(ev._id)}
-                      className="mt-1 md:mt-0"
-                      aria-label={`Select ${ev.title}`}
-                    />
-                    <div className="h-14 w-14 bg-amber-50 rounded-2xl flex flex-col items-center justify-center">
-                      <span className="text-xs font-black text-amber-600 uppercase">
-                        {new Date(ev.startTime).toLocaleString("default", {
-                          month: "short",
-                        })}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <div className="space-y-10">
+              {eventsGroupedByDay.map(([dayKey, dayEvents]) => {
+                const dayHeading = new Date(
+                  dayEvents[0]!.startTime,
+                ).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                return (
+                  <section key={dayKey} className="space-y-4">
+                    <div className="flex items-center gap-3 px-1">
+                      <div className="h-px flex-1 bg-gray-200" />
+                      <span className="text-xs font-black uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-100 px-4 py-1.5 rounded-full">
+                        {dayHeading}
                       </span>
-                      <span className="text-xl font-black text-amber-700 leading-none">
-                        {new Date(ev.startTime).getDate()}
-                      </span>
+                      <div className="h-px flex-1 bg-gray-200" />
                     </div>
-                  </div>
-
-                  {/* Main event info (clickable when linked to an activity / place) */}
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    {detailHref ? (
-                      <Link href={detailHref} className={linkableClass}>
-                        {detailBlock}
-                      </Link>
-                    ) : (
-                      <div className="flex-1 min-w-0">{detailBlock}</div>
-                    )}
-
-                    <div className="mt-2">
-                      <ActivityVoting
-                        activityId={ev._id}
-                        groupId={groupId}
-                        initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
-                        initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
-                        userVote={voteData[ev._id]?.userVote ?? null}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-row md:flex-col gap-2 shrink-0 md:items-end md:ml-auto pt-1">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openEdit(ev)}
-                      className="rounded-xl border border-amber-100 bg-amber-50/90 text-amber-950 shadow-none hover:bg-amber-100/90 font-semibold gap-1.5 h-9 px-3 dark:bg-amber-50 dark:text-amber-950 dark:border-amber-200 dark:hover:bg-amber-100"
+                    <SortableContext
+                      items={dayEvents.map((e) => e._id)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      <Edit3 size={16} />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(ev._id)}
-                      className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
-                    >
-                      <Trash2 size={16} className="inline mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-                    );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+                      <div className="grid gap-4">
+                        {dayEvents.map((ev) => (
+                          <SortableEventCard
+                            key={ev._id}
+                            ev={ev}
+                            canEdit={canEdit}
+                            groupId={groupId}
+                            selectedIds={selectedIds}
+                            voteData={voteData}
+                            onToggleSelect={toggleSelected}
+                            onEdit={openEdit}
+                            onDelete={handleDelete}
+                            onToggleLock={handleToggleLock}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </section>
+                );
+              })}
+            </div>
+          </DndContext>
         )}
       </div>
 
@@ -1123,7 +1373,7 @@ export default function CalendarEventsPanel({
                 }}
                 rows={3}
                 placeholder="Optional details for your group"
-                className="rounded-2xl border-gray-200 bg-white text-gray-900 resize-none min-h-[88px]"
+                className="rounded-2xl border-gray-200 bg-white text-gray-900 resize-none min-h-22"
               />
             </div>
 
@@ -1271,6 +1521,45 @@ export default function CalendarEventsPanel({
         onAccept={() => void handleApplyPreview()}
         onCancel={() => setPreviewOpen(false)}
       />
+
+      {/* ==================== */}
+      {/* Unlock Confirmation  */}
+      {/* ==================== */}
+      <Dialog
+        open={!!unlockDialogEvent}
+        onOpenChange={(open) => { if (!open) setUnlockDialogEvent(null); }}
+      >
+        <DialogContent className="rounded-[2.5rem] p-8 border border-amber-200 shadow-xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-gray-900 flex items-center gap-2">
+              <Unlock size={20} className="text-amber-500" />
+              Unlock activity?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 font-medium py-2">
+            <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
+            and will be preserved during regeneration. Unlock it to allow changes.
+          </p>
+          <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setUnlockDialogEvent(null)}
+              className="rounded-xl font-bold border-gray-200 text-gray-700 w-full sm:w-auto"
+            >
+              Keep locked
+            </Button>
+            <Button
+              onClick={async () => {
+                if (unlockDialogEvent) await doToggleLock(unlockDialogEvent._id);
+                setUnlockDialogEvent(null);
+              }}
+              className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-6 w-full sm:w-auto"
+            >
+              Unlock
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

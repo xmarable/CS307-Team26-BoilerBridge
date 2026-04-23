@@ -62,7 +62,7 @@ export function SignUp() {
         router.refresh();
         router.push("/dashboard?registered=true");
       } else {
-        router.push("/login?error=auto_login_failed");
+        router.push("/signin?error=auto_login_failed");
       }
     } catch (_err) {
       setServerError("An unexpected error occurred.");
@@ -172,7 +172,7 @@ export function SignUp() {
               <p className="text-center text-sm text-gray-600 mt-6">
                 Already have an account?{" "}
                 <Link
-                  href="/login"
+                  href="/signin"
                   className="text-amber-600 hover:text-amber-700 font-medium"
                 >
                   Sign in

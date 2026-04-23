@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import mongoose from "mongoose";
 import dbConnect from "@/lib/dbConnect";
 import Trip from "@/models/Trip";
 import MustHave from "@/models/MustHave";
@@ -7,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
 
 const TripPatchSchema = z
   .object({
@@ -78,6 +80,29 @@ export async function GET(
       };
     });
 
+    const primaryRaw = (t.primaryItinerary ?? []) as Parameters<
+      typeof ensureItinerarySectionIds
+    >[0];
+    const rainyRaw = (t.rainyDayItinerary ?? []) as Parameters<
+      typeof ensureItinerarySectionIds
+    >[0];
+    const ensuredPrimary = ensureItinerarySectionIds(primaryRaw);
+    const ensuredRainy = ensureItinerarySectionIds(rainyRaw);
+    if (ensuredPrimary.changed || ensuredRainy.changed) {
+      await Trip.collection.updateOne(
+        { _id: new mongoose.Types.ObjectId(String(tripId)) },
+        {
+          $set: {
+            primaryItinerary: ensuredPrimary.next,
+            rainyDayItinerary: ensuredRainy.next,
+          },
+        },
+      );
+    }
+
+    const itineraryVersion =
+      typeof t.itineraryVersion === "number" ? t.itineraryVersion : 0;
+
     return NextResponse.json({
       _id: t._id?.toString(),
       groupID: t.groupID?.toString(),
@@ -89,8 +114,9 @@ export async function GET(
       mode: t.mode,
       budget: t.budget,
       tripConfirmed: t.tripConfirmed,
-      primaryItinerary: t.primaryItinerary,
-      rainyDayItinerary: t.rainyDayItinerary,
+      primaryItinerary: ensuredPrimary.next,
+      rainyDayItinerary: ensuredRainy.next,
+      itineraryVersion,
       avoidActivities: t.avoidActivities ?? [],
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,

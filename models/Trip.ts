@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 
 const ActivitySchema = new mongoose.Schema({
   activityId: { type: String, required: false },
+  /** Stable id for PATCH /api/itinerary/:id/section (distinct from catalog activityId). Assigned in application code / ensureItinerarySectionIds. */
+  itineraryActivityId: {
+    type: String,
+  },
+  /** Groups activities into an editable day section (shared by all acts on that calendar day). */
+  dayId: { type: String },
   name: { type: String, required: false },
   startTime: { type: Date, required: false },
   endTime: { type: Date, required: false },
@@ -82,6 +88,9 @@ const TripSchema = new mongoose.Schema(
     /** Optional budget range for suggestions (US14) */
     budgetMin: { type: Number, default: undefined },
     budgetMax: { type: Number, default: undefined },
+
+    /** Incremented on successful PATCH /api/itinerary/:id/section; optional optimistic check via request body `version`. */
+    itineraryVersion: { type: Number, default: 0 },
   },
 
   { timestamps: true },

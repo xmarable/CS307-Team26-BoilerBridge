@@ -55,7 +55,12 @@ export async function PUT(
     // we need the full group document (not lean) because we might save reminders to it
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
-      console.log("Group not found for id:", groupId);
+      console.error(
+        "[PUT] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
@@ -65,7 +70,22 @@ export async function PUT(
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
+      console.error(
+        "[PUT] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    if (event.isLocked) {
+      return NextResponse.json(
+        { error: "Event is locked and cannot be edited" },
+        { status: 403 },
+      );
     }
 
     const creator = !!(await CalendarEvent.exists({
@@ -169,7 +189,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ groupId: string; eventId: string }> },
 ) {
@@ -200,6 +220,72 @@ export async function DELETE(
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    event.isLocked = !event.isLocked;
+    await event.save();
+
+    return NextResponse.json({ event }, { status: 200 });
+  } catch (err: any) {
+    console.error("PATCH calendar event lock error:", err);
+    return NextResponse.json(
+      { error: "Server error", details: err?.message ?? String(err) },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ groupId: string; eventId: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.userId as string | undefined;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { groupId, eventId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
+    }
+
+    await dbConnect();
+
+    const group: any = await TravelGroup.findOne({ groupID: groupId });
+    if (!group) {
+      console.error(
+        "[DELETE] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+
+    if (!isMemberOrLeader(group, userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
+    if (!event) {
+      console.error(
+        "[DELETE] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (event.isLocked) {
+      return NextResponse.json(
+        { error: "Event is locked and cannot be deleted" },
+        { status: 403 },
+      );
     }
 
     const creator = !!(await CalendarEvent.exists({

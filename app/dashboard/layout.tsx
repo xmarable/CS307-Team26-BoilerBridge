@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { SOSButton } from "@/components/SOSButton";
 import { Toaster } from "sonner";
 import { DashboardWarmer } from "@/components/DashboardWarmer";
+import { FetchErrorInterceptor } from "@/components/FetchErrorInterceptor";
 
 export default async function DashboardLayout({
   children,
@@ -72,7 +73,7 @@ export default async function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <DashboardWarmer />
       <Navbar session={enhancedSession} />
       <div className="flex flex-1 overflow-hidden">
@@ -82,6 +83,7 @@ export default async function DashboardLayout({
         </main>
       </div>
       <SOSButton />
+      <FetchErrorInterceptor />
       <Toaster richColors position="top-center" />
     </div>
   );

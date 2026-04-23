@@ -57,7 +57,7 @@ export default function CreateGroupPage() {
   const handleCreateGroupResponse = (res: Response, data: any) => {
     if (res.status === 401) {
       setError("You must be logged in to create a group.");
-      router.push("/login");
+      router.push("/signin");
       return;
     }
 

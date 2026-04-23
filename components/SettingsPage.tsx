@@ -1,6 +1,8 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import { useTheme } from "next-themes"
+import { Sun, Moon, Monitor } from "lucide-react"
 
 interface NotificationSettings {
   inApp: boolean,
@@ -41,8 +43,12 @@ const settingsConfig = [
 type SettingKey = typeof settingsConfig[number]["key"];
 type SettingType = "inApp" | "email";
 
-export default function SettingsPage({ initialData }: { initialData: SettingsPageProps }) {
+export default function SettingsPage({ initialData, embedded }: { initialData: SettingsPageProps; embedded?: boolean }) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
   const [success, setSuccess] = useState(false);
   const [settings, setSettings] = useState({
     tripReminders: { inApp: false, email: false },
@@ -72,7 +78,7 @@ export default function SettingsPage({ initialData }: { initialData: SettingsPag
     });
 
     if (!res.ok) {
-      alert("Failed to update settings")
+      setLoading(false);
       return;
     }
 
@@ -91,14 +97,49 @@ export default function SettingsPage({ initialData }: { initialData: SettingsPag
     }));
   }
 
-  return (
-    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div className="mb-8 flex justify-between items-start">
-        <div className="text-left">
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-500 text-sm">
-            Update your notification and account settings.
-          </p>
+  const content = (
+    <div>
+      {!embedded && (
+        <div className="mb-8 flex justify-between items-start">
+          <div className="text-left">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Account Settings</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              Update your notification and account settings.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Appearance ─────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">
+          Appearance
+        </h2>
+        <div className="flex gap-3">
+          {(
+            [
+              { value: "light", label: "Light", Icon: Sun },
+              { value: "system", label: "System", Icon: Monitor },
+              { value: "dark", label: "Dark", Icon: Moon },
+            ] as const
+          ).map(({ value, label, Icon }) => {
+            const active = mounted && theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTheme(value)}
+                className={`flex flex-1 flex-col items-center gap-2 rounded-xl border py-4 text-sm font-semibold transition-all ${
+                  active
+                    ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-900/10"
+                }`}
+              >
+                <Icon size={20} />
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -117,7 +158,7 @@ export default function SettingsPage({ initialData }: { initialData: SettingsPag
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-gray-700">In-App</span>
+                  <span className="text-sm text-gray-700 whitespace-nowrap">In-App</span>
                   <button
                     type="button"
                     onClick={() => handleToggle(setting.key, "inApp")}
@@ -125,14 +166,14 @@ export default function SettingsPage({ initialData }: { initialData: SettingsPag
                       }`}
                   >
                     <span
-                      className={`absolute left-0 top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings[setting.key].inApp ? "translate-x-6" : "translate-x-1"
+                      className={`absolute left-0 top-1 h-5 w-5 rounded-full bg-white dark:bg-gray-200 shadow transition-transform ${settings[setting.key].inApp ? "translate-x-6" : "translate-x-1"
                         }`}
                     />
                   </button>
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm text-gray-700">Email</span>
+                  <span className="text-sm text-gray-700 whitespace-nowrap">Email</span>
                   <button
                     type="button"
                     onClick={() => handleToggle(setting.key, "email")}
@@ -178,6 +219,14 @@ export default function SettingsPage({ initialData }: { initialData: SettingsPag
           </div>
         </div>
       </form>
+    </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      {content}
     </div>
   );
 }
