@@ -22,6 +22,8 @@ export interface ICalendarEvent extends Document {
   linkedPlaceId?: string;
   /** Trip destination city when row was created from Spark (for destination-aware preview links) */
   itineraryDestinationCity?: string;
+  /** US4: When true, this event is preserved through itinerary regeneration */
+  isLocked?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +77,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
     linkedActivityId: { type: String, trim: true },
     linkedPlaceId: { type: String, trim: true },
     itineraryDestinationCity: { type: String, trim: true },
+    isLocked: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

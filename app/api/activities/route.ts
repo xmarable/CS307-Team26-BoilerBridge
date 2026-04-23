@@ -11,7 +11,6 @@ const ReferenceLinkSchema = z.object({
   url: z.string().trim().min(1),
 });
 
-
 const CreateActivitySchema = z.object({
   /** Free-text: e.g. "Kayaking in Chicago" — server resolves Google Place ID when configured */
   name: z.string().min(1, "Name is required").trim(),
@@ -68,9 +67,9 @@ export async function GET(req: NextRequest) {
         .lean();
       return NextResponse.json({
         activities: activities.map((a) => {
-          const doc = a as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+          const doc = a as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
           return {
-            activityId: doc.activityId,
+            _id: serializeId(doc._id),
             placeId: doc.placeId,
             name: doc.name,
             address: doc.address,
@@ -91,10 +90,10 @@ export async function GET(req: NextRequest) {
         reviews: [],
       });
       const doc = created.toObject ? created.toObject() : created;
-      const d = doc as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+      const d = doc as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
       return NextResponse.json({
         activity: {
-          activityId: d.activityId,
+          _id: serializeId(d._id),
           placeId: d.placeId,
           name: d.name,
           address: d.address,
@@ -104,10 +103,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const doc = activity as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+    const doc = activity as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
     return NextResponse.json({
       activity: {
-        activityId: doc.activityId,
+        _id: serializeId(doc._id),
         placeId: doc.placeId,
         name: doc.name,
         address: doc.address,
@@ -210,12 +209,12 @@ export async function POST(req: NextRequest) {
     });
 
     const doc = created.toObject ? created.toObject() : created;
-    const d = doc as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+    const d = doc as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
 
     return NextResponse.json(
       {
         activity: {
-          activityId: d.activityId,
+          _id: serializeId(d._id),
           placeId: d.placeId,
           name: d.name,
           address: d.address,

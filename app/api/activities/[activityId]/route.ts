@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 import { enrichActivityForApi } from "@/lib/travel/enrichActivityForApi";
 
-
 /**
  * GET /api/activities/[activityId]
  * US15: Activity details + optional Google Places enrichment (GOOGLE_MAPS_API_KEY).
@@ -29,9 +28,13 @@ export async function GET(
     }
 
     const { activityId } = await params;
+    if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
+      return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
+    }
+
     await dbConnect();
 
-    const activity = await Activity.findOne({ activityId: activityId }).lean();
+    const activity = await Activity.findById(activityId).lean();
     if (!activity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }

@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 import { buildGooglePlacePhotoUpstreamUrl } from "@/lib/travel/googlePlaces";
 
-
 /**
  * Proxies a Google Places hero image so the browser never sees the API key (US15).
  */
@@ -28,8 +27,15 @@ export async function GET(
     }
 
     const { activityId } = await params;
+    if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
+      return NextResponse.json(
+        { error: "Invalid activity ID" },
+        { status: 400 },
+      );
+    }
+
     await dbConnect();
-    const activity = await Activity.findOne({ activityId: activityId });
+    const activity = await Activity.findById(activityId).lean();
     if (!activity) {
       return NextResponse.json(
         { error: "Activity not found" },
