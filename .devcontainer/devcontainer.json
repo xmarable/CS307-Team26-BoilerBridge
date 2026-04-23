@@ -50,7 +50,6 @@
     "REACT_EDITOR": "code"
   },
   "forwardPorts": [3000],
-  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   "mounts": [
     "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],

@@ -1,5 +1,6 @@
 "use client";
 
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -32,8 +33,8 @@ const navItems = [
   { name: "Friends", href: "/dashboard/friends", icon: Users },
   { name: "Discover", href: "/dashboard/discover", icon: TrendingUp },
   {
-    name: "Messages",
-    href: "/dashboard/messages",
+    name: "Activities",
+    href: "/dashboard/activities",
     icon: MessageSquare,
     badge: 11,
   },

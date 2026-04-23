@@ -1,7 +1,8 @@
-import { SharedItenerary } from "@/components/SharedItenerary";
+import { SharedItinerary } from "@/components/SharedItinerary";
 import dbConnect from "@/lib/dbConnect";
 import Itenerary from "@/models/Itenerary";
 import TravelGroup from "@/models/TravelGroup";
+
 
 export default async function SharedIteneraryPage({ params, searchParams }: { params: Promise<{ groupId: string }>, searchParams: Promise<{ token?: string }>}) {
   const { groupId } = await params;
@@ -10,7 +11,7 @@ export default async function SharedIteneraryPage({ params, searchParams }: { pa
   if (!token) {
     return (
       <div>
-        <SharedItenerary initialData={null}/>
+        <SharedItinerary initialData={null}/>
       </div>
     );
   }
@@ -20,7 +21,7 @@ export default async function SharedIteneraryPage({ params, searchParams }: { pa
   if (!group) {
     return (
       <div>
-        <SharedItenerary initialData={null}/>
+        <SharedItinerary initialData={null}/>
       </div>
     );
   }
@@ -29,14 +30,14 @@ export default async function SharedIteneraryPage({ params, searchParams }: { pa
   if (!itenerary || itenerary.token !== token) {
     return (
       <div>
-        <SharedItenerary initialData={null}/>
+        <SharedItinerary initialData={null}/>
       </div>
     );
   }
 
   return (
       <div>
-        <SharedItenerary initialData={itenerary}/>
+        <SharedItinerary initialData={itenerary}/>
       </div>
   );
 }
