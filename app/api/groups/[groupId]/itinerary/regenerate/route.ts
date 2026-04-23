@@ -166,7 +166,33 @@ export async function POST(
           { status: 400 },
         );
       }
-      targetDocs = found as typeof targetDocs;
+
+      const lockedSkipped = (found as Array<{ isLocked?: boolean }>)
+        .filter((e) => e.isLocked)
+        .map((e) => String((e as { _id: unknown })._id));
+      targetDocs = (found as typeof targetDocs).filter(
+        (e) => !(e as unknown as { isLocked?: boolean }).isLocked,
+      );
+
+      if (targetDocs.length === 0) {
+        return NextResponse.json(
+          {
+            error: "All selected events are locked. Unlock them first to regenerate.",
+            lockedSkipped,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (lockedSkipped.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Some selected events are locked and cannot be regenerated.",
+            lockedSkipped,
+          },
+          { status: 400 },
+        );
+      }
     } else {
       const { from, to } = data.dateRange!;
       if (to <= from) {
@@ -179,6 +205,7 @@ export async function POST(
         groupId,
         startTime: { $lt: to },
         endTime: { $gt: from },
+        isLocked: { $ne: true },
       };
       if (data.eventType) {
         q.eventType = data.eventType;
@@ -186,7 +213,7 @@ export async function POST(
       targetDocs = (await CalendarEvent.find(q).sort({ startTime: 1 }).lean()) as typeof targetDocs;
       if (targetDocs.length === 0) {
         return NextResponse.json(
-          { error: "No events match the given filters" },
+          { error: "No unlocked events match the given filters" },
           { status: 400 },
         );
       }

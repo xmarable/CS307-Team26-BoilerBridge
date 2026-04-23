@@ -9,12 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/components/ui/utils";
-import Link from "next/link";
-
 
 interface Review {
-  reviewId: string;
-  authorId: string;
   author: string;
   text: string;
   rating: number;
@@ -74,7 +70,6 @@ interface ActivityReviewsProps {
   className?: string;
   /** When set, show "Write a review" form using this name as author */
   currentUserDisplayName?: string | null;
-  userId?: string | null;
 }
 
 function fetchReviews(activityId: string): Promise<ReviewsResponse> {
@@ -96,7 +91,6 @@ export function ActivityReviews({
   activityId,
   className,
   currentUserDisplayName,
-  userId
 }: ActivityReviewsProps) {
   const [data, setData] = useState<ReviewsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,26 +145,6 @@ export function ActivityReviews({
       })
       .catch((err: Error) => setSubmitError(err.message))
       .finally(() => setSubmitting(false));
-  };
-
-  const handleDelete = async (reviewId: string) => {
-    console.log(activityId, " | ", reviewId);
-    if (!activityId || !reviewId) return;
-
-    const res = await fetch(`/api/activities/${activityId}/reviews`, {
-      method: "DELETE",
-      body: JSON.stringify({ reviewId: reviewId })
-    })
-
-    if (!res.ok) return;
-
-    if (!data) return;
-    const newData = {
-      ...data,
-      reviews: data.reviews.filter((i) => i.reviewId !== reviewId)
-    }
-
-    setData(newData);
   };
 
   if (loading) {
@@ -322,9 +296,6 @@ export function ActivityReviews({
                       <span className="text-xs text-gray-500">
                         {formatRelativeTime(review.time)}
                       </span>
-                      {review.authorId === userId && (
-                        <button className="text-red-500" onClick={() => handleDelete(review.reviewId)}>Delete</button>
-                      )}
                     </div>
                   </div>
                   <p className="text-sm text-gray-600">{review.text}</p>

@@ -1,10 +1,6 @@
-import { randomUUID } from "crypto";
-import mongoose, { Schema, Document, Model, mongo } from "mongoose";
-
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IReview {
-  reviewId: string;
-  authorId: string;
   author: string;
   text: string;
   rating: number;
@@ -17,7 +13,6 @@ export interface IReferenceLink {
 }
 
 export interface IActivity extends Document {
-  activityId: string;
   /** Google Place ID (Places API) — used for details + reviews enrichment */
   placeId?: string;
   name: string;
@@ -62,8 +57,6 @@ export interface IActivity extends Document {
 
 const ReviewSchema = new Schema<IReview>(
   {
-    reviewId: {type: String, default: randomUUID()},
-    authorId: { type: String, required: true },
     author: { type: String, required: true, trim: true },
     text: { type: String, required: true, trim: true },
     rating: { type: Number, required: true },
@@ -82,7 +75,6 @@ const ReferenceLinkSchema = new Schema<IReferenceLink>(
 
 const ActivitySchema = new Schema<IActivity>(
   {
-    activityId: { type: String, default: randomUUID(), unique: true },
     placeId: { type: String, index: true },
     name: { type: String, required: true, trim: true },
     address: { type: String, trim: true },

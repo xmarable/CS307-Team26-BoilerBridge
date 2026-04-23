@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, ExternalLink, MapPin, Plus } from "lucide-react";
 
-
 function AddActivityPageInner() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -67,7 +66,7 @@ function AddActivityPageInner() {
         return;
       }
 
-      const activityId = data?.activity?.activityId;
+      const activityId = data?.activity?._id;
       if (activityId) {
         router.push(`/dashboard/activities/${activityId}`);
       } else {

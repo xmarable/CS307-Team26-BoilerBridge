@@ -4,7 +4,6 @@
 // import your global styles here
 import "@/app/globals.css";
 
-
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -165,7 +164,6 @@ export default function GroupDashboard() {
   }, []);
 
   useEffect(() => {
-    setToggleState();
     fetchGroup();
     fetchFriends();
     if (groupId) {
@@ -246,24 +244,14 @@ export default function GroupDashboard() {
     }
   };
 
-  const setToggleState = async () => {
-    const res = await fetch(`/api/itineraries/share?groupId=${groupId}`);
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    console.log(data.isActive);
-    setAllowIteneraryShare(data.isActive);
-  };
-
   const handleToggle = async () => {
     try {
-      const nextToggle = !allowIteneraryShare;
-      setAllowIteneraryShare(nextToggle);
-      const res = await fetch(`/api/itineraries/share`, {
+      const res = await fetch(`/api/groups/${groupId}/itenerary/options`, {
         method: "PATCH",
-        body: JSON.stringify({ groupId: groupId, isActive: nextToggle })
+        body: JSON.stringify({ allowShare: allowIteneraryShare }),
       });
+
+      setAllowIteneraryShare(!allowIteneraryShare);
     } catch (e) {}
   };
 
@@ -313,18 +301,6 @@ export default function GroupDashboard() {
       alert("something went wrong");
     }
   };
-
-  const handleGetShareLink = async () => {
-    const res = await fetch(`/api/itineraries/share`, {
-      method: "POST",
-      body: JSON.stringify({ groupId: groupId })
-    });
-
-    if (!res.ok) return;
-    const data = await res.json();
-
-    await navigator.clipboard.writeText(data.shareURL);
-  }
 
   if (loading)
     return (
@@ -640,11 +616,8 @@ export default function GroupDashboard() {
                       >
                         Create Trip
                       </Link>
-                      <div className="flex flex-l gap-4">
-                        <button className="text-amber-700 text-sm" onClick={() => handleGetShareLink()}>Copy Share Link</button>
-                        <p className="text-sm text-amber-700">
-                          Allow Share: 
-                        </p>
+                      <div className="flex flex-l">
+                        <p className="text-sm text-amber-700">Allow Share:</p>
                         <button
                           type="button"
                           onClick={() => handleToggle()}
