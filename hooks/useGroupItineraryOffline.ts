@@ -43,17 +43,23 @@ export function useGroupItineraryOffline({
   >(null);
   const [isShowingCached, setIsShowingCached] = useState(false);
   const loadGen = useRef(0);
+  const tripActiveGen = useRef(0);
+  const mountedRef = useRef(true);
 
   const resolveTripActive = useCallback(async () => {
     if (!groupId) {
+      tripActiveGen.current += 1;
       setTripActive(false);
       return;
     }
+    const my = ++tripActiveGen.current;
     let active = false;
     try {
       const res = await fetch(`/api/trip`, { credentials: "include" });
+      if (my !== tripActiveGen.current) return;
       if (res.ok) {
         const data = (await res.json()) as unknown;
+        if (my !== tripActiveGen.current) return;
         const trips = Array.isArray(data) ? data : [];
         const mine = trips.find(
           (t: { groupID?: string; tripID?: string }) => t?.groupID === groupId,
@@ -62,16 +68,19 @@ export function useGroupItineraryOffline({
           active = true;
           await putGroupTripIdMapping(groupId, String(mine.tripID));
         }
+        if (my !== tripActiveGen.current) return;
       }
     } catch {
-      // network failure — try cache
+      if (my !== tripActiveGen.current) return;
     }
     if (!active) {
       const fromMap = await getTripIdForGroup(groupId);
+      if (my !== tripActiveGen.current) return;
       if (fromMap && (await hasUsableItineraryCacheForGroup(groupId))) {
         active = true;
       }
     }
+    if (my !== tripActiveGen.current) return;
     setTripActive(active);
   }, [groupId]);
 
@@ -80,11 +89,22 @@ export function useGroupItineraryOffline({
     void resolveTripActive();
   }, [groupId, isOnline, resolveTripActive]);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadGen.current += 1;
+      tripActiveGen.current += 1;
+    };
+  }, []);
+
   const loadTripDetail = useCallback(async () => {
     if (!groupId || !tripActive || !itinerarySectionOpen) {
+      loadGen.current += 1;
       setGroupTripDetail(null);
       setTripPlanError(null);
       setIsShowingCached(false);
+      setTripPlanLoading(false);
       return;
     }
     const myGen = ++loadGen.current;
@@ -110,10 +130,12 @@ export function useGroupItineraryOffline({
         } catch {
           // will fall back to mapping + cache
         }
+        if (myGen !== loadGen.current) return;
       }
       if (!tripId) {
         tripId = await getTripIdForGroup(groupId);
       }
+      if (myGen !== loadGen.current) return;
       if (!tripId) {
         if (myGen === loadGen.current) {
           setGroupTripDetail(null);
@@ -179,6 +201,7 @@ export function useGroupItineraryOffline({
       primaryItinerary: RainyDayTripInput["primaryItinerary"];
       rainyDayItinerary: RainyDayTripInput["rainyDayItinerary"];
     }) => {
+      if (!mountedRef.current) return;
       setGroupTripDetail((prev) => {
         if (!prev) return null;
         const next: GroupTripDetailState = {
@@ -201,10 +224,13 @@ export function useGroupItineraryOffline({
   );
 
   const resetAfterTripDelete = useCallback(() => {
+    loadGen.current += 1;
+    tripActiveGen.current += 1;
     setTripActive(false);
     setGroupTripDetail(null);
     setTripPlanError(null);
     setIsShowingCached(false);
+    setTripPlanLoading(false);
   }, []);
 
   return {

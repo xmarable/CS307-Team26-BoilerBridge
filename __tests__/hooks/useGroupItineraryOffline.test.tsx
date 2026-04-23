@@ -152,4 +152,120 @@ describe("useGroupItineraryOffline", () => {
       { timeout: 8000 },
     );
   });
+
+  it("unmount_ignores_deferred_trip_list_fetch", async () => {
+    let resList1!: (v: { ok: boolean; status: number; json: () => Promise<unknown> }) => void;
+    const pList1 = new Promise<{
+      ok: boolean;
+      status: number;
+      json: () => Promise<unknown>;
+    }>((r) => {
+      resList1 = r;
+    });
+    (global as unknown as { fetch: typeof fetch }).fetch = jest.fn(
+      (url: string) => {
+        const s = String(url);
+        if (s.includes("/api/trip") && !s.match(/\/api\/trip\/[a-f0-9]+$/i)) {
+          return pList1 as unknown as ReturnType<typeof fetch>;
+        }
+        if (s.includes("/api/trip/") && s.includes(TRIP)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ ...tripJson, itineraryVersion: 1 }),
+          } as { ok: boolean; status: number; json: () => Promise<typeof tripJson> });
+        }
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
+      },
+    );
+    const { unmount } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    unmount();
+    await act(async () => {
+      resList1!({
+        ok: true,
+        status: 200,
+        json: async () => [{ groupID: GROUP, tripID: TRIP }],
+      });
+    });
+  });
+
+  it("closing_itinerary_section_drops_in_flight_trip_list_fetch", async () => {
+    let resList2!: (v: { ok: boolean; status: number; json: () => Promise<unknown> }) => void;
+    const pList2 = new Promise<{
+      ok: boolean;
+      status: number;
+      json: () => Promise<unknown>;
+    }>((r) => {
+      resList2 = r;
+    });
+    let listCount = 0;
+    (global as unknown as { fetch: typeof fetch }).fetch = jest.fn(
+      (url: string) => {
+        const s = String(url);
+        if (s.includes("/api/trip/") && s.includes(TRIP)) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ ...tripJson, itineraryVersion: 1 }),
+          } as { ok: boolean; status: number; json: () => Promise<typeof tripJson> });
+        }
+        if (s.includes("/api/trip") && !s.match(/\/api\/trip\/[a-f0-9]+$/i)) {
+          listCount += 1;
+          if (listCount === 1) {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: async () => [{ groupID: GROUP, tripID: TRIP }],
+            } as { ok: boolean; status: number; json: () => Promise<unknown> });
+          }
+          return pList2 as unknown as ReturnType<typeof fetch>;
+        }
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
+      },
+    );
+    const { result, rerender } = renderHook(
+      (open: boolean) =>
+        useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: open }),
+      { initialProps: true },
+    );
+    await waitFor(
+      () => {
+        expect(result.current.tripActive).toBe(true);
+        expect(listCount).toBeGreaterThanOrEqual(1);
+      },
+      { timeout: 8000 },
+    );
+    await act(async () => {
+      rerender(false);
+    });
+    expect(result.current.tripPlanLoading).toBe(false);
+    expect(result.current.groupTripDetail).toBeNull();
+    await act(async () => {
+      resList2!({
+        ok: true,
+        status: 200,
+        json: async () => [{ groupID: GROUP, tripID: TRIP }],
+      });
+    });
+    expect(result.current.groupTripDetail).toBeNull();
+  });
+
+  it("offline_with_empty_cache_has_no_trip_detail", async () => {
+    setOnline(false);
+    emitNet("offline");
+    (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip("fail", null);
+    const { result } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    await waitFor(
+      () => {
+        expect(result.current.tripActive).toBe(false);
+        expect(result.current.groupTripDetail).toBeNull();
+        expect(result.current.tripPlanError).toBeNull();
+      },
+      { timeout: 8000 },
+    );
+  });
 });
