@@ -64,6 +64,13 @@ async function seedLeaderGroupTrip(
     budget: number;
     budgetMin: number;
     budgetMax: number;
+    accessibilityRequirements: {
+      wheelchairAccessible: boolean;
+      stepFree: boolean;
+      accessibleRestroom: boolean;
+      hearingAssistance: boolean;
+      visualAssistance: boolean;
+    };
   }>,
 ) {
   const suffix = randomUUID().slice(0, 8);
@@ -97,6 +104,9 @@ async function seedLeaderGroupTrip(
     avoidLocations: tripOverrides?.avoidLocations ?? [],
     ...(tripOverrides?.budgetMin != null ? { budgetMin: tripOverrides.budgetMin } : {}),
     ...(tripOverrides?.budgetMax != null ? { budgetMax: tripOverrides.budgetMax } : {}),
+    ...(tripOverrides?.accessibilityRequirements != null
+      ? { accessibilityRequirements: tripOverrides.accessibilityRequirements }
+      : {}),
   });
 
   await MustHave.create({
@@ -203,6 +213,39 @@ describe("POST /api/groups/[groupId]/itinerary/generate (Ollama stub)", () => {
       source: "itinerary",
     });
     expect(n).toBe(data.count);
+
+    await CalendarEvent.deleteMany({ groupId: groupID });
+    await MustHave.deleteMany({ groupId: groupID as never });
+    await Trip.deleteMany({ groupID });
+    await TravelGroup.deleteOne({ groupID });
+    await User.deleteOne({ userId: leaderId });
+  });
+
+  it("returns helpful empty-state error when no events match accessibility requirements", async () => {
+    const { leaderId, groupID } = await seedLeaderGroupTrip({
+      accessibilityRequirements: {
+        wheelchairAccessible: true,
+        stepFree: false,
+        accessibleRestroom: false,
+        hearingAssistance: false,
+        visualAssistance: false,
+      },
+    });
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId, email: "x@test.com" },
+      expires: "9999",
+    });
+
+    const res = await POSTGenerate(
+      new Request(`http://localhost/api/groups/${groupID}/itinerary/generate`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ groupId: groupID }) },
+    );
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(String(data.error)).toContain("No matching venues");
 
     await CalendarEvent.deleteMany({ groupId: groupID });
     await MustHave.deleteMany({ groupId: groupID as never });

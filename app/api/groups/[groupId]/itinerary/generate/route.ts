@@ -11,6 +11,7 @@ import {
 import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationContext";
 import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
 import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
+import { filterProposedEventsByAccessibility } from "@/lib/itinerary/filterProposedByAccessibility";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
 import { assignOptionGroupIds } from "@/lib/itinerary/clusterOptionGroups";
@@ -154,6 +155,24 @@ export async function POST(
       toCity: tripCtx.toCity,
       fromCity: tripCtx.fromCity,
     });
+    const accessibilityFiltered = await filterProposedEventsByAccessibility(
+      proposed,
+      linkRows,
+      tripCtx.accessibilityRequirements,
+    );
+    proposed = accessibilityFiltered.proposed;
+    linkRows = accessibilityFiltered.linkRows;
+
+    if (proposed.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No matching venues were found for the selected accessibility requirements. Try relaxing filters in trip preferences.",
+          removedByAccessibility: accessibilityFiltered.removedCount,
+        },
+        { status: 404 },
+      );
+    }
 
     const destCity = tripCtx.toCity?.trim() ?? "";
 
@@ -167,6 +186,7 @@ export async function POST(
       createdBy: userId,
       groupId,
       source: "itinerary" as const,
+      accessibilityMatched: true,
       timezone: ev.timezone ?? "UTC",
       itineraryOptionStatus: "candidate" as const,
       ...(optionGroupIds[i] ? { optionGroupId: optionGroupIds[i] } : {}),
@@ -182,6 +202,7 @@ export async function POST(
     return NextResponse.json({
       message: "Itinerary sparked successfully.",
       count: created.length,
+      removedByAccessibility: accessibilityFiltered.removedCount,
     });
   } catch (err: unknown) {
     // i want to see why this is failing so im logging the whole err object lol

@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import { z } from "zod";
+import { AccessibilityRequirementsSchema } from "@/lib/itinerary/schemas";
 
 const preferencesSchema = z.object({
   tripId: z.string().min(1, "tripId is required"),
@@ -12,6 +13,7 @@ const preferencesSchema = z.object({
   avoidLocations: z.array(z.string()).optional(),
   budgetMin: z.number().optional(),
   budgetMax: z.number().optional(),
+  accessibilityRequirements: AccessibilityRequirementsSchema.optional(),
 });
 
 /**
@@ -34,12 +36,22 @@ export async function POST(req: NextRequest) {
     const parsed = preferencesSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        {
+          error: parsed.error.issues[0]?.message ?? "Invalid input",
+          details: parsed.error.flatten(),
+        },
         { status: 400 }
       );
     }
 
-    const { tripId, avoidActivities, avoidLocations, budgetMin, budgetMax } =
+    const {
+      tripId,
+      avoidActivities,
+      avoidLocations,
+      budgetMin,
+      budgetMax,
+      accessibilityRequirements,
+    } =
       parsed.data;
 
     const trip = await Trip.findById(tripId);
@@ -70,6 +82,9 @@ export async function POST(req: NextRequest) {
     if (avoidLocations !== undefined) update.avoidLocations = avoidLocations;
     if (budgetMin !== undefined) update.budgetMin = budgetMin;
     if (budgetMax !== undefined) update.budgetMax = budgetMax;
+    if (accessibilityRequirements !== undefined) {
+      update.accessibilityRequirements = accessibilityRequirements;
+    }
 
     const updated = await Trip.findByIdAndUpdate(tripId, update, {
       new: true,
@@ -82,6 +97,7 @@ export async function POST(req: NextRequest) {
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,
       budgetMax: t.budgetMax,
+      accessibilityRequirements: t.accessibilityRequirements ?? {},
     });
   } catch (err: unknown) {
     console.error("POST /api/trip/preferences error:", err);

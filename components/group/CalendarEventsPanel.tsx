@@ -45,6 +45,12 @@ import { ActivityVoting } from "@/components/group/ActivityVoting";
 import { OptionGroupVoting } from "@/components/group/OptionGroupVoting";
 import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
 import { buildCalendarActivityDetailHref } from "@/lib/calendarActivityDetailLink";
+import { ItineraryExportMenu } from "@/components/group/ItineraryExportMenu";
+import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
+import {
+  emptyAccessibilityRequirements,
+} from "@/lib/accessibilityRequirements";
+import { hasAnyAccessibilityRequirement } from "@/lib/travel/accessibility";
 
 /* ---------- Types ---------- */
 type CalendarEvent = {
@@ -65,6 +71,7 @@ type CalendarEvent = {
   itineraryDestinationCity?: string;
   itineraryOptionStatus?: "candidate" | "removed" | "final";
   optionGroupId?: string;
+  accessibilityMatched?: boolean;
 };
 
 type GroupTripOption = {
@@ -73,6 +80,7 @@ type GroupTripOption = {
   toCity?: string;
   fromDate?: string;
   toDate?: string;
+  accessibilityRequirements?: AccessibilityRequirements;
 };
 
 type Props = {
@@ -80,6 +88,8 @@ type Props = {
   canPublishItinerary?: boolean;
   /** Leader-only: finalize option-group polls */
   isLeader?: boolean;
+  /** For export filename hint */
+  groupName?: string;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -147,6 +157,7 @@ export default function CalendarEventsPanel({
   groupId,
   canPublishItinerary = false,
   isLeader = false,
+  groupName,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -231,6 +242,10 @@ export default function CalendarEventsPanel({
     },
   );
   const polls = pollsData?.polls ?? {};
+  const [hideNonMatchingByAccessibility, setHideNonMatchingByAccessibility] =
+    useState(true);
+  const [activeAccessibilityRequirements, setActiveAccessibilityRequirements] =
+    useState<AccessibilityRequirements>(emptyAccessibilityRequirements());
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -262,8 +277,24 @@ export default function CalendarEventsPanel({
     [events],
   );
 
+  const filteredEventsForDisplay = useMemo(() => {
+    if (
+      !hideNonMatchingByAccessibility ||
+      !hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+    ) {
+      return events;
+    }
+    return events.filter(
+      (event) => event.source !== "itinerary" || event.accessibilityMatched === true,
+    );
+  }, [
+    events,
+    hideNonMatchingByAccessibility,
+    activeAccessibilityRequirements,
+  ]);
+
   const eventsGroupedByDay = useMemo(() => {
-    const sorted = events
+    const sorted = filteredEventsForDisplay
       .slice()
       .sort(
         (a, b) =>
@@ -277,7 +308,7 @@ export default function CalendarEventsPanel({
       map.set(k, arr);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [events]);
+  }, [filteredEventsForDisplay]);
 
   const firstEventIdByOptionGroup = useMemo(() => {
     const sorted = [...events].sort(
@@ -656,6 +687,14 @@ export default function CalendarEventsPanel({
     }
   }, [tripIdFromUrl, tripOptions]);
 
+  useEffect(() => {
+    const selectedTrip = tripOptions.find((trip) => trip._id === selectedTripId);
+    setActiveAccessibilityRequirements({
+      ...emptyAccessibilityRequirements(),
+      ...(selectedTrip?.accessibilityRequirements ?? {}),
+    });
+  }, [selectedTripId, tripOptions]);
+
   /* ---------- Render ---------- */
   return (
     <div className="space-y-8">
@@ -668,18 +707,26 @@ export default function CalendarEventsPanel({
       {/*   Date‑range selector (From / To) + Refresh button   */}
       {/* ====================================================== */}
       <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <Clock size={16} /> View Window
           </h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchEvents}
-            className="rounded-xl text-amber-600 hover:bg-amber-50"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <ItineraryExportMenu
+              groupId={groupId}
+              groupName={groupName}
+              rangeFrom={from}
+              rangeTo={to}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchEvents}
+              className="rounded-xl text-amber-600 hover:bg-amber-50"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -915,7 +962,7 @@ export default function CalendarEventsPanel({
               Upcoming Activities
             </h3>
             <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
-              {events.length} Events Found
+              {filteredEventsForDisplay.length} Events Found
             </Badge>
           </div>
 
@@ -948,6 +995,19 @@ export default function CalendarEventsPanel({
 
             {/* Action buttons */}
             <div className="flex items-end gap-2">
+              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements) ? (
+                <label className="flex h-11 items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-900">
+                  <input
+                    type="checkbox"
+                    checked={hideNonMatchingByAccessibility}
+                    onChange={(e) =>
+                      setHideNonMatchingByAccessibility(e.target.checked)
+                    }
+                    className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                  />
+                  Hide non-matching venues
+                </label>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -983,11 +1043,13 @@ export default function CalendarEventsPanel({
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-amber-500" size={32} />
           </div>
-        ) : events.length === 0 ? (
+        ) : filteredEventsForDisplay.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
             <Calendar className="mx-auto text-gray-300 mb-2" size={40} />
             <p className="text-gray-400 font-bold">
-              No events scheduled for this window.
+              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+                ? "No venues match your selected accessibility requirements in this window."
+                : "No events scheduled for this window."}
             </p>
           </div>
         ) : (
@@ -1034,6 +1096,17 @@ export default function CalendarEventsPanel({
                             >
                               {ev.eventType}
                             </Badge>
+                            {ev.source === "itinerary" &&
+                            hasAnyAccessibilityRequirement(
+                              activeAccessibilityRequirements,
+                            ) ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-sky-200 text-sky-700"
+                              >
+                                Accessibility match
+                              </Badge>
+                            ) : null}
                           </div>
 
                           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">

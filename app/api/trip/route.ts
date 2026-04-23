@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+import { AccessibilityRequirementsSchema } from "@/lib/itinerary/schemas";
 
 type ItineraryActivityInput = {
   activityId: string;
@@ -93,6 +94,7 @@ const tripSchema = z.object({
   avoidLocations: z.array(z.string()).optional(),
   budgetMin: z.coerce.number().optional(),
   budgetMax: z.coerce.number().optional(),
+  accessibilityRequirements: AccessibilityRequirementsSchema.optional(),
   mustHaves: z
     .array(
       z.object({
@@ -120,7 +122,10 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { error: result.error.issues[0]?.message || "Invalid input data" },
+        {
+          error: result.error.issues[0]?.message || "Invalid input data",
+          details: result.error.flatten(),
+        },
         { status: 400 },
       );
     }
@@ -146,6 +151,7 @@ export async function POST(req: NextRequest) {
       avoidLocations,
       budgetMin,
       budgetMax,
+      accessibilityRequirements,
       mustHaves,
       rainyDayItinerary,
     } = result.data;
@@ -208,6 +214,7 @@ export async function POST(req: NextRequest) {
           ...(avoidLocations != null && { avoidLocations }),
           ...(budgetMin != null && { budgetMin }),
           ...(budgetMax != null && { budgetMax }),
+          ...(accessibilityRequirements != null && { accessibilityRequirements }),
         },
       },
       { upsert: true, new: true },
@@ -253,6 +260,7 @@ export async function POST(req: NextRequest) {
         avoidLocations: t.avoidLocations ?? [],
         budgetMin: t.budgetMin,
         budgetMax: t.budgetMax,
+        accessibilityRequirements: t.accessibilityRequirements ?? {},
       },
       { status: existing != null ? 200 : 201 },
     );
@@ -295,6 +303,7 @@ export async function GET() {
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,
       budgetMax: t.budgetMax,
+      accessibilityRequirements: t.accessibilityRequirements ?? {},
     }));
 
     return NextResponse.json(payload, { status: 200 });

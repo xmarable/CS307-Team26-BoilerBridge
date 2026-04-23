@@ -1,6 +1,26 @@
 import { z } from "zod";
 
-/** Plain event fields suitable for CalendarEvent.create (no DB ids). */
+export const ACCESSIBILITY_REQUIREMENT_KEYS = [
+  "wheelchairAccessible",
+  "stepFree",
+  "accessibleRestroom",
+  "hearingAssistance",
+  "visualAssistance",
+] as const;
+
+export const AccessibilityRequirementsSchema = z
+  .object({
+    wheelchairAccessible: z.boolean().optional().default(false),
+    stepFree: z.boolean().optional().default(false),
+    accessibleRestroom: z.boolean().optional().default(false),
+    hearingAssistance: z.boolean().optional().default(false),
+    visualAssistance: z.boolean().optional().default(false),
+  })
+  .strict();
+
+export type AccessibilityRequirements = z.infer<
+  typeof AccessibilityRequirementsSchema
+>;
 export const ProposedEventSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),

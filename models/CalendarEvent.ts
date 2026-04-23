@@ -24,6 +24,8 @@ export interface ICalendarEvent extends Document {
   itineraryOptionStatus?: "candidate" | "removed" | "final";
   /** Cluster of competing activity options for voting (US12). */
   optionGroupId?: string;
+  /** True when an itinerary row passed strict accessibility filtering */
+  accessibilityMatched?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +83,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
       enum: ["candidate", "removed", "final"],
     },
     optionGroupId: { type: String, trim: true, index: true },
+    accessibilityMatched: { type: Boolean, default: undefined },
   },
   { timestamps: true },
 );

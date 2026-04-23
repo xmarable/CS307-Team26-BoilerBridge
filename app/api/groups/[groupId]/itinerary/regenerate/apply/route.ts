@@ -17,6 +17,7 @@ import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivit
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
 import { assignOptionGroupIds } from "@/lib/itinerary/clusterOptionGroups";
 import type { ProposedEventInput } from "@/lib/itinerary/schemas";
+import { filterProposedEventsByAccessibility } from "@/lib/itinerary/filterProposedByAccessibility";
 
 const ApplyBodySchema = z.object({
   replaceEventIds: z.array(z.string().min(1)).min(1),
@@ -107,6 +108,24 @@ export async function POST(
         ? { toCity: tripCtx.toCity, fromCity: tripCtx.fromCity }
         : null,
     );
+    const accessibilityFiltered = await filterProposedEventsByAccessibility(
+      proposedEvents,
+      linkRows,
+      tripCtx?.accessibilityRequirements,
+    );
+    proposedEvents = accessibilityFiltered.proposed;
+    linkRows = accessibilityFiltered.linkRows;
+
+    if (proposedEvents.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No matching venues were found for the selected accessibility requirements. Try relaxing filters in trip preferences.",
+          removedByAccessibility: accessibilityFiltered.removedCount,
+        },
+        { status: 404 },
+      );
+    }
 
     const destCity = tripCtx?.toCity?.trim() ?? "";
 
@@ -168,6 +187,7 @@ export async function POST(
       createdBy: userId,
       groupId,
       source: "itinerary" as const,
+      accessibilityMatched: true,
       timezone: ev.timezone ?? "UTC",
       itineraryOptionStatus: "candidate" as const,
       ...(optionGroupIds[i] ? { optionGroupId: optionGroupIds[i] } : {}),

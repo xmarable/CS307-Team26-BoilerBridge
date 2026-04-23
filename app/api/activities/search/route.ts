@@ -4,6 +4,11 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 import { searchPlacesText } from "@/lib/travel/googlePlaces";
+import {
+  getActiveAccessibilityRequirements,
+  matchesAccessibilityRequirements,
+  parseAccessibilityRequirementsFromSearchParams,
+} from "@/lib/travel/accessibility";
 
 function serializeId(id: unknown): string {
   if (id && typeof (id as { toString: () => string }).toString === "function") {
@@ -25,6 +30,14 @@ export type ActivitySearchResultRow = {
   rating?: number;
   reviewCount?: number;
   primaryType?: string;
+  accessibility?: {
+    wheelchairAccessible?: boolean;
+    stepFree?: boolean;
+    accessibleRestroom?: boolean;
+    hearingAssistance?: boolean;
+    visualAssistance?: boolean;
+  };
+  accessibilityMatch: boolean;
 };
 
 function formatPrimaryType(types?: string[]): string | undefined {
@@ -73,11 +86,26 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim() ?? "";
     const limit = Math.min(parseInt(searchParams.get("limit") || "24", 10) || 24, 40);
+    const parsedAccessibility =
+      parseAccessibilityRequirementsFromSearchParams(searchParams);
+    if (!parsedAccessibility.ok) {
+      return NextResponse.json(
+        {
+          error: parsedAccessibility.error,
+          details: parsedAccessibility.details,
+        },
+        { status: 400 },
+      );
+    }
+    const activeAccessibility = getActiveAccessibilityRequirements(
+      parsedAccessibility.data,
+    );
 
     if (q.length < 2) {
       return NextResponse.json({
         results: [] as ActivitySearchResultRow[],
         googleQueried: false,
+        activeAccessibilityRequirements: activeAccessibility,
       });
     }
 
@@ -118,6 +146,11 @@ export async function GET(req: NextRequest) {
         rating?: number;
         reviewCount?: number;
         googleTypes?: string[];
+        wheelchairAccessible?: boolean;
+        stepFree?: boolean;
+        accessibleRestroom?: boolean;
+        hearingAssistance?: boolean;
+        visualAssistance?: boolean;
       };
       merged.push({
         source: "saved",
@@ -128,6 +161,24 @@ export async function GET(req: NextRequest) {
         rating: d.rating,
         reviewCount: d.reviewCount ?? 0,
         primaryType: formatPrimaryType(d.googleTypes),
+        accessibility: {
+          wheelchairAccessible:
+            typeof d.wheelchairAccessible === "boolean"
+              ? d.wheelchairAccessible
+              : undefined,
+          stepFree: typeof d.stepFree === "boolean" ? d.stepFree : undefined,
+          accessibleRestroom:
+            typeof d.accessibleRestroom === "boolean"
+              ? d.accessibleRestroom
+              : undefined,
+          hearingAssistance:
+            typeof d.hearingAssistance === "boolean"
+              ? d.hearingAssistance
+              : undefined,
+          visualAssistance:
+            typeof d.visualAssistance === "boolean" ? d.visualAssistance : undefined,
+        },
+        accessibilityMatch: false,
       });
     }
 
@@ -141,15 +192,33 @@ export async function GET(req: NextRequest) {
         rating: g.rating,
         reviewCount: g.userRatingCount,
         primaryType: formatPrimaryType(g.types),
+        accessibility: {
+          wheelchairAccessible: g.wheelchairAccessible,
+          stepFree: g.stepFree,
+          accessibleRestroom: g.accessibleRestroom,
+        },
+        accessibilityMatch: false,
       });
     }
 
-    merged.sort((a, b) => relevanceScore(q, b) - relevanceScore(q, a));
+    const strictFiltered = merged.filter((row) =>
+      matchesAccessibilityRequirements(
+        row.accessibility,
+        parsedAccessibility.data,
+      ),
+    );
+
+    for (const row of strictFiltered) {
+      row.accessibilityMatch = true;
+    }
+
+    strictFiltered.sort((a, b) => relevanceScore(q, b) - relevanceScore(q, a));
 
     return NextResponse.json({
-      results: merged.slice(0, limit),
+      results: strictFiltered.slice(0, limit),
       googleQueried: true,
       googlePartial: googleError,
+      activeAccessibilityRequirements: activeAccessibility,
     });
   } catch (err: unknown) {
     console.error("GET /api/activities/search error:", err);

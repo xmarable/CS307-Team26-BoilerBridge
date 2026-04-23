@@ -179,4 +179,23 @@ describe("POST /api/trip rainy-day sanitization", () => {
       }),
     ]);
   });
+
+  it("returns 400 with field-level details for invalid accessibility payload", async () => {
+    const req = new Request("http://localhost/api/trip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...validBody,
+        accessibilityRequirements: {
+          wheelchairAccessible: "yes",
+        },
+      }),
+    });
+
+    const res = await route.POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(typeof data.error).toBe("string");
+    expect(data.details).toBeDefined();
+  });
 });

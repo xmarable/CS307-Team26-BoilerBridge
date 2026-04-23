@@ -94,6 +94,7 @@ export function GroupTripView({ initialData }: { initialData: any }) {
                 <MustHavesSection groupId={group.groupID} />
                 <TimelineSection
                   groupId={group.groupID}
+                  groupName={group.groupName}
                   canPublishItinerary={
                     userRole === "Leader" || userRole === "Admin"
                   }

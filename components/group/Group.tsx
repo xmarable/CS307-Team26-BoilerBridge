@@ -556,6 +556,7 @@ export default function GroupDashboard() {
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
                   <CalendarEventsPanel
                     groupId={groupId!}
+                    groupName={group.groupName}
                     canPublishItinerary={
                       userRole === "Leader" || userRole === "Admin"
                     }

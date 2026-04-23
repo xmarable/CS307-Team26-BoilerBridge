@@ -9,6 +9,11 @@ import { Plus, Trash2, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ACCESSIBILITY_REQUIREMENT_OPTIONS,
+  emptyAccessibilityRequirements,
+} from "@/lib/accessibilityRequirements";
+import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
 
 type Mode = "flight" | "train" | "bus" | "taxi";
 
@@ -24,6 +29,8 @@ export default function GroupTripPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([]);
+  const [accessibilityRequirements, setAccessibilityRequirements] =
+    useState<AccessibilityRequirements>(emptyAccessibilityRequirements());
 
   const groupId = params?.groupId as string | undefined;
 
@@ -73,6 +80,7 @@ export default function GroupTripPage() {
         budget: Number(formData.get("budget") || 0),
         tripConfirmed: formData.get("tripConfirmed") === "on",
         mustHaves: mustHaveList,
+        accessibilityRequirements,
       };
 
       if (!payload.fromCity || !payload.toCity || !payload.fromDate || !payload.toDate) {
@@ -272,6 +280,46 @@ export default function GroupTripPage() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="rounded-2xl border border-sky-100 bg-sky-50 p-5 space-y-3">
+            <div>
+              <Label className="font-bold text-gray-700">
+                Accessibility needs
+              </Label>
+              <p className="text-sm text-gray-500 mt-1">
+                We only include venues with explicitly matching accessibility data.
+                Unknown venue accessibility is treated as non-matching.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {ACCESSIBILITY_REQUIREMENT_OPTIONS.map((option) => (
+                <label
+                  key={option.key}
+                  className="flex items-start gap-3 rounded-xl border border-sky-100 bg-white px-3 py-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(accessibilityRequirements[option.key])}
+                    onChange={(e) =>
+                      setAccessibilityRequirements((prev) => ({
+                        ...prev,
+                        [option.key]: e.target.checked,
+                      }))
+                    }
+                    className="mt-0.5 rounded border-gray-300 text-sky-600 focus:ring-sky-500 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-800">
+                      {option.label}
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      {option.description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer">

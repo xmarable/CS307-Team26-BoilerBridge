@@ -7,6 +7,11 @@ import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ACCESSIBILITY_REQUIREMENT_OPTIONS,
+  emptyAccessibilityRequirements,
+} from "@/lib/accessibilityRequirements";
+import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
 
 type Mode = "flight" | "train" | "bus" | "taxi";
 
@@ -30,6 +35,7 @@ interface TripData {
   avoidLocations?: string[];
   budgetMin?: number;
   budgetMax?: number;
+  accessibilityRequirements?: AccessibilityRequirements;
 }
 
 function toDateInputValue(value: string | Date | undefined): string {
@@ -63,6 +69,8 @@ function EditTripPageContent() {
     { _id: string; name: string; address?: string; estimatedCost?: number }[]
   >([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [accessibilityRequirements, setAccessibilityRequirements] =
+    useState<AccessibilityRequirements>(emptyAccessibilityRequirements());
 
   useEffect(() => {
     if (!tripId) {
@@ -82,6 +90,10 @@ function EditTripPageContent() {
         setAvoidLocations(data.avoidLocations ?? []);
         setBudgetMin(data.budgetMin != null ? String(data.budgetMin) : "");
         setBudgetMax(data.budgetMax != null ? String(data.budgetMax) : "");
+        setAccessibilityRequirements({
+          ...emptyAccessibilityRequirements(),
+          ...(data.accessibilityRequirements ?? {}),
+        });
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -205,6 +217,7 @@ function EditTripPageContent() {
         avoidLocations,
         budgetMin: budgetMinPayload,
         budgetMax: budgetMaxPayload,
+        accessibilityRequirements,
       };
 
       if (
@@ -530,6 +543,43 @@ function EditTripPageContent() {
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
+          <Label className="text-base font-medium">
+            Accessibility requirements
+          </Label>
+          <p className="text-sm text-gray-500 mt-1 mb-3">
+            Strict mode: places with unknown accessibility data are excluded.
+          </p>
+          <div className="space-y-2">
+            {ACCESSIBILITY_REQUIREMENT_OPTIONS.map((option) => (
+              <label
+                key={option.key}
+                className="flex items-start gap-3 rounded-md border border-sky-100 bg-white px-3 py-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(accessibilityRequirements[option.key])}
+                  onChange={(e) =>
+                    setAccessibilityRequirements((prev) => ({
+                      ...prev,
+                      [option.key]: e.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 rounded border-gray-300 text-sky-600 focus:ring-sky-500 h-4 w-4"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-800">
+                    {option.label}
+                  </span>
+                  <span className="block text-xs text-gray-500">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
           </div>
         </div>
 

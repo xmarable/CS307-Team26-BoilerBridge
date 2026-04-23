@@ -16,6 +16,9 @@ import {
 import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationContext";
 import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
 import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
+import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
+import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import { filterProposedEventsByAccessibility } from "@/lib/itinerary/filterProposedByAccessibility";
 
 const RegenerateBodySchema = z
   .object({
@@ -229,6 +232,28 @@ export async function POST(
       tripCtx.avoidLocations ?? [],
       approvedMustHaves,
     );
+    let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
+    linkRows = await augmentResolvedLinksWithTextSearch(proposed, linkRows, {
+      toCity: tripCtx.toCity,
+      fromCity: tripCtx.fromCity,
+    });
+    const accessibilityFiltered = await filterProposedEventsByAccessibility(
+      proposed,
+      linkRows,
+      tripCtx.accessibilityRequirements,
+    );
+    proposed = accessibilityFiltered.proposed;
+
+    if (proposed.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No matching venues were found for the selected accessibility requirements. Try relaxing filters in trip preferences.",
+          removedByAccessibility: accessibilityFiltered.removedCount,
+        },
+        { status: 404 },
+      );
+    }
 
     const originals = targetDocs.map(serializeEvent);
     const proposedSerialized = proposed.map((p) => serializeProposed(p));
@@ -237,6 +262,7 @@ export async function POST(
       {
         originals,
         proposed: proposedSerialized,
+        removedByAccessibility: accessibilityFiltered.removedCount,
       },
       { status: 200 },
     );
