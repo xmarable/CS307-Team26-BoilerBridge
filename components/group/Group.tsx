@@ -51,10 +51,13 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
+import { RainyDayToggle } from "@/components/RainyDayToggle";
+import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
+import { OfflineItineraryBanner } from "@/components/offline/OfflineItineraryBanner";
 import {
-  RainyDayToggle,
-  type RainyDayTripInput,
-} from "@/components/RainyDayToggle";
+  deleteTripItineraryCache,
+  getTripIdForGroup,
+} from "@/lib/offline/tripItineraryCache";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
@@ -126,10 +129,20 @@ export default function GroupDashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteScope, setDeleteScope] = useState<"trip" | "group" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [tripActive, setTripActive] = useState(false);
-  const [groupTripDetail, setGroupTripDetail] = useState<
-    (RainyDayTripInput & { _id: string }) | null
-  >(null);
+
+  const {
+    tripActive,
+    groupTripDetail,
+    tripPlanLoading,
+    tripPlanError,
+    isOffline,
+    isShowingCached,
+    onItinerarySynced,
+    resetAfterTripDelete,
+  } = useGroupItineraryOffline({
+    groupId,
+    itinerarySectionOpen: activeSection === "itinerary",
+  });
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -168,59 +181,7 @@ export default function GroupDashboard() {
     setToggleState();
     fetchGroup();
     fetchFriends();
-    if (groupId) {
-      fetch(`/api/trip`, { credentials: "include" })
-        .then((r) => r.json())
-        .then((data) => {
-          const trips = Array.isArray(data) ? data : [];
-          setTripActive(trips.some((t) => t.groupID === groupId));
-        })
-        .catch(() => {});
-    }
   }, [fetchGroup, fetchFriends, groupId]);
-
-  useEffect(() => {
-    if (!groupId || !tripActive || activeSection !== "itinerary") {
-      setGroupTripDetail(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const listRes = await fetch("/api/trip", { credentials: "include" });
-        if (!listRes.ok) return;
-        const trips = await listRes.json();
-        if (!Array.isArray(trips)) return;
-        const mine = trips.find(
-          (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
-        );
-        const id = mine?.tripID;
-        if (!id || typeof id !== "string") return;
-        const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
-        if (!dRes.ok) return;
-        const d = await dRes.json();
-        if (
-          !cancelled &&
-          d?._id &&
-          Array.isArray(d.primaryItinerary) &&
-          Array.isArray(d.rainyDayItinerary)
-        ) {
-          setGroupTripDetail({
-            _id: String(d._id),
-            primaryItinerary: d.primaryItinerary,
-            rainyDayItinerary: d.rainyDayItinerary,
-            itineraryVersion:
-              typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
-          });
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, tripActive, activeSection]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -283,7 +244,9 @@ export default function GroupDashboard() {
       if (deleteScope === "group") {
         router.push("/dashboard/groups");
       } else {
-        setTripActive(false);
+        const tid = groupTripDetail?._id ?? (await getTripIdForGroup(groupId));
+        if (tid) void deleteTripItineraryCache(tid, groupId);
+        resetAfterTripDelete();
         setDeleteDialogOpen(false);
         setDeleteScope(null);
         await fetchGroup();
@@ -689,7 +652,7 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
-              {tripActive && groupTripDetail ? (
+              {tripActive ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
@@ -699,24 +662,40 @@ export default function GroupDashboard() {
                       Trip plan
                     </h2>
                   </div>
-                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full">
-                    <RainyDayToggle
-                      trip={groupTripDetail}
-                      tripId={groupTripDetail._id}
-                      canEdit={!isViewer}
-                      onItinerarySynced={(payload) => {
-                        setGroupTripDetail((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                primaryItinerary: payload.primaryItinerary,
-                                rainyDayItinerary: payload.rainyDayItinerary,
-                                itineraryVersion: payload.itineraryVersion,
-                              }
-                            : prev,
-                        );
-                      }}
+                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full space-y-4">
+                    <OfflineItineraryBanner
+                      isOffline={isOffline}
+                      isShowingCached={isShowingCached}
                     />
+                    {tripPlanLoading && !groupTripDetail ? (
+                      <div
+                        className="flex items-center justify-center py-8 text-amber-700"
+                        role="status"
+                        aria-label="Loading itinerary"
+                      >
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : null}
+                    {tripPlanError === "offline_unavailable" &&
+                    !groupTripDetail &&
+                    !tripPlanLoading ? (
+                      <p
+                        className="text-center text-bb-text-muted font-medium py-6"
+                        role="alert"
+                      >
+                        No saved itinerary is available for offline viewing. Open
+                        this page while online once so we can keep a local copy
+                        of your group&apos;s trip.
+                      </p>
+                    ) : null}
+                    {groupTripDetail ? (
+                      <RainyDayToggle
+                        trip={groupTripDetail}
+                        tripId={groupTripDetail._id}
+                        canEdit={!isViewer && !isOffline}
+                        onItinerarySynced={onItinerarySynced}
+                      />
+                    ) : null}
                   </div>
                 </section>
               ) : null}

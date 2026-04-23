@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
 
+if (typeof globalThis.structuredClone !== "function") {
+  globalThis.structuredClone = (v) => JSON.parse(JSON.stringify(v));
+}
+
 // configure dotenv to point to your local variables
 dotenv.config({ path: ".env.local" });
 
