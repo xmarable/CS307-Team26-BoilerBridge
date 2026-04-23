@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 
+
 const ActivitySchema = new mongoose.Schema({
   activityId: { type: String, required: false },
   name: { type: String, required: false },

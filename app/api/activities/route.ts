@@ -11,6 +11,7 @@ const ReferenceLinkSchema = z.object({
   url: z.string().trim().min(1),
 });
 
+
 const CreateActivitySchema = z.object({
   /** Free-text: e.g. "Kayaking in Chicago" — server resolves Google Place ID when configured */
   name: z.string().min(1, "Name is required").trim(),

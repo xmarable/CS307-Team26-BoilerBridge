@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, ExternalLink, MapPin, Plus } from "lucide-react";
 
+
 function AddActivityPageInner() {
   const { data: session, status } = useSession();
   const router = useRouter();

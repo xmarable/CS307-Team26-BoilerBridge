@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, MapPin, Plus, Search, Star, AlertCircle } from "lucide-react";
 
+
 interface BrowseActivity {
   activityId: string;
   name: string;

@@ -21,6 +21,7 @@ const UpdateShareItenerarySchema = z.object({
   isActive: z.boolean(),
 });
 
+
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {

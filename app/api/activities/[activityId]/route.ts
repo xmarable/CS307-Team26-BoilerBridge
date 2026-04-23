@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 import { enrichActivityForApi } from "@/lib/travel/enrichActivityForApi";
 
+
 /**
  * GET /api/activities/[activityId]
  * US15: Activity details + optional Google Places enrichment (GOOGLE_MAPS_API_KEY).

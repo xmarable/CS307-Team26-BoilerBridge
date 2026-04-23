@@ -10,6 +10,7 @@ import { ActivityDetailContent } from "@/components/ActivityDetailContent";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 
+
 export default function ActivityPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
