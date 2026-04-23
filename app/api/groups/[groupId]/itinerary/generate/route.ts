@@ -139,16 +139,9 @@ export async function POST(
       );
     }
 
-    const lockedEvents = await CalendarEvent.find({
-      groupId: groupId as never,
-      source: "itinerary",
-      isLocked: true,
-    } as never).lean();
-
     await CalendarEvent.deleteMany({
       groupId: groupId as never,
       source: "itinerary",
-      isLocked: { $ne: true },
     } as never);
 
     let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
@@ -181,8 +174,7 @@ export async function POST(
 
     return NextResponse.json({
       message: "Itinerary sparked successfully.",
-      count: created.length + lockedEvents.length,
-      lockedCount: lockedEvents.length,
+      count: created.length,
     });
   } catch (err: unknown) {
     // i want to see why this is failing so im logging the whole err object lol
