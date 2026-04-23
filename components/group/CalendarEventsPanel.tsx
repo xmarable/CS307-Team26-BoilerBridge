@@ -40,8 +40,6 @@ import {
   Wand2,
   SlidersHorizontal,
   GripVertical,
-  Lock,
-  Unlock,
 } from "lucide-react";
 import {
   DndContext,
@@ -86,7 +84,6 @@ type CalendarEvent = {
   linkedPlaceId?: string;
   itineraryDestinationCity?: string;
   displayOrder?: number;
-  isLocked?: boolean;
 };
 
 type GroupTripOption = {
@@ -172,7 +169,6 @@ type SortableEventCardProps = {
   onToggleSelect: (id: string) => void;
   onEdit: (ev: CalendarEvent) => void;
   onDelete: (id: string) => void;
-  onToggleLock: (ev: CalendarEvent) => void;
 };
 
 function SortableEventCard({
@@ -184,7 +180,6 @@ function SortableEventCard({
   onToggleSelect,
   onEdit,
   onDelete,
-  onToggleLock,
 }: SortableEventCardProps) {
   const {
     attributes,
@@ -217,12 +212,6 @@ function SortableEventCard({
         >
           {ev.title}
         </h4>
-        {ev.isLocked && (
-          <Badge className="text-[10px] uppercase bg-amber-100 text-amber-700 border-amber-200 font-bold shrink-0 gap-1">
-            <Lock size={10} />
-            Locked
-          </Badge>
-        )}
         <Badge
           variant="outline"
           className="text-[10px] uppercase border-gray-200 text-gray-400 font-bold shrink-0"
@@ -266,16 +255,13 @@ function SortableEventCard({
 
   const dragHandle = canEdit ? (
     <button
-      {...(ev.isLocked ? {} : { ...attributes, ...listeners })}
+      {...attributes}
+      {...listeners}
       type="button"
-      aria-label={ev.isLocked ? "Activity is locked" : "Drag to reorder"}
-      className={`shrink-0 touch-none p-1 -ml-1 rounded transition-colors ${
-        ev.isLocked
-          ? "cursor-not-allowed text-amber-400"
-          : "cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-400"
-      }`}
+      aria-label="Drag to reorder"
+      className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-400 transition-colors shrink-0 touch-none p-1 -ml-1 rounded"
     >
-      {ev.isLocked ? <Lock size={18} /> : <GripVertical size={20} />}
+      <GripVertical size={20} />
     </button>
   ) : (
     <Tooltip>
@@ -294,11 +280,7 @@ function SortableEventCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group bg-white p-6 rounded-4xl border shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-start gap-4 ${
-        ev.isLocked
-          ? "border-amber-300 bg-amber-50/30 hover:border-amber-400"
-          : "border-gray-100 hover:border-amber-200"
-      }`}
+      className="group bg-white p-6 rounded-4xl border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col md:flex-row md:items-start gap-4"
     >
       {/* Drag handle */}
       <div className="flex items-center shrink-0 self-start md:self-center pt-1 md:pt-0">
@@ -347,35 +329,11 @@ function SortableEventCard({
       </div>
 
       <div className="flex flex-row md:flex-col gap-2 shrink-0 md:items-end md:ml-auto pt-1">
-        {canEdit && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onToggleLock(ev)}
-                className={`rounded-xl font-semibold h-9 px-3 gap-1.5 ${
-                  ev.isLocked
-                    ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50 border border-amber-200"
-                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                }`}
-                aria-label={ev.isLocked ? "Unlock activity" : "Lock activity"}
-              >
-                {ev.isLocked ? <Lock size={15} /> : <Unlock size={15} />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              {ev.isLocked ? "Locked — click to unlock" : "Lock to preserve during regeneration"}
-            </TooltipContent>
-          </Tooltip>
-        )}
         <Button
           type="button"
           variant="secondary"
           size="sm"
           onClick={() => onEdit(ev)}
-          disabled={!canEdit}
           className="rounded-xl border border-amber-100 bg-amber-50/90 text-amber-950 shadow-none hover:bg-amber-100/90 font-semibold gap-1.5 h-9 px-3 dark:bg-amber-50 dark:text-amber-950 dark:border-amber-200 dark:hover:bg-amber-100"
         >
           <Edit3 size={16} />
@@ -386,7 +344,6 @@ function SortableEventCard({
           variant="ghost"
           size="sm"
           onClick={() => onDelete(ev._id)}
-          disabled={!canEdit}
           className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
         >
           <Trash2 size={16} className="inline mr-1" />
@@ -462,7 +419,6 @@ export default function CalendarEventsPanel({
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
   const [voteData, setVoteData] = useState<VoteData>({});
-  const [unlockDialogEvent, setUnlockDialogEvent] = useState<CalendarEvent | null>(null);
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -714,32 +670,6 @@ export default function CalendarEventsPanel({
     }
   }
 
-  async function handleToggleLock(ev: CalendarEvent) {
-    if (ev.isLocked) {
-      setUnlockDialogEvent(ev);
-      return;
-    }
-    await doToggleLock(ev._id);
-  }
-
-  async function doToggleLock(eventId: string) {
-    try {
-      const res = await fetch(
-        `/api/groups/${groupId}/calendar/events/${eventId}`,
-        { method: "PATCH" },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to toggle lock.");
-      setEvents((prev) =>
-        prev.map((e) =>
-          e._id === eventId ? { ...e, isLocked: data.event?.isLocked } : e,
-        ),
-      );
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to toggle lock.");
-    }
-  }
-
   async function handleRegenerateSelected() {
     if (selectedIds.size === 0) return;
     try {
@@ -836,12 +766,6 @@ export default function CalendarEventsPanel({
 
     const activeId = String(active.id);
     const overId = String(over.id);
-
-    const draggedEvent = events.find((e) => e._id === activeId);
-    if (draggedEvent?.isLocked) {
-      setUnlockDialogEvent(draggedEvent);
-      return;
-    }
 
     const dayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
       dayEvents.some((e) => e._id === activeId),
@@ -1274,7 +1198,6 @@ export default function CalendarEventsPanel({
                             onToggleSelect={toggleSelected}
                             onEdit={openEdit}
                             onDelete={handleDelete}
-                            onToggleLock={handleToggleLock}
                           />
                         ))}
                       </div>
@@ -1521,45 +1444,6 @@ export default function CalendarEventsPanel({
         onAccept={() => void handleApplyPreview()}
         onCancel={() => setPreviewOpen(false)}
       />
-
-      {/* ==================== */}
-      {/* Unlock Confirmation  */}
-      {/* ==================== */}
-      <Dialog
-        open={!!unlockDialogEvent}
-        onOpenChange={(open) => { if (!open) setUnlockDialogEvent(null); }}
-      >
-        <DialogContent className="rounded-[2.5rem] p-8 border border-amber-200 shadow-xl max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black text-gray-900 flex items-center gap-2">
-              <Unlock size={20} className="text-amber-500" />
-              Unlock activity?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600 font-medium py-2">
-            <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
-            and will be preserved during regeneration. Unlock it to allow changes.
-          </p>
-          <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setUnlockDialogEvent(null)}
-              className="rounded-xl font-bold border-gray-200 text-gray-700 w-full sm:w-auto"
-            >
-              Keep locked
-            </Button>
-            <Button
-              onClick={async () => {
-                if (unlockDialogEvent) await doToggleLock(unlockDialogEvent._id);
-                setUnlockDialogEvent(null);
-              }}
-              className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-6 w-full sm:w-auto"
-            >
-              Unlock
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
