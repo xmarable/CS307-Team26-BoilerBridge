@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 
 const ActivitySchema = new mongoose.Schema({
@@ -18,6 +19,15 @@ const ActivitySchema = new mongoose.Schema({
 
 const TripSchema = new mongoose.Schema(
   {
+    tripId: {
+      type: mongoose.Schema.Types.UUID,
+      default: randomUUID(),
+      unique: true
+    },
+    shareLink: {
+      type: String,
+      default: ""
+    },
     groupID: {
       type: mongoose.Schema.Types.UUID,
       required: true,

@@ -4,7 +4,7 @@ interface IteneraryProps {
     yes: string | null;
 }
 
-export function SharedItenerary({ initialData }: { initialData: IteneraryProps | null }) {
+export function SharedItinerary({ initialData }: { initialData: IteneraryProps | null }) {
     
     
     return (

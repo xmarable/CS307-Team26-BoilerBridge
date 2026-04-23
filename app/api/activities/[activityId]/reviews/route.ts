@@ -5,6 +5,7 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
+import { randomUUID } from "crypto";
 
 const PostReviewSchema = z.object({
   text: z.string().min(1, "Review text is required").trim().max(2000),
@@ -17,21 +18,16 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? (session.user as { id: string }).id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any).userId;
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { activityId } = await params;
-    if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
-      return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
-    }
-
     await dbConnect();
 
-    const activity = await Activity.findById(activityId).lean();
+    const activity = await Activity.findOne({ activityId: activityId });
     if (!activity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
@@ -65,8 +61,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const rawId = session?.user && "id" in session.user ? (session.user as { id: string }).id : undefined;
-    const userId = typeof rawId === "string" ? rawId : undefined;
+    const userId = (session?.user as any).userId;
     const displayName =
       (session?.user as { name?: string; username?: string })?.name ||
       (session?.user as { username?: string })?.username ||
@@ -77,10 +72,6 @@ export async function POST(
     }
 
     const { activityId } = await params;
-    if (!activityId || !mongoose.Types.ObjectId.isValid(activityId)) {
-      return NextResponse.json({ error: "Invalid activity ID" }, { status: 400 });
-    }
-
     const body = await req.json();
     const parsed = PostReviewSchema.safeParse(body);
     if (!parsed.success) {
@@ -92,13 +83,15 @@ export async function POST(
 
     await dbConnect();
 
-    const activity = await Activity.findById(activityId);
+    const activity = await Activity.findOne({ activityId: activityId });
     if (!activity) {
       return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     }
 
     const { text, rating } = parsed.data;
     const newReview = {
+      reviewId: randomUUID(),
+      authorId: userId,
       author: displayName,
       text,
       rating,
@@ -131,4 +124,37 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+const ReviewDeleteSchema = z.object({
+  reviewId: z.string().min(1)
+})
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ activityId: string }>}) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauathorized" }, { status: 401 });
+  }
+
+  const userId = session.user.userId;
+  if (!userId) {
+    return NextResponse.json({ error: "Unauathorized" }, { status: 401 });
+  }
+
+  const { activityId } = await params;
+  const activity = await Activity.findOne({ activityId: activityId });
+  if (!activity) {
+    return NextResponse.json({ error: "Activity not found" }, { status: 400 });
+  }
+
+  const body = await req.json();
+  const request = ReviewDeleteSchema.safeParse(body);
+  if (!request.success) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  activity.reviews = activity.reviews.filter((i) => i.reviewId != request.data.reviewId);
+  await activity.save();
+
+  return NextResponse.json({ message: "Success" }, { status: 200 });
 }

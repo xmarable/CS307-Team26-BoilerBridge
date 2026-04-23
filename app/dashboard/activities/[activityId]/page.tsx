@@ -71,6 +71,7 @@ export default function ActivityPage() {
               (session?.user as { username?: string })?.username ||
               null
             }
+            userId={(session?.user as { userId?: string })?.userId || null}
           />
         </div>
       </main>
