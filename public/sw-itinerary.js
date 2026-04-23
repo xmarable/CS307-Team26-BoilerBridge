@@ -1,15 +1,13 @@
 /* eslint-disable no-undef */
 /**
  * BoilerBridge offline shell:
- * - HTML navigations: network-first, then Cache Storage (so refresh works offline).
+ * - HTML navigations: network-first (redirect: manual), then Cache Storage on failure.
+ * - Never stores auth redirects as successful navigations (prevents /dashboard ↔ /signin loops).
  * - /_next/static/*: cache-first (hashed assets safe to keep).
- * - Selected GET APIs: network-first, then cache (trip, groups, friends, auth, share).
- *
- * Prefer verifying with: npm run build && npm run start
- * (next dev can change chunk URLs between loads, which weakens offline refresh.)
+ * - Selected GET APIs: network-first, then cache (trip, groups, friends, share) — not /api/auth/*.
  */
 
-const CACHE_NS = "bb-offline-v2";
+const CACHE_NS = "bb-offline-v3";
 const NAV = `${CACHE_NS}-nav`;
 const STATIC = `${CACHE_NS}-static`;
 const API = `${CACHE_NS}-api`;
@@ -26,6 +24,14 @@ self.addEventListener("activate", (event) => {
         try {
           await caches.delete(name);
         } catch (_) {}
+      }
+      const keys = await caches.keys();
+      for (const name of keys) {
+        if (name.startsWith("bb-offline-v2")) {
+          try {
+            await caches.delete(name);
+          } catch (_) {}
+        }
       }
       await self.clients.claim();
     })(),
@@ -60,15 +66,35 @@ function shouldInterceptApi(url) {
   if (/^\/api\/groups\/[0-9a-f-]+/i.test(p)) return true;
   if (p.startsWith("/api/friends")) return true;
   if (p.startsWith("/api/itineraries/share")) return true;
-  if (p.startsWith("/api/auth/")) return true;
   return false;
+}
+
+function shouldPutNavigationInCache(requestUrl, responseUrl, response) {
+  if (!response || !response.ok || response.status !== 200 || response.type === "opaqueredirect") {
+    return false;
+  }
+  let reqPath;
+  let resPath;
+  try {
+    reqPath = new URL(requestUrl).pathname;
+    resPath = new URL(responseUrl).pathname;
+  } catch (_) {
+    return false;
+  }
+  if (reqPath !== resPath) return false;
+  if (reqPath === "/signin" || reqPath.startsWith("/signin/")) return false;
+  if (reqPath === "/signup" || reqPath.startsWith("/signup/")) return false;
+  if (reqPath === "/signout" || reqPath.startsWith("/signout/")) return false;
+  if (reqPath === "/dashboard" || reqPath === "/dashboard/") return false;
+  if (reqPath.startsWith("/api/auth") || reqPath.startsWith("/api/auth/")) return false;
+  return true;
 }
 
 async function navNetworkFirst(request) {
   const cache = await caches.open(NAV);
   try {
-    const res = await fetch(request);
-    if (res.ok) {
+    const res = await fetch(request, { redirect: "manual" });
+    if (shouldPutNavigationInCache(request.url, res.url, res)) {
       try {
         await cache.put(request, res.clone());
       } catch (_) {}

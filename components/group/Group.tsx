@@ -693,7 +693,7 @@ export default function GroupDashboard() {
                   )}
                 </div>
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125 space-y-6">
-                  {tripActive ? (
+                  {(tripActive || isOffline) ? (
                     <ItineraryOfflineControls
                       isOnline={!isOffline}
                       userHasOfflineSave={userHasOfflineSave}
@@ -734,7 +734,7 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
-              {tripActive ? (
+              {(tripActive || isOffline) ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">

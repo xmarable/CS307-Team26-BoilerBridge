@@ -19,10 +19,15 @@ describe("public/sw-itinerary.js", () => {
     expect(src).toContain("clients.claim");
     expect(src).toContain("Save for Offline");
     expect(src).toContain("offlinePathname");
+    expect(src).toContain('redirect: "manual"');
+    expect(src).toContain("shouldPutNavigationInCache");
+    expect(src).toContain("bb-offline-v3");
+    expect(src).not.toContain('startsWith("/api/auth/")) return true');
   });
 
   it("removes_legacy_trip_only_cache_name", () => {
     const src = fs.readFileSync(swPath, "utf8");
     expect(src).toContain("bb-sw-trip-get-v1");
+    expect(src).toContain("bb-offline-v2");
   });
 });

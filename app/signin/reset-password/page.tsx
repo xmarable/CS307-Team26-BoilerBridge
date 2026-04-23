@@ -6,7 +6,7 @@ import { ResetPassword } from "@/components/ResetPassword";
 
 export default async function ResetPasswordPage() {
     const session = await getServerSession(authOptions);
-    if (session?.user) {
+    if (session?.user?.email) {
         redirect("/dashboard");
     }
 

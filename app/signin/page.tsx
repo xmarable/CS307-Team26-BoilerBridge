@@ -6,7 +6,7 @@ import { SignIn } from "@/components/SignIn";
 
 export default async function SignInPage() {
   const session = (await getServerSession(authOptions)) as any;
-  if (session?.user) {
+  if (session?.user?.email) {
     redirect("/dashboard");
   }
 

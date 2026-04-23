@@ -192,6 +192,8 @@ export function useGroupItineraryOffline({
         active = true;
       } else if (getGroupTripPresenceTripId(groupId)) {
         active = true;
+      } else if (await getTripIdForGroup(groupId)) {
+        active = true;
       }
       if (my !== tripActiveGen.current) return;
       setTripActive(active);
@@ -260,6 +262,7 @@ export function useGroupItineraryOffline({
 
     if (!isOnline) {
       setItinerarySyncState("idle");
+      setTripPlanLoading(true);
       const tripId =
         (await getTripIdForGroup(groupId)) ?? getGroupTripPresenceTripId(groupId);
       if (myGen !== loadGen.current) return;

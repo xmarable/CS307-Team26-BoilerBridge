@@ -83,6 +83,21 @@ describe("ItineraryOfflineControls", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows_offline_cold_start_hint_when_offline_without_trip_error", () => {
+    render(
+      <ItineraryOfflineControls
+        {...base}
+        isOnline={false}
+        userHasOfflineSave={false}
+        hasTripContent={false}
+        tripPlanError={null}
+      />,
+    );
+    expect(
+      screen.getByText(/open this group once while online/i),
+    ).toBeInTheDocument();
+  });
+
   it("shows_syncing_when_syncing_state", () => {
     render(
       <ItineraryOfflineControls

@@ -54,6 +54,12 @@ export function ItineraryOfflineControls({
     tripPlanError === "offline_unavailable" &&
     !hasTripContent &&
     !tripPlanLoading;
+  const showOfflineNoMapping =
+    !isOnline &&
+    tripPlanError === null &&
+    !hasTripContent &&
+    !tripPlanLoading &&
+    !userHasOfflineSave;
   const showSyncing =
     itinerarySyncState === "syncing" &&
     (offlineActionBusy || tripPlanLoading);
@@ -210,6 +216,16 @@ export function ItineraryOfflineControls({
         >
           This itinerary is not saved for offline viewing. While online, open this group and
           choose Save for Offline, then you can use it without signal.
+        </p>
+      )}
+
+      {showOfflineNoMapping && (
+        <p
+          className="text-sm font-medium text-bb-text-muted leading-snug"
+          role="status"
+        >
+          You’re offline. Open this group once while online so it loads in this browser; then use
+          Save for Offline on the itinerary you want to keep.
         </p>
       )}
     </div>

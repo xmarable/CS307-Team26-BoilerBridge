@@ -299,6 +299,25 @@ describe("useGroupItineraryOffline", () => {
     );
   });
 
+  it("offline_with_idb_trip_mapping_only_sets_active_and_offline_unavailable", async () => {
+    await putGroupTripIdMapping(GROUP, TRIP);
+    setOnline(false);
+    emitNet("offline");
+    (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip("fail", null);
+    const { result } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    await waitFor(
+      () => {
+        expect(result.current.tripActive).toBe(true);
+        expect(result.current.groupTripDetail).toBeNull();
+        expect(result.current.tripPlanError).toBe("offline_unavailable");
+        expect(result.current.tripPlanLoading).toBe(false);
+      },
+      { timeout: 8000 },
+    );
+  });
+
   it("offline_with_no_presence_and_no_save_is_inactive", async () => {
     setOnline(false);
     emitNet("offline");

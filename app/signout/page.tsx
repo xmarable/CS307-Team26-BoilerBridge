@@ -8,7 +8,7 @@ export default async function SignOutPage() {
    
   const session = (await getServerSession(authOptions)) as any;
 
-  if (!session?.user) {
+  if (!session?.user?.email) {
     redirect("/");
   }
 
