@@ -2,6 +2,11 @@
 
 import { useEffect } from "react";
 
+/**
+ * Registers `/sw-itinerary.js` (scope `/`) so navigations and static chunks can be
+ * replayed from Cache Storage after an online visit. Offline refresh is most reliable
+ * after `npm run build && npm run start`; `next dev` may invalidate chunk URLs between loads.
+ */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -12,11 +17,12 @@ export function ServiceWorkerRegister() {
       try {
         const reg = await navigator.serviceWorker.register("/sw-itinerary.js", {
           scope: "/",
+          updateViaCache: "none",
         });
         if (!alive) return;
         void reg;
       } catch {
-        // registration optional (localhost http, user disabled SW, etc.)
+        // optional (unsupported, user disabled SW, etc.)
       }
     })();
     return () => {
