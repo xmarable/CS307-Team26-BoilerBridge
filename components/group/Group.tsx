@@ -5,7 +5,7 @@
 import "@/app/globals.css";
 
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -53,10 +53,11 @@ import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import { RainyDayToggle } from "@/components/RainyDayToggle";
 import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
-import { OfflineItineraryBanner } from "@/components/offline/OfflineItineraryBanner";
+import { OfflineItineraryStatus } from "@/components/offline/OfflineItineraryStatus";
 import {
   deleteTripItineraryCache,
   getTripIdForGroup,
+  putGroupTripIdMapping,
 } from "@/lib/offline/tripItineraryCache";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
@@ -103,6 +104,7 @@ type Activity = {
 export default function GroupDashboard() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const groupId = params?.groupId as string | undefined;
 
   const [group, setGroup] = useState<GroupState | null>(null);
@@ -139,10 +141,25 @@ export default function GroupDashboard() {
     isShowingCached,
     onItinerarySynced,
     resetAfterTripDelete,
+    refreshTripItinerary,
+    lastDeviceSavedAt,
+    idbSupported,
+    removeLocalItineraryCopy,
   } = useGroupItineraryOffline({
     groupId,
     itinerarySectionOpen: activeSection === "itinerary",
   });
+
+  const tripIdInQuery = searchParams.get("tripId");
+  // After itinerary generation / prefs save, the group URL often includes
+  // ?tripId= so we can resolve the row even before GET /api/trip lists it.
+  useEffect(() => {
+    if (!groupId || !tripIdInQuery) return;
+    void (async () => {
+      await putGroupTripIdMapping(groupId, tripIdInQuery);
+      await refreshTripItinerary();
+    })();
+  }, [groupId, tripIdInQuery, refreshTripItinerary]);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -658,14 +675,32 @@ export default function GroupDashboard() {
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
                       <MapPin size={24} />
                     </div>
-                    <h2 className="text-3xl font-black text-bb-text tracking-tight">
-                      Trip plan
-                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-3xl font-black text-bb-text tracking-tight">
+                        Trip plan
+                      </h2>
+                      {lastDeviceSavedAt != null && idbSupported && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-bold border-emerald-200 bg-emerald-50 text-emerald-800"
+                        >
+                          Saved for offline
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full space-y-4">
-                    <OfflineItineraryBanner
-                      isOffline={isOffline}
+                    <OfflineItineraryStatus
+                      isOnline={!isOffline}
                       isShowingCached={isShowingCached}
+                      tripPlanError={tripPlanError}
+                      hasTripContent={!!groupTripDetail}
+                      isLoading={tripPlanLoading}
+                      lastDeviceSavedAt={lastDeviceSavedAt}
+                      idbSupported={idbSupported}
+                      onSaveOrRefresh={() => void refreshTripItinerary()}
+                      onRemoveLocal={() => void removeLocalItineraryCopy()}
+                      isSaveBusy={tripPlanLoading}
                     />
                     {tripPlanLoading && !groupTripDetail ? (
                       <div
@@ -675,18 +710,6 @@ export default function GroupDashboard() {
                       >
                         <Loader2 className="h-8 w-8 animate-spin" />
                       </div>
-                    ) : null}
-                    {tripPlanError === "offline_unavailable" &&
-                    !groupTripDetail &&
-                    !tripPlanLoading ? (
-                      <p
-                        className="text-center text-bb-text-muted font-medium py-6"
-                        role="alert"
-                      >
-                        No saved itinerary is available for offline viewing. Open
-                        this page while online once so we can keep a local copy
-                        of your group&apos;s trip.
-                      </p>
                     ) : null}
                     {groupTripDetail ? (
                       <RainyDayToggle

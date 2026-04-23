@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTripItineraryWithCache } from "@/lib/offline/fetchTripItineraryWithCache";
 import {
+  deleteTripItineraryCache,
+  getFullTripItineraryCache,
   getTripIdForGroup,
   hasUsableItineraryCacheForGroup,
+  isItineraryCacheSupported,
   patchItineraryInCache,
   putGroupTripIdMapping,
 } from "@/lib/offline/tripItineraryCache";
@@ -42,9 +45,22 @@ export function useGroupItineraryOffline({
     null | "offline_unavailable" | "auth" | "other"
   >(null);
   const [isShowingCached, setIsShowingCached] = useState(false);
+  const [lastDeviceSavedAt, setLastDeviceSavedAt] = useState<number | null>(
+    null,
+  );
+  const [idbSupported, setIdbSupported] = useState(true);
   const loadGen = useRef(0);
   const tripActiveGen = useRef(0);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    setIdbSupported(isItineraryCacheSupported());
+  }, []);
+
+  const listTripsForGroup = useCallback((gid: string) => {
+    const q = new URLSearchParams({ groupId: gid });
+    return fetch(`/api/trip?${q.toString()}`, { credentials: "include" });
+  }, []);
 
   const resolveTripActive = useCallback(async () => {
     if (!groupId) {
@@ -55,7 +71,7 @@ export function useGroupItineraryOffline({
     const my = ++tripActiveGen.current;
     let active = false;
     try {
-      const res = await fetch(`/api/trip`, { credentials: "include" });
+      const res = await listTripsForGroup(groupId);
       if (my !== tripActiveGen.current) return;
       if (res.ok) {
         const data = (await res.json()) as unknown;
@@ -82,7 +98,7 @@ export function useGroupItineraryOffline({
     }
     if (my !== tripActiveGen.current) return;
     setTripActive(active);
-  }, [groupId]);
+  }, [groupId, listTripsForGroup]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -104,6 +120,7 @@ export function useGroupItineraryOffline({
       setGroupTripDetail(null);
       setTripPlanError(null);
       setIsShowingCached(false);
+      setLastDeviceSavedAt(null);
       setTripPlanLoading(false);
       return;
     }
@@ -111,11 +128,12 @@ export function useGroupItineraryOffline({
     setTripPlanLoading(true);
     setTripPlanError(null);
     setIsShowingCached(false);
+    // lastDeviceSavedAt updated after successful load, or when reading cache
     let tripId: string | null = null;
     try {
       if (isOnline) {
         try {
-          const listRes = await fetch(`/api/trip`, { credentials: "include" });
+          const listRes = await listTripsForGroup(groupId);
           if (listRes.ok) {
             const data = (await listRes.json()) as unknown;
             const trips = Array.isArray(data) ? data : [];
@@ -141,6 +159,7 @@ export function useGroupItineraryOffline({
           setGroupTripDetail(null);
           if (!isOnline) setTripPlanError("offline_unavailable");
           setIsShowingCached(false);
+          setLastDeviceSavedAt(null);
         }
         return;
       }
@@ -151,6 +170,7 @@ export function useGroupItineraryOffline({
         setGroupTripDetail(null);
         setTripPlanError("auth");
         setIsShowingCached(false);
+        setLastDeviceSavedAt(null);
         return;
       }
 
@@ -165,6 +185,14 @@ export function useGroupItineraryOffline({
         });
         setIsShowingCached(out.source === "cache" || out.isStale);
         setTripPlanError(null);
+        try {
+          const rec = await getFullTripItineraryCache(tripId);
+          setLastDeviceSavedAt(
+            typeof rec?.updatedAt === "number" ? rec.updatedAt : null,
+          );
+        } catch {
+          setLastDeviceSavedAt(null);
+        }
         return;
       }
 
@@ -172,24 +200,33 @@ export function useGroupItineraryOffline({
         setGroupTripDetail(null);
         setTripPlanError("offline_unavailable");
         setIsShowingCached(false);
+        setLastDeviceSavedAt(null);
         return;
       }
 
       setGroupTripDetail(null);
       setTripPlanError("other");
       setIsShowingCached(false);
+      setLastDeviceSavedAt(null);
     } catch {
       if (myGen === loadGen.current) {
         setGroupTripDetail(null);
         setTripPlanError(!isOnline ? "offline_unavailable" : "other");
         setIsShowingCached(false);
+        setLastDeviceSavedAt(null);
       }
     } finally {
       if (myGen === loadGen.current) {
         setTripPlanLoading(false);
       }
     }
-  }, [groupId, tripActive, itinerarySectionOpen, isOnline]);
+  }, [
+    groupId,
+    tripActive,
+    itinerarySectionOpen,
+    isOnline,
+    listTripsForGroup,
+  ]);
 
   useEffect(() => {
     void loadTripDetail();
@@ -216,12 +253,32 @@ export function useGroupItineraryOffline({
             rainyDayItinerary: payload.rainyDayItinerary,
             itineraryVersion: payload.itineraryVersion,
           });
+          setLastDeviceSavedAt(Date.now());
         }
         return next;
       });
     },
     [groupId],
   );
+
+  const removeLocalItineraryCopy = useCallback(async () => {
+    if (!groupId) return;
+    if (
+      !window.confirm(
+        "Remove the offline copy of this itinerary from this device? " +
+          "You will need an internet connection to view it again unless you open this page online once more.",
+      )
+    ) {
+      return;
+    }
+    const tid =
+      groupTripDetail?._id || (await getTripIdForGroup(groupId)) || null;
+    if (!tid) return;
+    await deleteTripItineraryCache(tid, groupId);
+    setLastDeviceSavedAt(null);
+    setIsShowingCached(false);
+    await loadTripDetail();
+  }, [groupId, groupTripDetail, loadTripDetail]);
 
   const resetAfterTripDelete = useCallback(() => {
     loadGen.current += 1;
@@ -230,6 +287,7 @@ export function useGroupItineraryOffline({
     setGroupTripDetail(null);
     setTripPlanError(null);
     setIsShowingCached(false);
+    setLastDeviceSavedAt(null);
     setTripPlanLoading(false);
   }, []);
 
@@ -240,7 +298,10 @@ export function useGroupItineraryOffline({
     tripPlanError,
     isOffline: !isOnline,
     isShowingCached,
+    lastDeviceSavedAt,
+    idbSupported,
     refreshTripItinerary: loadTripDetail,
+    removeLocalItineraryCopy,
     onItinerarySynced,
     resetAfterTripDelete,
   };
