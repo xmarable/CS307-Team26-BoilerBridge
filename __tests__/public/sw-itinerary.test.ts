@@ -17,6 +17,8 @@ describe("public/sw-itinerary.js", () => {
     expect(src).toContain("\\/api\\/groups");
     expect(src).toContain("skipWaiting");
     expect(src).toContain("clients.claim");
+    expect(src).toContain("Save for Offline");
+    expect(src).toContain("offlinePathname");
   });
 
   it("removes_legacy_trip_only_cache_name", () => {

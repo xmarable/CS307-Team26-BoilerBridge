@@ -81,12 +81,41 @@ async function navNetworkFirst(request) {
   }
 }
 
+function offlinePathname(pageUrl) {
+  try {
+    return new URL(pageUrl).pathname || "/";
+  } catch (_) {
+    return "/";
+  }
+}
+
 function offlineDocumentFallback(pageUrl) {
   const safe = String(pageUrl).replace(/</g, "");
+  const pathname = offlinePathname(pageUrl);
+  const onDashboardRoot = pathname === "/dashboard" || pathname === "/dashboard/";
+  const onGroupPage = /^\/dashboard\/groups\/[^/]+\/?$/i.test(pathname);
+
+  let body =
+    "This exact URL has not been stored in this browser yet (or the cache was cleared). Reconnect once, open the page you need, then try offline again.";
+  if (onDashboardRoot) {
+    body =
+      "The dashboard needs a connection the first time it loads in this browser. For an <strong>offline itinerary</strong>: while online, open a <strong>group</strong> → <strong>Itinerary</strong> → <strong>Save for Offline</strong>. After that, that <strong>group</strong> page can open here without internet (not this dashboard list).";
+  } else if (onGroupPage) {
+    body =
+      "Reconnect once to load this group in this browser. Then open <strong>Itinerary</strong> and choose <strong>Save for Offline</strong>. After that, refresh works here without internet.";
+  }
+
+  let extra =
+    '<p><a href="/dashboard">Go to Dashboard</a> <span style="opacity:.75">(works when you are online again)</span></p>';
+  if (onDashboardRoot) {
+    extra =
+      '<p style="font-size:.9rem;opacity:.85">When you are back online, open a group you use often first; that is what gets saved for offline viewing.</p>';
+  }
+
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Offline • BoilerBridge</title></head><body style="font-family:system-ui,sans-serif;max-width:36rem;margin:2rem auto;padding:0 1rem;line-height:1.5">
 <h1 style="font-size:1.25rem">You’re offline</h1>
-<p>This page hasn’t been saved in your browser yet. While you have Wi‑Fi or data, open the itinerary (or dashboard) once so BoilerBridge can keep a copy for travel.</p>
-<p><a href="/dashboard">Go to Dashboard</a></p>
+<p>${body}</p>
+${extra}
 <p style="font-size:.8rem;opacity:.65">Requested: ${safe}</p>
 </body></html>`;
   return new Response(html, {
