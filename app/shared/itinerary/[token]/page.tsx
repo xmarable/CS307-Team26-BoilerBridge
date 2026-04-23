@@ -15,6 +15,7 @@ type DetailResponse = {
   snapshot: Record<string, unknown>;
 };
 
+
 export default function SharedItineraryPage() {
   const params = useParams();
   const [data, setData] = useState<DetailResponse | null>(null);

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BookingPlan } from "@/lib/travel/bookingIntel";
 
+
 export interface ActivityDetailPayload {
   activityId?: string;
   isPreview?: boolean;

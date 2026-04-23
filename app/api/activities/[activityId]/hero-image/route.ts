@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
 import { buildGooglePlacePhotoUpstreamUrl } from "@/lib/travel/googlePlaces";
 
+
 /**
  * Proxies a Google Places hero image so the browser never sees the API key (US15).
  */

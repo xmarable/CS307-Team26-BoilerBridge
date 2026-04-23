@@ -12,6 +12,7 @@ const PostReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
 });
 
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ activityId: string }> }

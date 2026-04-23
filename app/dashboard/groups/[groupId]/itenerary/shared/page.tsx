@@ -3,6 +3,7 @@ import dbConnect from "@/lib/dbConnect";
 import Itenerary from "@/models/Itenerary";
 import TravelGroup from "@/models/TravelGroup";
 
+
 export default async function SharedIteneraryPage({ params, searchParams }: { params: Promise<{ groupId: string }>, searchParams: Promise<{ token?: string }>}) {
   const { groupId } = await params;
   const token = (await searchParams).token;

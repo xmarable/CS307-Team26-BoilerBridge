@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+
 const sharedItineraryLinkSchema = new mongoose.Schema({
     groupId: {
         type: mongoose.Schema.Types.UUID,
