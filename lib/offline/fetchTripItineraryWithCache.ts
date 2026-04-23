@@ -1,6 +1,6 @@
 import {
   getFullTripItineraryCache,
-  putFullTripItineraryCache,
+  syncUserSavedOfflinePayload,
 } from "@/lib/offline/tripItineraryCache";
 
 export type TripItineraryFetchResult = {
@@ -24,32 +24,29 @@ function hasValidItineraryShape(d: Record<string, unknown>): boolean {
   );
 }
 
-export async function fetchTripItineraryWithCache(
+export async function readUserSavedOfflineTripItinerary(
   tripId: string,
-  groupId: string,
 ): Promise<TripItineraryFetchResult> {
-  const tryCacheOnly = async (): Promise<TripItineraryFetchResult> => {
-    const cached = await getFullTripItineraryCache(tripId);
-    if (cached?.payload && hasValidItineraryShape(cached.payload)) {
-      return {
-        data: cached.payload,
-        source: "cache",
-        isStale: true,
-        error: "none",
-      };
-    }
+  const cached = await getFullTripItineraryCache(tripId);
+  if (cached?.savedByUser === true && cached.payload && hasValidItineraryShape(cached.payload)) {
     return {
-      data: null,
-      source: "none",
-      isStale: false,
-      error: "offline_unavailable",
+      data: cached.payload,
+      source: "cache",
+      isStale: true,
+      error: "none",
     };
-  };
-
-  if (!isOnlineClient()) {
-    return tryCacheOnly();
   }
+  return {
+    data: null,
+    source: "none",
+    isStale: false,
+    error: "offline_unavailable",
+  };
+}
 
+export async function fetchTripItineraryFromNetwork(
+  tripId: string,
+): Promise<TripItineraryFetchResult> {
   try {
     const res = await fetch(`/api/trip/${encodeURIComponent(tripId)}`, {
       credentials: "include",
@@ -66,7 +63,6 @@ export async function fetchTripItineraryWithCache(
     if (res.ok) {
       const data = (await res.json()) as Record<string, unknown>;
       if (hasValidItineraryShape(data)) {
-        await putFullTripItineraryCache(tripId, groupId, data);
         return {
           data,
           source: "network",
@@ -74,18 +70,15 @@ export async function fetchTripItineraryWithCache(
           error: "none",
         };
       }
-    }
-
-    const fallback = await getFullTripItineraryCache(tripId);
-    if (fallback?.payload && hasValidItineraryShape(fallback.payload)) {
       return {
-        data: fallback.payload,
-        source: "cache",
-        isStale: true,
-        error: "none",
+        data: null,
+        source: "none",
+        isStale: false,
+        error: "network",
         httpStatus: res.status,
       };
     }
+
     return {
       data: null,
       source: "none",
@@ -94,23 +87,45 @@ export async function fetchTripItineraryWithCache(
       httpStatus: res.status,
     };
   } catch {
-    const fallback = await getFullTripItineraryCache(tripId);
-    if (fallback?.payload && hasValidItineraryShape(fallback.payload)) {
-      return {
-        data: fallback.payload,
-        source: "cache",
-        isStale: true,
-        error: "none",
-      };
-    }
-    if (!isOnlineClient()) {
-      return {
-        data: null,
-        source: "none",
-        isStale: false,
-        error: "offline_unavailable",
-      };
-    }
     return { data: null, source: "none", isStale: false, error: "network" };
   }
+}
+
+export async function fetchTripItineraryWithCache(
+  tripId: string,
+  groupId: string,
+): Promise<TripItineraryFetchResult> {
+  if (!isOnlineClient()) {
+    return readUserSavedOfflineTripItinerary(tripId);
+  }
+
+  const net = await fetchTripItineraryFromNetwork(tripId);
+
+  if (net.error === "unauthorized") {
+    return net;
+  }
+
+  if (net.error === "not_found") {
+    return net;
+  }
+
+  if (net.data && net.error === "none") {
+    await syncUserSavedOfflinePayload(tripId, groupId, net.data);
+    return net;
+  }
+
+  const fallback = await readUserSavedOfflineTripItinerary(tripId);
+  if (fallback.data) {
+    return {
+      ...fallback,
+      isStale: true,
+      httpStatus: net.httpStatus,
+    };
+  }
+
+  if (net.error === "network") {
+    return net;
+  }
+
+  return fallback;
 }

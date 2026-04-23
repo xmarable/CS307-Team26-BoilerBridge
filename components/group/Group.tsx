@@ -53,7 +53,8 @@ import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import { RainyDayToggle } from "@/components/RainyDayToggle";
 import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
-import { OfflineItineraryStatus } from "@/components/offline/OfflineItineraryStatus";
+import { ItineraryOfflineControls } from "@/components/offline/ItineraryOfflineControls";
+import { setGroupTripPresence } from "@/lib/offline/groupTripPresence";
 import {
   deleteTripItineraryCache,
   getTripIdForGroup,
@@ -138,13 +139,17 @@ export default function GroupDashboard() {
     tripPlanLoading,
     tripPlanError,
     isOffline,
-    isShowingCached,
     onItinerarySynced,
     resetAfterTripDelete,
     refreshTripItinerary,
-    lastDeviceSavedAt,
+    userHasOfflineSave,
+    savedAt,
+    lastSyncedAt,
     idbSupported,
     removeLocalItineraryCopy,
+    saveForOffline,
+    itinerarySyncState,
+    offlineActionBusy,
   } = useGroupItineraryOffline({
     groupId,
     itinerarySectionOpen: activeSection === "itinerary",
@@ -157,6 +162,7 @@ export default function GroupDashboard() {
     if (!groupId || !tripIdInQuery) return;
     void (async () => {
       await putGroupTripIdMapping(groupId, tripIdInQuery);
+      setGroupTripPresence(groupId, tripIdInQuery);
       await refreshTripItinerary();
     })();
   }, [groupId, tripIdInQuery, refreshTripItinerary]);
@@ -644,7 +650,24 @@ export default function GroupDashboard() {
                     </div>
                   )}
                 </div>
-                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
+                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125 space-y-6">
+                  {tripActive ? (
+                    <ItineraryOfflineControls
+                      isOnline={!isOffline}
+                      userHasOfflineSave={userHasOfflineSave}
+                      savedAt={savedAt}
+                      lastSyncedAt={lastSyncedAt}
+                      tripPlanError={tripPlanError}
+                      hasTripContent={!!groupTripDetail}
+                      idbSupported={idbSupported}
+                      itinerarySyncState={itinerarySyncState}
+                      offlineActionBusy={offlineActionBusy}
+                      tripPlanLoading={tripPlanLoading}
+                      onSaveForOffline={() => void saveForOffline()}
+                      onRemoveOffline={() => void removeLocalItineraryCopy()}
+                      onRetrySync={() => void refreshTripItinerary()}
+                    />
+                  ) : null}
                   <CalendarEventsPanel
                     groupId={groupId!}
                     canPublishItinerary={
@@ -679,29 +702,17 @@ export default function GroupDashboard() {
                       <h2 className="text-3xl font-black text-bb-text tracking-tight">
                         Trip plan
                       </h2>
-                      {lastDeviceSavedAt != null && idbSupported && (
+                      {userHasOfflineSave && idbSupported && (
                         <Badge
                           variant="outline"
                           className="text-xs font-bold border-emerald-200 bg-emerald-50 text-emerald-800"
                         >
-                          Saved for offline
+                          Available offline
                         </Badge>
                       )}
                     </div>
                   </div>
                   <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full space-y-4">
-                    <OfflineItineraryStatus
-                      isOnline={!isOffline}
-                      isShowingCached={isShowingCached}
-                      tripPlanError={tripPlanError}
-                      hasTripContent={!!groupTripDetail}
-                      isLoading={tripPlanLoading}
-                      lastDeviceSavedAt={lastDeviceSavedAt}
-                      idbSupported={idbSupported}
-                      onSaveOrRefresh={() => void refreshTripItinerary()}
-                      onRemoveLocal={() => void removeLocalItineraryCopy()}
-                      isSaveBusy={tripPlanLoading}
-                    />
                     {tripPlanLoading && !groupTripDetail ? (
                       <div
                         className="flex items-center justify-center py-8 text-amber-700"

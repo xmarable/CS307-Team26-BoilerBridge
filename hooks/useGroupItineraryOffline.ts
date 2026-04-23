@@ -1,15 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTripItineraryWithCache } from "@/lib/offline/fetchTripItineraryWithCache";
+import {
+  fetchTripItineraryFromNetwork,
+  fetchTripItineraryWithCache,
+  readUserSavedOfflineTripItinerary,
+} from "@/lib/offline/fetchTripItineraryWithCache";
+import {
+  clearGroupTripPresence,
+  getGroupTripPresenceTripId,
+  setGroupTripPresence,
+} from "@/lib/offline/groupTripPresence";
 import {
   deleteTripItineraryCache,
   getFullTripItineraryCache,
   getTripIdForGroup,
-  hasUsableItineraryCacheForGroup,
+  hasUserSavedOfflineItineraryForGroup,
   isItineraryCacheSupported,
   patchItineraryInCache,
   putGroupTripIdMapping,
+  saveUserOfflineItinerary,
 } from "@/lib/offline/tripItineraryCache";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { RainyDayTripInput } from "@/components/RainyDayToggle";
@@ -21,6 +31,8 @@ type Options = {
   itinerarySectionOpen: boolean;
 };
 
+type ItinerarySyncState = "idle" | "syncing" | "failed";
+
 function isTripPayloadUsable(
   d: Record<string, unknown> | null | undefined,
 ): d is Record<string, unknown> {
@@ -30,6 +42,92 @@ function isTripPayloadUsable(
     Array.isArray(d.primaryItinerary) &&
     Array.isArray(d.rainyDayItinerary)
   );
+}
+
+async function resolveTripIdForGroup(
+  groupId: string,
+  isOnline: boolean,
+  listTripsForGroup: (gid: string) => Promise<Response>,
+): Promise<string | null> {
+  let tripId: string | null = null;
+  if (isOnline) {
+    try {
+      const listRes = await listTripsForGroup(groupId);
+      if (listRes.ok) {
+        const data = (await listRes.json()) as unknown;
+        const trips = Array.isArray(data) ? data : [];
+        const mine = trips.find(
+          (t: { groupID?: string; tripID?: string }) => t?.groupID === groupId,
+        ) as { tripID?: string } | undefined;
+        if (mine?.tripID) {
+          tripId = String(mine.tripID);
+          await putGroupTripIdMapping(groupId, tripId);
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!tripId) {
+    tripId = await getTripIdForGroup(groupId);
+  }
+  if (!tripId) {
+    tripId = getGroupTripPresenceTripId(groupId);
+  }
+  return tripId;
+}
+
+function applyTripFetchToState(
+  out: Awaited<ReturnType<typeof fetchTripItineraryWithCache>>,
+  setters: {
+    setGroupTripDetail: (v: GroupTripDetailState) => void;
+    setIsShowingCached: (v: boolean) => void;
+    setTripPlanError: (v: null | "offline_unavailable" | "auth" | "other") => void;
+    setUserHasOfflineSave: (v: boolean) => void;
+    setSavedAt: (v: number | null) => void;
+    setLastSyncedAt: (v: number | null) => void;
+  },
+) {
+  if (out.error === "unauthorized") {
+    setters.setGroupTripDetail(null);
+    setters.setTripPlanError("auth");
+    setters.setIsShowingCached(false);
+    setters.setUserHasOfflineSave(false);
+    setters.setSavedAt(null);
+    setters.setLastSyncedAt(null);
+    return;
+  }
+
+  if (isTripPayloadUsable(out.data as Record<string, unknown> | null)) {
+    const d = out.data as Record<string, unknown>;
+    setters.setGroupTripDetail({
+      _id: String(d._id),
+      primaryItinerary: d.primaryItinerary as RainyDayTripInput["primaryItinerary"],
+      rainyDayItinerary: d.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
+      itineraryVersion:
+        typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
+    });
+    setters.setIsShowingCached(out.source === "cache" || out.isStale);
+    setters.setTripPlanError(null);
+    return;
+  }
+
+  if (out.error === "offline_unavailable") {
+    setters.setGroupTripDetail(null);
+    setters.setTripPlanError("offline_unavailable");
+    setters.setIsShowingCached(false);
+    setters.setUserHasOfflineSave(false);
+    setters.setSavedAt(null);
+    setters.setLastSyncedAt(null);
+    return;
+  }
+
+  setters.setGroupTripDetail(null);
+  setters.setTripPlanError("other");
+  setters.setIsShowingCached(false);
+  setters.setUserHasOfflineSave(false);
+  setters.setSavedAt(null);
+  setters.setLastSyncedAt(null);
 }
 
 export function useGroupItineraryOffline({
@@ -45,10 +143,13 @@ export function useGroupItineraryOffline({
     null | "offline_unavailable" | "auth" | "other"
   >(null);
   const [isShowingCached, setIsShowingCached] = useState(false);
-  const [lastDeviceSavedAt, setLastDeviceSavedAt] = useState<number | null>(
-    null,
-  );
+  const [userHasOfflineSave, setUserHasOfflineSave] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [idbSupported, setIdbSupported] = useState(true);
+  const [itinerarySyncState, setItinerarySyncState] =
+    useState<ItinerarySyncState>("idle");
+  const [offlineActionBusy, setOfflineActionBusy] = useState(false);
   const loadGen = useRef(0);
   const tripActiveGen = useRef(0);
   const mountedRef = useRef(true);
@@ -62,6 +163,22 @@ export function useGroupItineraryOffline({
     return fetch(`/api/trip?${q.toString()}`, { credentials: "include" });
   }, []);
 
+  const refreshOfflineMeta = useCallback(async (tripId: string) => {
+    try {
+      const rec = await getFullTripItineraryCache(tripId);
+      const saved = rec?.savedByUser === true;
+      setUserHasOfflineSave(saved);
+      setSavedAt(saved && typeof rec?.savedAt === "number" ? rec.savedAt : null);
+      setLastSyncedAt(
+        saved && typeof rec?.lastSyncedAt === "number" ? rec.lastSyncedAt : null,
+      );
+    } catch {
+      setUserHasOfflineSave(false);
+      setSavedAt(null);
+      setLastSyncedAt(null);
+    }
+  }, []);
+
   const resolveTripActive = useCallback(async () => {
     if (!groupId) {
       tripActiveGen.current += 1;
@@ -70,6 +187,17 @@ export function useGroupItineraryOffline({
     }
     const my = ++tripActiveGen.current;
     let active = false;
+    if (!isOnline) {
+      if (await hasUserSavedOfflineItineraryForGroup(groupId)) {
+        active = true;
+      } else if (getGroupTripPresenceTripId(groupId)) {
+        active = true;
+      }
+      if (my !== tripActiveGen.current) return;
+      setTripActive(active);
+      return;
+    }
+
     try {
       const res = await listTripsForGroup(groupId);
       if (my !== tripActiveGen.current) return;
@@ -92,13 +220,13 @@ export function useGroupItineraryOffline({
     if (!active) {
       const fromMap = await getTripIdForGroup(groupId);
       if (my !== tripActiveGen.current) return;
-      if (fromMap && (await hasUsableItineraryCacheForGroup(groupId))) {
+      if (fromMap) {
         active = true;
       }
     }
     if (my !== tripActiveGen.current) return;
     setTripActive(active);
-  }, [groupId, listTripsForGroup]);
+  }, [groupId, isOnline, listTripsForGroup]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -120,100 +248,122 @@ export function useGroupItineraryOffline({
       setGroupTripDetail(null);
       setTripPlanError(null);
       setIsShowingCached(false);
-      setLastDeviceSavedAt(null);
+      setUserHasOfflineSave(false);
+      setSavedAt(null);
+      setLastSyncedAt(null);
       setTripPlanLoading(false);
+      setItinerarySyncState("idle");
       return;
     }
     const myGen = ++loadGen.current;
-    setTripPlanLoading(true);
     setTripPlanError(null);
-    setIsShowingCached(false);
-    // lastDeviceSavedAt updated after successful load, or when reading cache
-    let tripId: string | null = null;
-    try {
-      if (isOnline) {
-        try {
-          const listRes = await listTripsForGroup(groupId);
-          if (listRes.ok) {
-            const data = (await listRes.json()) as unknown;
-            const trips = Array.isArray(data) ? data : [];
-            const mine = trips.find(
-              (t: { groupID?: string; tripID?: string }) => t?.groupID === groupId,
-            ) as { tripID?: string } | undefined;
-            if (mine?.tripID) {
-              tripId = String(mine.tripID);
-              await putGroupTripIdMapping(groupId, tripId);
-            }
-          }
-        } catch {
-          // will fall back to mapping + cache
-        }
-        if (myGen !== loadGen.current) return;
-      }
-      if (!tripId) {
-        tripId = await getTripIdForGroup(groupId);
-      }
+
+    if (!isOnline) {
+      setItinerarySyncState("idle");
+      const tripId =
+        (await getTripIdForGroup(groupId)) ?? getGroupTripPresenceTripId(groupId);
       if (myGen !== loadGen.current) return;
       if (!tripId) {
-        if (myGen === loadGen.current) {
-          setGroupTripDetail(null);
-          if (!isOnline) setTripPlanError("offline_unavailable");
-          setIsShowingCached(false);
-          setLastDeviceSavedAt(null);
-        }
-        return;
-      }
-      const out = await fetchTripItineraryWithCache(tripId, groupId);
-      if (myGen !== loadGen.current) return;
-
-      if (out.error === "unauthorized") {
-        setGroupTripDetail(null);
-        setTripPlanError("auth");
-        setIsShowingCached(false);
-        setLastDeviceSavedAt(null);
-        return;
-      }
-
-      if (isTripPayloadUsable(out.data as Record<string, unknown> | null)) {
-        const d = out.data as Record<string, unknown>;
-        setGroupTripDetail({
-          _id: String(d._id),
-          primaryItinerary: d.primaryItinerary as RainyDayTripInput["primaryItinerary"],
-          rainyDayItinerary: d.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
-          itineraryVersion:
-            typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
-        });
-        setIsShowingCached(out.source === "cache" || out.isStale);
-        setTripPlanError(null);
-        try {
-          const rec = await getFullTripItineraryCache(tripId);
-          setLastDeviceSavedAt(
-            typeof rec?.updatedAt === "number" ? rec.updatedAt : null,
-          );
-        } catch {
-          setLastDeviceSavedAt(null);
-        }
-        return;
-      }
-
-      if (out.error === "offline_unavailable") {
         setGroupTripDetail(null);
         setTripPlanError("offline_unavailable");
         setIsShowingCached(false);
-        setLastDeviceSavedAt(null);
+        setUserHasOfflineSave(false);
+        setSavedAt(null);
+        setLastSyncedAt(null);
+        setTripPlanLoading(false);
+        return;
+      }
+      const out = await readUserSavedOfflineTripItinerary(tripId);
+      if (myGen !== loadGen.current) return;
+      const setters = {
+        setGroupTripDetail,
+        setIsShowingCached,
+        setTripPlanError,
+        setUserHasOfflineSave,
+        setSavedAt,
+        setLastSyncedAt,
+      };
+      applyTripFetchToState(out, setters);
+      if (out.data && myGen === loadGen.current) {
+        await refreshOfflineMeta(tripId);
+      }
+      if (myGen === loadGen.current) {
+        setTripPlanLoading(false);
+      }
+      return;
+    }
+
+    setTripPlanLoading(true);
+    setIsShowingCached(false);
+
+    let hadUserSave = false;
+    try {
+      const tripId = await resolveTripIdForGroup(
+        groupId,
+        isOnline,
+        listTripsForGroup,
+      );
+      if (myGen !== loadGen.current) return;
+      if (tripId) {
+        const pre = await getFullTripItineraryCache(tripId);
+        hadUserSave = pre?.savedByUser === true;
+        if (hadUserSave) {
+          setItinerarySyncState("syncing");
+        }
+      }
+      if (!tripId) {
+        if (myGen === loadGen.current) {
+          setGroupTripDetail(null);
+          setTripPlanError(null);
+          setUserHasOfflineSave(false);
+          setSavedAt(null);
+          setLastSyncedAt(null);
+          setItinerarySyncState("idle");
+        }
         return;
       }
 
-      setGroupTripDetail(null);
-      setTripPlanError("other");
-      setIsShowingCached(false);
-      setLastDeviceSavedAt(null);
+      const out = await fetchTripItineraryWithCache(tripId, groupId);
+      if (myGen !== loadGen.current) return;
+
+      if (out.data && out.error === "none" && out.source === "network") {
+        setGroupTripPresence(groupId, tripId);
+      }
+
+      applyTripFetchToState(out, {
+        setGroupTripDetail,
+        setIsShowingCached,
+        setTripPlanError,
+        setUserHasOfflineSave,
+        setSavedAt,
+        setLastSyncedAt,
+      });
+
+      if (out.data && myGen === loadGen.current) {
+        await refreshOfflineMeta(tripId);
+      }
+
+      if (myGen === loadGen.current) {
+        if (
+          hadUserSave &&
+          out.data &&
+          out.error === "none" &&
+          (out.source === "cache" || out.isStale)
+        ) {
+          setItinerarySyncState("failed");
+        } else {
+          setItinerarySyncState("idle");
+        }
+      }
     } catch {
       if (myGen === loadGen.current) {
         setGroupTripDetail(null);
-        setTripPlanError(!isOnline ? "offline_unavailable" : "other");
+        setTripPlanError("other");
         setIsShowingCached(false);
-        setLastDeviceSavedAt(null);
+        setUserHasOfflineSave(false);
+        setSavedAt(null);
+        setLastSyncedAt(null);
+        setItinerarySyncState(hadUserSave ? "failed" : "idle");
       }
     } finally {
       if (myGen === loadGen.current) {
@@ -226,11 +376,48 @@ export function useGroupItineraryOffline({
     itinerarySectionOpen,
     isOnline,
     listTripsForGroup,
+    refreshOfflineMeta,
   ]);
 
   useEffect(() => {
     void loadTripDetail();
   }, [loadTripDetail]);
+
+  const saveForOffline = useCallback(async () => {
+    if (!groupId || !idbSupported) return;
+    const tid =
+      groupTripDetail?._id ??
+      (await getTripIdForGroup(groupId)) ??
+      getGroupTripPresenceTripId(groupId);
+    if (!tid) return;
+    setOfflineActionBusy(true);
+    setItinerarySyncState("syncing");
+    try {
+      const net = await fetchTripItineraryFromNetwork(tid);
+      if (!net.data || net.error !== "none") {
+        setItinerarySyncState("failed");
+        return;
+      }
+      await saveUserOfflineItinerary(tid, groupId, net.data);
+      await putGroupTripIdMapping(groupId, tid);
+      setGroupTripPresence(groupId, tid);
+      setGroupTripDetail({
+        _id: String(net.data._id),
+        primaryItinerary: net.data.primaryItinerary as RainyDayTripInput["primaryItinerary"],
+        rainyDayItinerary: net.data.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
+        itineraryVersion:
+          typeof net.data.itineraryVersion === "number" ? net.data.itineraryVersion : 0,
+      });
+      setIsShowingCached(false);
+      setTripPlanError(null);
+      await refreshOfflineMeta(tid);
+      setItinerarySyncState("idle");
+    } catch {
+      setItinerarySyncState("failed");
+    } finally {
+      setOfflineActionBusy(false);
+    }
+  }, [groupId, groupTripDetail, idbSupported, refreshOfflineMeta]);
 
   const onItinerarySynced = useCallback(
     (payload: {
@@ -252,13 +439,16 @@ export function useGroupItineraryOffline({
             primaryItinerary: payload.primaryItinerary,
             rainyDayItinerary: payload.rainyDayItinerary,
             itineraryVersion: payload.itineraryVersion,
+          }).then(() => {
+            if (mountedRef.current) {
+              void refreshOfflineMeta(String(next._id));
+            }
           });
-          setLastDeviceSavedAt(Date.now());
         }
         return next;
       });
     },
-    [groupId],
+    [groupId, refreshOfflineMeta],
   );
 
   const removeLocalItineraryCopy = useCallback(async () => {
@@ -266,30 +456,41 @@ export function useGroupItineraryOffline({
     if (
       !window.confirm(
         "Remove the offline copy of this itinerary from this device? " +
-          "You will need an internet connection to view it again unless you open this page online once more.",
+          "You will need an internet connection to view it again unless you save it again while online.",
       )
     ) {
       return;
     }
     const tid =
-      groupTripDetail?._id || (await getTripIdForGroup(groupId)) || null;
+      groupTripDetail?._id ||
+      (await getTripIdForGroup(groupId)) ||
+      getGroupTripPresenceTripId(groupId) ||
+      null;
     if (!tid) return;
     await deleteTripItineraryCache(tid, groupId);
-    setLastDeviceSavedAt(null);
+    setUserHasOfflineSave(false);
+    setSavedAt(null);
+    setLastSyncedAt(null);
     setIsShowingCached(false);
     await loadTripDetail();
   }, [groupId, groupTripDetail, loadTripDetail]);
 
   const resetAfterTripDelete = useCallback(() => {
+    if (groupId) {
+      clearGroupTripPresence(groupId);
+    }
     loadGen.current += 1;
     tripActiveGen.current += 1;
     setTripActive(false);
     setGroupTripDetail(null);
     setTripPlanError(null);
     setIsShowingCached(false);
-    setLastDeviceSavedAt(null);
+    setUserHasOfflineSave(false);
+    setSavedAt(null);
+    setLastSyncedAt(null);
     setTripPlanLoading(false);
-  }, []);
+    setItinerarySyncState("idle");
+  }, [groupId]);
 
   return {
     tripActive,
@@ -298,10 +499,16 @@ export function useGroupItineraryOffline({
     tripPlanError,
     isOffline: !isOnline,
     isShowingCached,
-    lastDeviceSavedAt,
+    userHasOfflineSave,
+    savedAt,
+    lastSyncedAt,
+    lastDeviceSavedAt: lastSyncedAt,
     idbSupported,
+    itinerarySyncState,
+    offlineActionBusy,
     refreshTripItinerary: loadTripDetail,
     removeLocalItineraryCopy,
+    saveForOffline,
     onItinerarySynced,
     resetAfterTripDelete,
   };

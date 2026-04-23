@@ -1,10 +1,10 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it, beforeEach } from "@jest/globals";
 import {
-  putFullTripItineraryCache,
+  saveUserOfflineItinerary,
   getFullTripItineraryCache,
   getTripIdForGroup,
-  hasUsableItineraryCacheForGroup,
+  hasUserSavedOfflineItineraryForGroup,
   patchItineraryInCache,
   deleteTripItineraryCache,
 } from "@/lib/offline/tripItineraryCache";
@@ -33,24 +33,25 @@ beforeEach(async () => {
 });
 
 describe("tripItineraryCache (IndexedDB)", () => {
-  it("writes_and_reads_full_trip", async () => {
+  it("writes_and_reads_user_offline_copy", async () => {
     const payload = { ...basePayload, itineraryVersion: 2 };
-    await putFullTripItineraryCache(TRIP, GROUP, payload);
+    await saveUserOfflineItinerary(TRIP, GROUP, payload);
     const r = await getFullTripItineraryCache(TRIP);
     expect(r).not.toBeNull();
+    expect(r!.savedByUser).toBe(true);
     expect(r!.payload.itineraryVersion).toBe(2);
     const gid = await getTripIdForGroup(GROUP);
     expect(gid).toBe(TRIP);
   });
 
-  it("hasUsableItineraryCacheForGroup", async () => {
-    expect(await hasUsableItineraryCacheForGroup(GROUP)).toBe(false);
-    await putFullTripItineraryCache(TRIP, GROUP, { ...basePayload });
-    expect(await hasUsableItineraryCacheForGroup(GROUP)).toBe(true);
+  it("hasUserSavedOfflineItineraryForGroup", async () => {
+    expect(await hasUserSavedOfflineItineraryForGroup(GROUP)).toBe(false);
+    await saveUserOfflineItinerary(TRIP, GROUP, { ...basePayload });
+    expect(await hasUserSavedOfflineItineraryForGroup(GROUP)).toBe(true);
   });
 
   it("patchItineraryInCache_merges_and_updates_version", async () => {
-    await putFullTripItineraryCache(TRIP, GROUP, { ...basePayload, mustHaves: [1, 2] });
+    await saveUserOfflineItinerary(TRIP, GROUP, { ...basePayload, mustHaves: [1, 2] });
     const nextRow = { name: "X", dayId: "d1", itineraryActivityId: "a1" };
     await patchItineraryInCache(TRIP, GROUP, {
       primaryItinerary: [nextRow],
@@ -65,7 +66,7 @@ describe("tripItineraryCache (IndexedDB)", () => {
   });
 
   it("deleteTripItineraryCache_removes_both", async () => {
-    await putFullTripItineraryCache(TRIP, GROUP, { ...basePayload });
+    await saveUserOfflineItinerary(TRIP, GROUP, { ...basePayload });
     await deleteTripItineraryCache(TRIP, GROUP);
     expect(await getFullTripItineraryCache(TRIP)).toBeNull();
     expect(await getTripIdForGroup(GROUP)).toBeNull();

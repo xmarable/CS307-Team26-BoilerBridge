@@ -3,7 +3,11 @@ import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
-import { putFullTripItineraryCache, putGroupTripIdMapping } from "@/lib/offline/tripItineraryCache";
+import {
+  saveUserOfflineItinerary,
+  putGroupTripIdMapping,
+} from "@/lib/offline/tripItineraryCache";
+import { setGroupTripPresence } from "@/lib/offline/groupTripPresence";
 
 const TRIP = "507f1f77bcf86cd799439099";
 const GROUP = "group-offline-test";
@@ -83,13 +87,35 @@ describe("useGroupItineraryOffline", () => {
         expect(result.current.tripActive).toBe(true);
         expect(result.current.groupTripDetail?.itineraryVersion).toBe(1);
         expect(result.current.isShowingCached).toBe(false);
+        expect(result.current.userHasOfflineSave).toBe(false);
       },
       { timeout: 8000 },
     );
   });
 
-  it("serves_cache_when_map_and_payload_exist_offline", async () => {
-    await putFullTripItineraryCache(
+  it("save_for_offline_persists_and_sets_flags", async () => {
+    (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip(
+      [{ groupID: GROUP, tripID: TRIP }],
+      { ...tripJson, itineraryVersion: 1 },
+    );
+    const { result } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    await waitFor(() => {
+      expect(result.current.groupTripDetail?._id).toBe(TRIP);
+    });
+    await act(async () => {
+      await result.current.saveForOffline();
+    });
+    await waitFor(() => {
+      expect(result.current.userHasOfflineSave).toBe(true);
+      expect(result.current.savedAt).not.toBeNull();
+      expect(result.current.lastSyncedAt).not.toBeNull();
+    });
+  });
+
+  it("serves_user_saved_cache_when_offline_without_spinner_stuck", async () => {
+    await saveUserOfflineItinerary(
       TRIP,
       GROUP,
       tripJson as unknown as Record<string, unknown>,
@@ -106,18 +132,20 @@ describe("useGroupItineraryOffline", () => {
         expect(result.current.isOffline).toBe(true);
         expect(result.current.groupTripDetail?._id).toBe(TRIP);
         expect(result.current.isShowingCached).toBe(true);
+        expect(result.current.tripPlanLoading).toBe(false);
       },
       { timeout: 8000 },
     );
   });
 
-  it("refetches_higher_version_after_reconnecting", async () => {
+  it("refetches_higher_version_after_reconnecting_and_updates_user_copy", async () => {
     await putGroupTripIdMapping(GROUP, TRIP);
-    await putFullTripItineraryCache(
+    await saveUserOfflineItinerary(
       TRIP,
       GROUP,
       { ...tripJson, itineraryVersion: 1 } as unknown as Record<string, unknown>,
     );
+    setGroupTripPresence(GROUP, TRIP);
     (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip(
       [{ groupID: GROUP, tripID: TRIP }],
       { ...tripJson, itineraryVersion: 1 },
@@ -252,7 +280,26 @@ describe("useGroupItineraryOffline", () => {
     expect(result.current.groupTripDetail).toBeNull();
   });
 
-  it("offline_with_empty_cache_has_no_trip_detail", async () => {
+  it("offline_with_no_user_save_shows_empty_trip_state", async () => {
+    setGroupTripPresence(GROUP, TRIP);
+    setOnline(false);
+    emitNet("offline");
+    (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip("fail", null);
+    const { result } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    await waitFor(
+      () => {
+        expect(result.current.tripActive).toBe(true);
+        expect(result.current.groupTripDetail).toBeNull();
+        expect(result.current.tripPlanError).toBe("offline_unavailable");
+        expect(result.current.tripPlanLoading).toBe(false);
+      },
+      { timeout: 8000 },
+    );
+  });
+
+  it("offline_with_no_presence_and_no_save_is_inactive", async () => {
     setOnline(false);
     emitNet("offline");
     (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip("fail", null);
@@ -267,5 +314,32 @@ describe("useGroupItineraryOffline", () => {
       },
       { timeout: 8000 },
     );
+  });
+
+  it("remove_offline_copy_clears_user_save", async () => {
+    await saveUserOfflineItinerary(
+      TRIP,
+      GROUP,
+      tripJson as unknown as Record<string, unknown>,
+    );
+    setGroupTripPresence(GROUP, TRIP);
+    (global as unknown as { fetch: typeof fetch }).fetch = mockListAndTrip(
+      [{ groupID: GROUP, tripID: TRIP }],
+      { ...tripJson, itineraryVersion: 1 },
+    );
+    const { result } = renderHook(() =>
+      useGroupItineraryOffline({ groupId: GROUP, itinerarySectionOpen: true }),
+    );
+    await waitFor(() => {
+      expect(result.current.userHasOfflineSave).toBe(true);
+    });
+    const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(true);
+    await act(async () => {
+      await result.current.removeLocalItineraryCopy();
+    });
+    confirmSpy.mockRestore();
+    await waitFor(() => {
+      expect(result.current.userHasOfflineSave).toBe(false);
+    });
   });
 });

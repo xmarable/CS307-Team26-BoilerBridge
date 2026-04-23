@@ -12,6 +12,9 @@ export type CachedTripItineraryRecord = {
   itineraryVersion: number;
   cacheRecordVersion: typeof CACHE_RECORD_VERSION;
   updatedAt: number;
+  savedByUser: boolean;
+  savedAt: number | null;
+  lastSyncedAt: number | null;
 };
 
 function idb(): IDBFactory | null {
@@ -46,6 +49,32 @@ function txDone(tx: IDBTransaction): Promise<void> {
     tx.onerror = () => reject(tx.error ?? new Error("IndexedDB transaction failed"));
     tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
   });
+}
+
+function normalizeTripRow(
+  row: CachedTripItineraryRecord | undefined,
+): CachedTripItineraryRecord | null {
+  if (!row) return null;
+  const savedByUser = row.savedByUser === true;
+  const savedAt = !savedByUser
+    ? null
+    : typeof row.savedAt === "number"
+      ? row.savedAt
+      : typeof row.updatedAt === "number"
+        ? row.updatedAt
+        : null;
+  const lastSyncedAt =
+    typeof row.lastSyncedAt === "number"
+      ? row.lastSyncedAt
+      : savedByUser && typeof row.updatedAt === "number"
+        ? row.updatedAt
+        : null;
+  return {
+    ...row,
+    savedByUser,
+    savedAt,
+    lastSyncedAt,
+  };
 }
 
 export function isItineraryCacheSupported(): boolean {
@@ -90,32 +119,67 @@ function payloadItineraryVersion(p: Record<string, unknown>): number {
   return typeof p.itineraryVersion === "number" ? p.itineraryVersion : 0;
 }
 
-export async function putFullTripItineraryCache(
+async function putTripRecord(rec: CachedTripItineraryRecord): Promise<void> {
+  if (!idb()) return;
+  const db = await openDb();
+  const tx = db.transaction(STORE_TRIPS, "readwrite");
+  tx.objectStore(STORE_TRIPS).put(rec);
+  await txDone(tx);
+  db.close();
+  await putGroupTripIdMapping(rec.groupId, rec.tripId);
+}
+
+export async function saveUserOfflineItinerary(
   tripId: string,
   groupId: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
   if (!idb()) return;
+  const now = Date.now();
+  const prev = normalizeTripRow(
+    (await getFullTripItineraryCacheRaw(tripId)) ?? undefined,
+  );
+  const firstSaveAt = prev?.savedByUser === true && prev.savedAt != null ? prev.savedAt : now;
   const rec: CachedTripItineraryRecord = {
     tripId,
     groupId,
     payload: { ...payload },
     itineraryVersion: payloadItineraryVersion(payload),
     cacheRecordVersion: CACHE_RECORD_VERSION,
-    updatedAt: Date.now(),
+    updatedAt: now,
+    savedByUser: true,
+    savedAt: firstSaveAt,
+    lastSyncedAt: now,
   };
-  const db = await openDb();
-  const tx = db.transaction(STORE_TRIPS, "readwrite");
-  tx.objectStore(STORE_TRIPS).put(rec);
-  await txDone(tx);
-  db.close();
-  await putGroupTripIdMapping(groupId, tripId);
+  await putTripRecord(rec);
 }
 
-export async function getFullTripItineraryCache(
+export async function syncUserSavedOfflinePayload(
   tripId: string,
-): Promise<CachedTripItineraryRecord | null> {
-  if (!idb()) return null;
+  groupId: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (!idb()) return false;
+  const cur = normalizeTripRow(
+    (await getFullTripItineraryCacheRaw(tripId)) ?? undefined,
+  );
+  if (!cur?.savedByUser) return false;
+  const now = Date.now();
+  const rec: CachedTripItineraryRecord = {
+    ...cur,
+    payload: { ...payload },
+    itineraryVersion: payloadItineraryVersion(payload),
+    updatedAt: now,
+    lastSyncedAt: now,
+  };
+  await putTripRecord(rec);
+  return true;
+}
+
+async function getFullTripItineraryCacheRaw(
+  tripId: string,
+): Promise<CachedTripItineraryRecord | undefined> {
+  if (!idb()) return undefined;
   try {
     const db = await openDb();
     const tx = db.transaction(STORE_TRIPS, "readonly");
@@ -129,25 +193,35 @@ export async function getFullTripItineraryCache(
     );
     await txDone(tx);
     db.close();
-    return row ?? null;
+    return row;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
-export async function hasUsableItineraryCacheForGroup(
+export async function getFullTripItineraryCache(
+  tripId: string,
+): Promise<CachedTripItineraryRecord | null> {
+  const raw = await getFullTripItineraryCacheRaw(tripId);
+  return normalizeTripRow(raw);
+}
+
+function hasValidPayloadShape(p: Record<string, unknown>): boolean {
+  return (
+    p._id != null &&
+    Array.isArray(p.primaryItinerary) &&
+    Array.isArray(p.rainyDayItinerary)
+  );
+}
+
+export async function hasUserSavedOfflineItineraryForGroup(
   groupId: string,
 ): Promise<boolean> {
   const tid = await getTripIdForGroup(groupId);
   if (!tid) return false;
   const r = await getFullTripItineraryCache(tid);
-  if (!r?.payload) return false;
-  const p = r.payload;
-  return (
-    typeof p._id === "string" &&
-    Array.isArray(p.primaryItinerary) &&
-    Array.isArray(p.rainyDayItinerary)
-  );
+  if (!r?.savedByUser || !r.payload) return false;
+  return hasValidPayloadShape(r.payload);
 }
 
 export async function patchItineraryInCache(
@@ -161,16 +235,22 @@ export async function patchItineraryInCache(
 ): Promise<void> {
   if (!idb()) return;
   const cur = await getFullTripItineraryCache(tripId);
-  const base: Record<string, unknown> = cur
-    ? { ...cur.payload }
-    : { _id: tripId, groupID: groupId };
+  if (!cur?.savedByUser) return;
+  const base: Record<string, unknown> = { ...cur.payload };
   const next: Record<string, unknown> = {
     ...base,
     primaryItinerary: update.primaryItinerary,
     rainyDayItinerary: update.rainyDayItinerary,
     itineraryVersion: update.itineraryVersion,
   };
-  await putFullTripItineraryCache(tripId, groupId, next);
+  const now = Date.now();
+  await putTripRecord({
+    ...cur,
+    payload: next,
+    itineraryVersion: update.itineraryVersion,
+    updatedAt: now,
+    lastSyncedAt: now,
+  });
 }
 
 export async function deleteTripItineraryCache(tripId: string, groupId: string) {
