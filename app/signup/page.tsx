@@ -7,12 +7,12 @@ import { redirect } from "next/navigation";
 export default async function SignUpPage() {
    
   const session = (await getServerSession(authOptions)) as any;
-  if (session) {
+  if (session?.user) {
     redirect("/dashboard");
   }
   return (
     <div>
-      <Header />
+      <Header session={session} />
       <SignUp />
     </div>
   );
