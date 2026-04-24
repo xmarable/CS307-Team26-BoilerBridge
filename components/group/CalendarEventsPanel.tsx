@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -123,6 +124,8 @@ type Props = {
   isLeader?: boolean;
   /** For export filename hint */
   groupName?: string;
+  /** After calendar rows are copied into Trip.primaryItinerary, refetch trip plan in parent. */
+  onTripPlanSynced?: () => void;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -153,6 +156,40 @@ function toDateLabel(value?: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+const calendarRangeStorageKey = (gid: string) => `bb-cal-range:${gid}`;
+
+function readStoredCalendarRange(
+  groupId: string,
+): { from: string; to: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(calendarRangeStorageKey(groupId));
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { from?: string; to?: string };
+    if (typeof o.from === "string" && typeof o.to === "string") {
+      return { from: o.from, to: o.to };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function persistCalendarRange(
+  groupId: string,
+  fromStr: string,
+  toStr: string,
+): void {
+  try {
+    sessionStorage.setItem(
+      calendarRangeStorageKey(groupId),
+      JSON.stringify({ from: fromStr, to: toStr }),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 function formatScheduleConflictMessage(data: {
@@ -490,6 +527,7 @@ export default function CalendarEventsPanel({
   canEdit = false,
   isLeader = false,
   groupName,
+  onTripPlanSynced,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -509,8 +547,14 @@ export default function CalendarEventsPanel({
   const [errorPopupTripLink, setErrorPopupTripLink] = useState(false);
 
   // Form fields for creating a new event
-  const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
+  const [from, setFrom] = useState(() => {
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) return stored.from;
+    return toDatetimeLocalValue(new Date());
+  });
   const [to, setTo] = useState(() => {
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) return stored.to;
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return toDatetimeLocalValue(d);
@@ -546,6 +590,7 @@ export default function CalendarEventsPanel({
   );
   const [regenerating, setRegenerating] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [syncingTripPlan, setSyncingTripPlan] = useState(false);
   const [tripOptions, setTripOptions] = useState<GroupTripOption[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
@@ -652,12 +697,18 @@ export default function CalendarEventsPanel({
   }, [filteredEventsForDisplay]);
 
   /* ---------- API Calls ---------- */
-  async function fetchEvents() {
+  async function fetchEvents(rangeOverride?: { from: string; to: string }) {
     try {
       setLoading(true);
       setErr(null);
+      const qs = new URLSearchParams();
+      const fromVal = rangeOverride?.from ?? from;
+      const toVal = rangeOverride?.to ?? to;
+      qs.set("from", new Date(fromVal).toISOString());
+      qs.set("to", new Date(toVal).toISOString());
+      const query = `?${qs.toString()}`;
       const res = await fetch(
-        `/api/groups/${groupId}/calendar/events${rangeQuery}`,
+        `/api/groups/${groupId}/calendar/events${query}`,
         { credentials: "include" },
       );
       const data = await res.json();
@@ -784,7 +835,21 @@ export default function CalendarEventsPanel({
         } else {
           setPopupMsg(data?.message || "Itinerary sparked successfully.");
           setShowSuccessPopup(true);
-          await fetchEvents();
+          const trip = tripOptions.find((t) => t._id === selectedTripId);
+          let rangeOverride: { from: string; to: string } | undefined;
+          if (trip?.fromDate && trip?.toDate) {
+            const start = new Date(String(trip.fromDate));
+            const end = new Date(String(trip.toDate));
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            const fromStr = toDatetimeLocalValue(start);
+            const toStr = toDatetimeLocalValue(end);
+            setFrom(fromStr);
+            setTo(toStr);
+            rangeOverride = { from: fromStr, to: toStr };
+            persistCalendarRange(groupId, fromStr, toStr);
+          }
+          await fetchEvents(rangeOverride);
         }
       }
     } catch (e: any) {
@@ -967,6 +1032,45 @@ export default function CalendarEventsPanel({
     }
   }
 
+  async function handleApplyToTripPlan() {
+    if (!canEdit || !selectedTripId) {
+      setErr(
+        "Choose a trip in “Trip Source” above, then apply Spark activities to the trip plan.",
+      );
+      return;
+    }
+    try {
+      setSyncingTripPlan(true);
+      setErr(null);
+      const body: { tripId: string; eventIds?: string[] } = {
+        tripId: selectedTripId,
+      };
+      if (selectedIds.size > 0) {
+        body.eventIds = Array.from(selectedIds);
+      }
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/apply-to-trip`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string" ? data.error : "Apply to trip failed",
+        );
+      }
+      onTripPlanSynced?.();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Apply to trip failed");
+    } finally {
+      setSyncingTripPlan(false);
+    }
+  }
+
   async function handleApplyPreview() {
     try {
       setApplying(true);
@@ -1112,6 +1216,29 @@ export default function CalendarEventsPanel({
     });
   }, [selectedTripId, tripOptions]);
 
+  /** Restore calendar view window after navigation, or default to trip dates. */
+  useEffect(() => {
+    if (!groupId || tripOptions.length === 0) return;
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) {
+      setFrom(stored.from);
+      setTo(stored.to);
+      return;
+    }
+    const tid = selectedTripId || tripOptions[0]?._id;
+    const trip = tripOptions.find((t) => t._id === tid);
+    if (trip?.fromDate && trip?.toDate) {
+      const start = new Date(String(trip.fromDate));
+      const end = new Date(String(trip.toDate));
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const fromStr = toDatetimeLocalValue(start);
+      const toStr = toDatetimeLocalValue(end);
+      setFrom(fromStr);
+      setTo(toStr);
+    }
+  }, [groupId, tripOptions, selectedTripId]);
+
   /* ---------- Render ---------- */
   return (
     <div className="space-y-8">
@@ -1153,7 +1280,11 @@ export default function CalendarEventsPanel({
             <Input
               type="datetime-local"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFrom(v);
+                persistCalendarRange(groupId, v, to);
+              }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -1164,7 +1295,11 @@ export default function CalendarEventsPanel({
             <Input
               type="datetime-local"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTo(v);
+                persistCalendarRange(groupId, from, v);
+              }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -1451,6 +1586,39 @@ export default function CalendarEventsPanel({
                 )}
                 Regenerate Selected
               </Button>
+
+              {canEdit ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void handleApplyToTripPlan()}
+                        disabled={
+                          syncingTripPlan ||
+                          loading ||
+                          loadingTrips ||
+                          !selectedTripId
+                        }
+                        className="rounded-2xl h-11 font-black border-2 border-emerald-700/30 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 gap-2"
+                      >
+                        {syncingTripPlan ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                          <MapPin size={18} />
+                        )}
+                        Apply to trip plan
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs font-medium">
+                    Replaces the trip&apos;s Primary plan with Spark timeline rows
+                    for the chosen trip. With no selection, all non-dismissed
+                    itinerary events in the trip dates are used.
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1692,21 +1860,22 @@ export default function CalendarEventsPanel({
             <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
               <Zap fill="currentColor" size={32} /> Trip Error
             </DialogTitle>
+            <DialogDescription asChild>
+              <div className="py-8 space-y-4 text-left">
+                <p className="text-xl font-black text-gray-900 leading-tight whitespace-pre-line">
+                  {popupMsg}
+                </p>
+                {errorPopupTripLink && (
+                  <Link
+                    href={`/dashboard/groups/${groupId}/trip`}
+                    className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+                  >
+                    Open trip settings
+                  </Link>
+                )}
+              </div>
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="py-8 space-y-4">
-            <p className="text-xl font-black text-gray-900 leading-tight whitespace-pre-line">
-              {popupMsg}
-            </p>
-            {errorPopupTripLink && (
-              <Link
-                href={`/dashboard/groups/${groupId}/trip`}
-                className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
-              >
-                Open trip settings
-              </Link>
-            )}
-          </div>
 
           <DialogFooter>
             <Button
@@ -1724,34 +1893,27 @@ export default function CalendarEventsPanel({
       {/* ==================== */}
       <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
         <DialogContent className="rounded-[2.5rem] border-4 border-amber-500 p-0 bg-white shadow-[10px_10px_0px_0px_rgba(245,158,11,1)] max-w-md mx-auto overflow-hidden">
-          {/* forced centering container */}
-          <div className="flex flex-col items-center justify-center p-10 w-full text-center">
-            {/* title section */}
-            <div className="flex flex-col items-center justify-center gap-3 mb-8">
-              <h2 className="text-4xl font-black text-amber-500 uppercase tracking-tighter">
-                Sparked
-              </h2>
-            </div>
+          <DialogHeader className="flex flex-col items-center justify-center p-10 pb-0 text-center space-y-6">
+            <DialogTitle className="text-4xl font-black text-amber-500 uppercase tracking-tighter border-0 p-0">
+              Sparked
+            </DialogTitle>
+            <DialogDescription className="text-xl font-black text-gray-900 leading-tight mb-2 max-w-md">
+              {popupMsg}
+              <span className="mt-3 block text-sm font-bold text-gray-400 leading-relaxed">
+                Your timeline has been refreshed with the new activities. If you
+                still do not see events, widen the &quot;View window&quot; dates above
+                the list.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* body section */}
-            <div className="mb-10">
-              <p className="text-xl font-black text-gray-900 leading-tight mb-2">
-                {popupMsg}
-              </p>
-              <p className="text-sm font-bold text-gray-400 leading-relaxed">
-                Your timeline has been refreshed with the new activities
-              </p>
-            </div>
-
-            {/* button */}
-            <div className="w-full">
-              <Button
-                onClick={() => setShowSuccessPopup(false)}
-                className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
-              >
-                Nice
-              </Button>
-            </div>
+          <div className="flex flex-col items-center px-10 pb-10 w-full">
+            <Button
+              onClick={() => setShowSuccessPopup(false)}
+              className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
+            >
+              Nice
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1782,11 +1944,11 @@ export default function CalendarEventsPanel({
               <Unlock size={20} className="text-amber-500" />
               Unlock activity?
             </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 font-medium py-2 text-left">
+              <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
+              and will be preserved during regeneration. Unlock it to allow changes.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-gray-600 font-medium py-2">
-            <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
-            and will be preserved during regeneration. Unlock it to allow changes.
-          </p>
           <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end pt-2">
             <Button
               variant="outline"

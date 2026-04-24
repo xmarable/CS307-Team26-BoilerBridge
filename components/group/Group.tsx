@@ -131,6 +131,39 @@ export default function GroupDashboard() {
     (RainyDayTripInput & { _id: string }) | null
   >(null);
 
+  const refreshGroupTripDetail = useCallback(async () => {
+    if (!groupId || !tripActive) return;
+    try {
+      const listRes = await fetch("/api/trip", { credentials: "include" });
+      if (!listRes.ok) return;
+      const trips = await listRes.json();
+      if (!Array.isArray(trips)) return;
+      const mine = trips.find(
+        (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
+      );
+      const id = mine?.tripID;
+      if (!id || typeof id !== "string") return;
+      const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
+      if (!dRes.ok) return;
+      const d = await dRes.json();
+      if (
+        d?._id &&
+        Array.isArray(d.primaryItinerary) &&
+        Array.isArray(d.rainyDayItinerary)
+      ) {
+        setGroupTripDetail({
+          _id: String(d._id),
+          primaryItinerary: d.primaryItinerary,
+          rainyDayItinerary: d.rainyDayItinerary,
+          itineraryVersion:
+            typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [groupId, tripActive]);
+
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
     try {
@@ -184,43 +217,8 @@ export default function GroupDashboard() {
       setGroupTripDetail(null);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const listRes = await fetch("/api/trip", { credentials: "include" });
-        if (!listRes.ok) return;
-        const trips = await listRes.json();
-        if (!Array.isArray(trips)) return;
-        const mine = trips.find(
-          (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
-        );
-        const id = mine?.tripID;
-        if (!id || typeof id !== "string") return;
-        const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
-        if (!dRes.ok) return;
-        const d = await dRes.json();
-        if (
-          !cancelled &&
-          d?._id &&
-          Array.isArray(d.primaryItinerary) &&
-          Array.isArray(d.rainyDayItinerary)
-        ) {
-          setGroupTripDetail({
-            _id: String(d._id),
-            primaryItinerary: d.primaryItinerary,
-            rainyDayItinerary: d.rainyDayItinerary,
-            itineraryVersion:
-              typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
-          });
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, tripActive, activeSection]);
+    void refreshGroupTripDetail();
+  }, [groupId, tripActive, activeSection, refreshGroupTripDetail]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -673,6 +671,7 @@ export default function GroupDashboard() {
                     }
                     canEdit={userRole === "Leader" || userRole === "Admin"}
                     isLeader={isLeader}
+                    onTripPlanSynced={() => void refreshGroupTripDetail()}
                   />
                 </div>
               </section>
