@@ -18,7 +18,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     if (!shared) {
         return NextResponse.json({ error: "Shared Not found" }, { status: 404 });
     }
-
     
     const group = await TravelGroup.findOne({ groupID: shared.groupId })
     const trip = await Trip.findOne({ tripId: shared.tripId });

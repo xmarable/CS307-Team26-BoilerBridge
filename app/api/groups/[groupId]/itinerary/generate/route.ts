@@ -22,6 +22,7 @@ import { mergeItineraryValidationIssues } from "@/lib/itinerary/itineraryDetermi
 import CalendarEvent from "@/models/CalendarEvent";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
+import { createTripNotif } from "@/lib/notifications";
 
 export async function POST(
   req: Request,
@@ -214,6 +215,12 @@ export async function POST(
     }));
 
     const created = await CalendarEvent.insertMany(docs);
+
+    createTripNotif({
+      groupID: groupId,
+      userId: userId,
+      message: `Itinerary generated for ${trip.toCity}`
+    });
 
     return NextResponse.json({
       message: "Itinerary sparked successfully.",

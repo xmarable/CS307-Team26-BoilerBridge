@@ -14,6 +14,7 @@ import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationC
 import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import { createTripNotif } from "@/lib/notifications";
 
 const ApplyBodySchema = z.object({
   replaceEventIds: z.array(z.string().min(1)).min(1),
@@ -71,10 +72,10 @@ export async function POST(
     const tripDoc = await Trip.findOne({ groupID: groupId }).sort({ createdAt: -1 }).lean();
     const tripCtx = tripDoc
       ? mapTripToGenerationContext({
-          ...(tripDoc as Record<string, unknown>),
-          fromDate: new Date((tripDoc as { fromDate: Date }).fromDate),
-          toDate: new Date((tripDoc as { toDate: Date }).toDate),
-        })
+        ...(tripDoc as Record<string, unknown>),
+        fromDate: new Date((tripDoc as { fromDate: Date }).fromDate),
+        toDate: new Date((tripDoc as { toDate: Date }).toDate),
+      })
       : undefined;
 
     const mustHaveDocs = await MustHave.find({
@@ -158,6 +159,12 @@ export async function POST(
     }));
 
     const inserted = await CalendarEvent.insertMany(docs);
+
+    createTripNotif({
+      groupID: groupId,
+      userId: userId,
+      message: `Itinerary regenerated for ${tripDoc.toCity}`
+    });
 
     return NextResponse.json({ events: inserted }, { status: 200 });
   } catch (err: unknown) {

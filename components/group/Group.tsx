@@ -799,7 +799,6 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
-              {tripActive && groupTripDetail ? (
               {(tripActive || isOffline) ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
