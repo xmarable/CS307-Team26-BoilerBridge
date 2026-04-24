@@ -85,13 +85,6 @@ afterAll(async () => {
   await ItineraryStop.deleteMany({});
   await TravelGroup.deleteMany({});
   await User.deleteMany({});
-
-  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
-  if ((global as any).mongoose) {
-    (global as any).mongoose.conn = null;
-    (global as any).mongoose.promise = null;
-  }
-
   jest.resetModules();
   jest.clearAllMocks();
 });
