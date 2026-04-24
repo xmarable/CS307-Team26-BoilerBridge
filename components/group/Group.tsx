@@ -73,6 +73,7 @@ import { GroupBoard } from "@/components/GroupBoard";
 import { ActivityVoting } from "./ActivityVoting";
 import { SheetTitle } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { ItinieraryWeather } from "../itineraries/ItineraryWeather";
 
 type GroupState = {
   _id: string;
@@ -777,7 +778,7 @@ export default function GroupDashboard() {
                   />
                 </div>
               </section>
-
+              
               <section className="space-y-6 flex-1">
                 <div className="flex items-center gap-3 px-2">
                   <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
@@ -792,6 +793,13 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
+              <section className="col-span-full w-full">
+                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit">
+                  <ItinieraryWeather groupId={groupId || ""} />
+                </div>
+              </section>
+
+              {tripActive && groupTripDetail ? (
               {(tripActive || isOffline) ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
