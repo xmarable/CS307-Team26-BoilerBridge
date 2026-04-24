@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -44,6 +44,9 @@ import {
   GripVertical,
   Lock,
   Unlock,
+  Check,
+  X,
+  CircleHelp,
 } from "lucide-react";
 import {
   DndContext,
@@ -76,7 +79,11 @@ import { ItineraryExportMenu } from "@/components/group/ItineraryExportMenu";
 import { buildCalendarActivityDetailHref } from "@/lib/calendarActivityDetailLink";
 import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
 import { emptyAccessibilityRequirements } from "@/lib/accessibilityRequirements";
-import { hasAnyAccessibilityRequirement } from "@/lib/travel/accessibility";
+import {
+  accessibilityRowsForVenue,
+  hasAnyAccessibilityRequirement,
+} from "@/lib/travel/accessibility";
+import type { PlaceAccessibilityInfo } from "@/lib/travel/accessibility";
 
 /* ---------- Types ---------- */
 type CalendarEvent = {
@@ -100,6 +107,8 @@ type CalendarEvent = {
   itineraryOptionStatus?: "candidate" | "removed" | "final";
   optionGroupId?: string;
   accessibilityMatched?: boolean;
+  /** From GET /calendar/events — Activity place fields when linked. */
+  venueAccessibility?: PlaceAccessibilityInfo | null;
 };
 
 type GroupTripOption = {
@@ -222,6 +231,103 @@ function isDismissibleCandidate(ev: CalendarEvent): boolean {
   return s === "candidate" || s === undefined;
 }
 
+function AccessibilityDetailsTrigger({
+  rows,
+}: {
+  rows: ReturnType<typeof accessibilityRowsForVenue>;
+}) {
+  if (rows.length === 0) return null;
+
+  const allUnknown = rows.every((r) => r.status === "unknown");
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-sky-800 hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
+          aria-label="Accessibility: compare trip requirements to venue data"
+        >
+          Details
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-sm border border-gray-200 bg-white p-3 text-gray-900 shadow-md"
+      >
+        <p className="text-[11px] font-black uppercase tracking-wide text-gray-500">
+          Trip requirement vs venue data
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex items-start justify-between gap-3 text-xs"
+            >
+              <span className="font-semibold text-gray-800">{row.label}</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-gray-900">
+                {row.status === "met" ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                    Yes
+                  </>
+                ) : row.status === "not_met" ? (
+                  <>
+                    <X className="h-3.5 w-3.5 text-red-600" aria-hidden />
+                    No
+                  </>
+                ) : (
+                  <>
+                    <CircleHelp
+                      className="h-3.5 w-3.5 text-amber-600"
+                      aria-hidden
+                    />
+                    Unknown
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 border-t border-gray-100 pt-2">
+          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+            When venue data is known
+          </p>
+          <ul className="mt-1.5 space-y-1 text-[11px] text-gray-600">
+            <li className="flex items-start justify-between gap-3">
+              <span className="text-gray-500">Example: requirement met</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-emerald-700">
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                Yes
+              </span>
+            </li>
+            <li className="flex items-start justify-between gap-3">
+              <span className="text-gray-500">Example: not met at venue</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-red-700">
+                <X className="h-3.5 w-3.5" aria-hidden />
+                No
+              </span>
+            </li>
+          </ul>
+        </div>
+        <p className="mt-2 border-t border-gray-100 pt-2 text-[11px] leading-snug text-gray-500">
+          Unknown means the linked catalog place did not list that field, or
+          this row is not linked to a catalog place yet.
+          {allUnknown ? (
+            <>
+              {" "}
+              Use <span className="font-semibold text-gray-700">Load Google venue data</span>{" "}
+              above the activity list (with <span className="font-semibold text-gray-700">GOOGLE_MAPS_API_KEY</span>{" "}
+              set) to fill mobility fields from Google for linked places, or from
+              title and location when no place is linked yet.
+            </>
+          ) : null}
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 /* ---------- Sortable Event Card ---------- */
 type SortableEventCardProps = {
   ev: CalendarEvent;
@@ -273,11 +379,20 @@ function SortableEventCard({
     isDragging,
   } = useSortable({ id: ev._id });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const accessibilityRows =
+    ev.source === "itinerary" &&
+    hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+      ? accessibilityRowsForVenue(
+          activeAccessibilityRequirements,
+          ev.venueAccessibility ?? undefined,
+        )
+      : [];
 
   const detailHref = buildCalendarActivityDetailHref(ev);
   const linkableClass =
@@ -307,14 +422,8 @@ function SortableEventCard({
         >
           {ev.eventType}
         </Badge>
-        {ev.source === "itinerary" &&
-        hasAnyAccessibilityRequirement(activeAccessibilityRequirements) ? (
-          <Badge
-            variant="outline"
-            className="text-[10px] border-sky-200 text-sky-700"
-          >
-            Accessibility match
-          </Badge>
+        {accessibilityRows.length > 0 ? (
+          <AccessibilityDetailsTrigger rows={accessibilityRows} />
         ) : null}
       </div>
 
@@ -348,6 +457,29 @@ function SortableEventCard({
           {ev.description}
         </p>
       )}
+
+      {accessibilityRows.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {accessibilityRows.map((row) => (
+            <span
+              key={row.key}
+              className="inline-flex max-w-full items-center gap-1 rounded-lg border border-sky-100 bg-sky-50/90 px-2 py-0.5 text-[10px] font-bold text-sky-900"
+              title={row.label}
+            >
+              <span className="truncate">{row.label}</span>
+              <span className="shrink-0 inline-flex items-center" aria-hidden>
+                {row.status === "met" ? (
+                  <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />
+                ) : row.status === "not_met" ? (
+                  <X className="h-3 w-3 text-red-600" strokeWidth={3} />
+                ) : (
+                  <CircleHelp className="h-3 w-3 text-amber-600" />
+                )}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 
@@ -697,7 +829,10 @@ export default function CalendarEventsPanel({
   }, [filteredEventsForDisplay]);
 
   /* ---------- API Calls ---------- */
-  async function fetchEvents(rangeOverride?: { from: string; to: string }) {
+  async function fetchEvents(
+    rangeOverride?: { from: string; to: string },
+    opts?: { enrichAccessibility?: boolean },
+  ) {
     try {
       setLoading(true);
       setErr(null);
@@ -706,6 +841,9 @@ export default function CalendarEventsPanel({
       const toVal = rangeOverride?.to ?? to;
       qs.set("from", new Date(fromVal).toISOString());
       qs.set("to", new Date(toVal).toISOString());
+      if (opts?.enrichAccessibility) {
+        qs.set("enrichAccessibility", "true");
+      }
       const query = `?${qs.toString()}`;
       const res = await fetch(
         `/api/groups/${groupId}/calendar/events${query}`,
@@ -1548,17 +1686,49 @@ export default function CalendarEventsPanel({
             {/* Action buttons */}
             <div className="flex items-end gap-2">
               {hasAnyAccessibilityRequirement(activeAccessibilityRequirements) ? (
-                <label className="flex h-11 items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-900">
-                  <input
-                    type="checkbox"
-                    checked={hideNonMatchingByAccessibility}
-                    onChange={(e) =>
-                      setHideNonMatchingByAccessibility(e.target.checked)
-                    }
-                    className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
-                  />
-                  Hide non-matching venues
-                </label>
+                <>
+                  <label className="flex h-11 items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-900">
+                    <input
+                      type="checkbox"
+                      checked={hideNonMatchingByAccessibility}
+                      onChange={(e) =>
+                        setHideNonMatchingByAccessibility(e.target.checked)
+                      }
+                      className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                    />
+                    Hide non-matching venues
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-11 rounded-2xl border-sky-200 text-xs font-bold text-sky-900"
+                          disabled={loading}
+                          onClick={() =>
+                            void fetchEvents(undefined, {
+                              enrichAccessibility: true,
+                            })
+                          }
+                        >
+                          {loading ? (
+                            <Loader2 className="animate-spin mr-1.5" size={14} />
+                          ) : null}
+                          Load Google venue data
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs font-medium">
+                      Uses Place Details for linked place IDs (up to 15), and
+                      text search for rows without a link (up to 8), biased by
+                      trip city when available. Mobility fields from Google fill
+                      unknown chips and are saved on linked activities; new place
+                      IDs are saved on the calendar row when found.
+                    </TooltipContent>
+                  </Tooltip>
+                </>
               ) : null}
               <Button
                 type="button"

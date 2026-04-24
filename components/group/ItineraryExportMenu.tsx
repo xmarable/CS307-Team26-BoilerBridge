@@ -135,6 +135,13 @@ export function ItineraryExportMenu({
     }
   }
 
+  function subscriptionUrlWithRange(baseUrl: string): string {
+    const r = exportRangeSchema.safeParse({ from: rangeFrom, to: rangeTo });
+    if (!r.success) return baseUrl;
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${sep}${buildExportQueryString(rangeFrom, rangeTo)}`;
+  }
+
   async function copySubscriptionLink() {
     setBusy("copy");
     try {
@@ -153,8 +160,18 @@ export function ItineraryExportMenu({
         return;
       }
       if (typeof j.subscriptionUrl === "string") {
-        await navigator.clipboard.writeText(j.subscriptionUrl);
-        toast.success("Subscription link copied — paste into Apple/Google calendar");
+        const url = subscriptionUrlWithRange(j.subscriptionUrl);
+        await navigator.clipboard.writeText(url);
+        toast.success(
+          "Subscription link copied. Google/Apple will refetch this URL periodically.",
+          {
+            description:
+              typeof window !== "undefined" &&
+              window.location.hostname === "localhost"
+                ? "Note: Google Calendar cannot fetch http://localhost — use Download .ics for local dev, or deploy and use an HTTPS URL for subscriptions."
+                : "If the calendar looks empty, widen the trip date range above before copying so from/to match your events.",
+          },
+        );
       }
     } catch {
       toast.error("Copy failed");

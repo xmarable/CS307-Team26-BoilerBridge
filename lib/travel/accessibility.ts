@@ -78,3 +78,42 @@ export function matchesAccessibilityRequirements(
   return true;
 }
 
+/** Human-readable labels for trip accessibility toggles (UI + TA demos). */
+export const ACCESSIBILITY_FEATURE_LABELS: Record<
+  (typeof ACCESSIBILITY_REQUIREMENT_KEYS)[number],
+  string
+> = {
+  wheelchairAccessible: "Wheelchair-accessible entrance",
+  stepFree: "Step-free access",
+  accessibleRestroom: "Accessible restroom",
+  hearingAssistance: "Hearing assistance",
+  visualAssistance: "Visual assistance",
+};
+
+export type AccessibilityVenueRowStatus = "met" | "not_met" | "unknown";
+
+/**
+ * For each trip requirement that is turned on, compare to optional venue
+ * fields from the linked Activity / Places row.
+ */
+export function accessibilityRowsForVenue(
+  requirements: AccessibilityRequirements | null | undefined,
+  venue: PlaceAccessibilityInfo | null | undefined,
+): Array<{
+  key: (typeof ACCESSIBILITY_REQUIREMENT_KEYS)[number];
+  label: string;
+  status: AccessibilityVenueRowStatus;
+}> {
+  const req = AccessibilityRequirementsSchema.parse(requirements ?? {});
+  const active = getActiveAccessibilityRequirements(req);
+  const src = venue ?? {};
+  return active.map((key) => {
+    const v = src[key];
+    let status: AccessibilityVenueRowStatus;
+    if (v === true) status = "met";
+    else if (v === false) status = "not_met";
+    else status = "unknown";
+    return { key, label: ACCESSIBILITY_FEATURE_LABELS[key], status };
+  });
+}
+

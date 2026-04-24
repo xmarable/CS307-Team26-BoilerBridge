@@ -221,7 +221,7 @@ describe("POST /api/groups/[groupId]/itinerary/generate (Ollama stub)", () => {
     await User.deleteOne({ userId: leaderId });
   });
 
-  it("returns helpful empty-state error when no events match accessibility requirements", async () => {
+  it("keeps generation usable when accessibility metadata is unavailable", async () => {
     const { leaderId, groupID } = await seedLeaderGroupTrip({
       accessibilityRequirements: {
         wheelchairAccessible: true,
@@ -243,9 +243,10 @@ describe("POST /api/groups/[groupId]/itinerary/generate (Ollama stub)", () => {
       }),
       { params: Promise.resolve({ groupId: groupID }) },
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
     const data = await res.json();
-    expect(String(data.error)).toContain("No matching venues");
+    expect(typeof data.count).toBe("number");
+    expect(data.count).toBeGreaterThan(0);
 
     await CalendarEvent.deleteMany({ groupId: groupID });
     await MustHave.deleteMany({ groupId: groupID as never });

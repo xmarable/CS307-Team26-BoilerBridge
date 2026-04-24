@@ -97,6 +97,12 @@ export async function filterProposedEventsByAccessibility(
     const link = linkRows[i];
     const key = link?.linkedActivityId?.trim() || link?.linkedPlaceId?.trim();
     const candidate = key ? lookup.get(key) : undefined;
+    // If we have no accessibility metadata for this row, keep it instead of
+    // hard-failing the entire generated itinerary.
+    if (!candidate) {
+      keepIndices.push(i);
+      continue;
+    }
     if (matchesAccessibilityRequirements(candidate, requirements)) {
       keepIndices.push(i);
     }
