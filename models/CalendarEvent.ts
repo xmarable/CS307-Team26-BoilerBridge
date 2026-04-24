@@ -28,6 +28,8 @@ export interface ICalendarEvent extends Document {
   optionGroupId?: string;
   /** True when an itinerary row passed strict accessibility filtering */
   accessibilityMatched?: boolean;
+  /** When true, row is preserved during reorder/regeneration flows */
+  isLocked?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +89,7 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
     },
     optionGroupId: { type: String, trim: true, index: true },
     accessibilityMatched: { type: Boolean, default: undefined },
+    isLocked: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

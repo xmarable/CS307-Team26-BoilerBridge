@@ -19,7 +19,7 @@ export function formatOllamaHttpError(
   }
 
   if (status === 404) {
-    const hint = `No local model matches "${model}". Run: ollama pull ${model}`;
+    const hint = `No local model matches "${model}". Run: ollama pull ${model} — or set OLLAMA_MODEL in .env.local to a tag from \`ollama list\`.`;
     return serverMessage ? `${hint} (Ollama: ${serverMessage})` : hint;
   }
 
