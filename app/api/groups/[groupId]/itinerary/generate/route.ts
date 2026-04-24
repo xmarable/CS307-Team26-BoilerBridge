@@ -13,6 +13,10 @@ import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTime
 import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import {
+  getItineraryChronologyIssues,
+  ItineraryValidationError,
+} from "@/lib/itinerary/itineraryChronology";
 
 import CalendarEvent from "@/models/CalendarEvent";
 import MustHave from "@/models/MustHave";
@@ -127,7 +131,37 @@ export async function POST(
         tripCtx.avoidLocations ?? [],
         approvedMustHaves,
       );
+
+      let issues = getItineraryChronologyIssues(proposed, tripCtx);
+      if (issues.length > 0) {
+        console.warn("[itinerary] chronology validation failed, retrying once:", issues);
+        proposed = await generateFullTripEvents(tripCtx, approvedMustHaves, {
+          chronologyCorrectionNote: issues.join("; "),
+        });
+        proposed = normalizeProposedTimeline(proposed, { trip: tripCtx });
+        proposed = filterProposedEventsByAvoidLists(
+          proposed,
+          tripCtx.avoidActivities ?? [],
+          tripCtx.avoidLocations ?? [],
+          approvedMustHaves,
+        );
+        issues = getItineraryChronologyIssues(proposed, tripCtx);
+      }
+      if (issues.length > 0) {
+        console.error("[itinerary] chronology validation failed after retry:", issues);
+        throw new ItineraryValidationError(issues);
+      }
     } catch (e) {
+      if (e instanceof ItineraryValidationError) {
+        return NextResponse.json(
+          {
+            error:
+              "Generated itinerary could not be validated for realistic times. Try again or simplify trip settings.",
+            details: e.issues.join("; "),
+          },
+          { status: 422 },
+        );
+      }
       console.error("Ollama full itinerary generation:", e);
       const msg = e instanceof Error ? e.message : String(e);
       return NextResponse.json(

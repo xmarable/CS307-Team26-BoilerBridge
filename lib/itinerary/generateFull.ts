@@ -26,9 +26,14 @@ function validateFullResponseStrict(raw: unknown): ProposedEventInput[] | null {
   return parsed.data.events;
 }
 
+function sortByStart(events: ProposedEventInput[]): ProposedEventInput[] {
+  return [...events].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+}
+
 function buildFullTripPrompt(
   trip: TripContext,
   approvedMustHaves: MustHaveContext[],
+  chronologyCorrectionNote?: string,
 ): string {
   const budgetRange =
     trip.budgetMin != null || trip.budgetMax != null
@@ -67,10 +72,16 @@ Never use absurd same-day windows like 00:00→12:00 for a museum or neighborhoo
 
 Return a single JSON object: { "events": [ { "title": string, "description"?: string, "startTime": string (ISO 8601), "endTime": string (ISO 8601), "location"?: string, "eventType"?: string, "timezone"?: string } ] }
 
-Rules:
-- endTime strictly after startTime for every event.
-- Include approved must-haves as real events at sensible times; use eventType "travel" or "transit" for intercity legs when appropriate.
-- Set "timezone" to "${planningTz}" on every event (ISO timestamps must match that zone's local intent).`;
+Rules (must all hold):
+- The "events" array is strictly chronological by startTime across the whole trip (sort before returning).
+- Same calendar day: no overlapping intervals; leave realistic buffer travel time between stops.
+- Every event: endTime strictly after startTime; typical blocks 1–3h (meals ~1–1.5h), not impossible all-day "arrival" windows.
+- If ${trip.fromCity.trim()} and ${trip.toCity.trim()} differ: the first substantive leg from origin to destination must be a transport event (eventType "transport", "travel", or "transit", or title clearly states flight/train/bus/taxi between the two cities) and must END before any "arrival", hotel check-in, or destination-only activities that day. Do not schedule "arrival" in ${trip.toCity.trim()} before that outbound transport completes.
+- Do not invent multiple redundant "arrival" blocks the same day; at most one arrival/check-in at the destination after the inbound transport leg.
+- Use eventType "transport" (preferred), "travel", or "transit" for intercity movement; use concrete titles (e.g. "Flight: Chicago → Miami").
+- Include approved must-haves as real events at sensible times after you have logically arrived.
+- Set "timezone" to "${planningTz}" on every event (ISO timestamps must match that zone's local intent).
+${chronologyCorrectionNote ? `\n\nRegenerate fixing this validation feedback from the previous attempt:\n${chronologyCorrectionNote}\n` : ""}`;
 }
 
 function stubFullTrip(
@@ -127,12 +138,17 @@ function stubFullTrip(
 export async function generateFullTripEvents(
   trip: TripContext,
   approvedMustHaves: MustHaveContext[],
+  opts?: { chronologyCorrectionNote?: string },
 ): Promise<ProposedEventInput[]> {
   if (process.env.OLLAMA_SKIP === "1") {
     return stubFullTrip(trip, approvedMustHaves);
   }
 
-  const prompt = buildFullTripPrompt(trip, approvedMustHaves);
+  const prompt = buildFullTripPrompt(
+    trip,
+    approvedMustHaves,
+    opts?.chronologyCorrectionNote,
+  );
   const content = await ollamaChatJson([{ role: "user", content: prompt }]);
   let raw: unknown;
   try {
@@ -148,18 +164,18 @@ export async function generateFullTripEvents(
         ? ev
         : { ...ev, endTime: new Date(ev.startTime.getTime() + 90 * 60 * 1000) },
     );
-    return repaired;
+    return sortByStart(repaired);
   }
 
   const strict = validateFullResponseStrict(raw);
-  if (strict && strict.length > 0) return strict;
+  if (strict && strict.length > 0) return sortByStart(strict);
 
   const coerced = coerceOllamaJsonToProposedEvents(raw);
   if (coerced.length > 0) {
     console.warn(
       "[itinerary] Ollama JSON used relaxed coercion (alternate keys, snake_case, or nested arrays).",
     );
-    return coerced;
+    return sortByStart(coerced);
   }
 
   console.warn(
@@ -168,5 +184,5 @@ export async function generateFullTripEvents(
       ? Object.keys(raw as object).join(", ")
       : typeof raw,
   );
-  return stubFullTrip(trip, approvedMustHaves);
+  return sortByStart(stubFullTrip(trip, approvedMustHaves));
 }

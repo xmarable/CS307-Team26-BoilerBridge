@@ -8,9 +8,15 @@ import {
   zonedDayKey,
 } from "@/lib/itinerary/zonedWallClock";
 import {
+  dedupeRedundantArrivalEvents,
+  repairIntercityDayOneSequence,
+} from "@/lib/itinerary/itineraryChronology";
+import {
   interCityBlockMs,
   intraCityTransitionMs,
   isInterCityTrip,
+  isStrictOutboundIntercityLeg,
+  isStrictReturnIntercityLeg,
   isTravelLikeEvent,
   maxActivityDurationMs,
 } from "@/lib/itinerary/travelHeuristics";
@@ -39,9 +45,7 @@ function firstDayHasOutboundTravel(
   const firstKey = zonedDayKey(trip.fromDate, tz);
   return events.some((ev) => {
     if (zonedDayKey(ev.startTime, tz) !== firstKey) return false;
-    if (!isTravelLikeEvent(ev)) return false;
-    const mins = minutesSinceMidnightInZone(ev.startTime, tz);
-    return mins >= 5 * 60 && mins <= 14 * 60;
+    return isStrictOutboundIntercityLeg(ev, trip);
   });
 }
 
@@ -72,7 +76,7 @@ function injectOutboundTravel(
 
   const buffer = intraCityTransitionMs(trip.mode);
   const shifted = events.map((ev) => {
-    if (isTravelLikeEvent(ev)) return ev;
+    if (isStrictOutboundIntercityLeg(ev, trip)) return ev;
     if (zonedDayKey(ev.startTime, tz) !== zonedDayKey(trip.fromDate, tz)) return ev;
     if (ev.startTime.getTime() >= travelEnd.getTime() + buffer) return ev;
     const rawDur = Math.max(ev.endTime.getTime() - ev.startTime.getTime(), MIN_DURATION_MS);
@@ -108,7 +112,7 @@ function injectReturnTravel(
   const adjusted = events
     .map((ev) => {
       if (zonedDayKey(ev.startTime, tz) !== endKey) return ev;
-      if (isTravelLikeEvent(ev)) return ev;
+      if (isTravelLikeEvent(ev) || isStrictReturnIntercityLeg(ev, trip)) return ev;
       if (ev.endTime.getTime() <= lastActivityEndLimit) return ev;
       const rawDur = Math.max(ev.endTime.getTime() - ev.startTime.getTime(), MIN_DURATION_MS);
       const d = clampDurationMs(rawDur, ev);
@@ -126,7 +130,7 @@ function injectReturnTravel(
     .filter((ev) => ev.endTime.getTime() > ev.startTime.getTime())
     .filter((ev) => {
       if (zonedDayKey(ev.startTime, tz) !== endKey) return true;
-      if (isTravelLikeEvent(ev)) return true;
+      if (isTravelLikeEvent(ev) || isStrictReturnIntercityLeg(ev, trip)) return true;
       return ev.startTime.getTime() < retStart.getTime();
     });
 
@@ -247,6 +251,8 @@ export function repairItinerarySlice(events: ProposedEventInput[], trip: TripCon
   if (events.length === 0) return [];
   const tz = inferPlanningTimezone(trip.toCity, trip.fromCity);
   let working = sortByStart(events);
+  working = repairIntercityDayOneSequence(working, trip, tz);
+  working = dedupeRedundantArrivalEvents(working, trip, tz);
   working = bumpNightOwlStarts(working, tz);
   working = repairWithinEachDay(working, trip, tz);
   working = globalDeOverlap(working);
@@ -265,6 +271,8 @@ export function finalizeItineraryProposedEvents(
   working = injectOutboundTravel(working, trip, tz);
   working = injectReturnTravel(working, trip, tz);
   working = bumpNightOwlStarts(working, tz);
+  working = repairIntercityDayOneSequence(working, trip, tz);
+  working = dedupeRedundantArrivalEvents(working, trip, tz);
   working = repairWithinEachDay(working, trip, tz);
   working = globalDeOverlap(working);
   return working;
