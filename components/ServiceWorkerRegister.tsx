@@ -3,16 +3,34 @@
 import { useEffect } from "react";
 
 /**
- * Registers `/sw-itinerary.js` (scope `/`). Navigation cache name matches
- * `OFFLINE_NAV_CACHE_NAME` in `lib/offline/primeOfflineGroupNavigationCache.ts`.
- * Offline refresh is most reliable
- * after `npm run build && npm run start`; `next dev` may invalidate chunk URLs between loads.
+ * Registers `/sw-itinerary.js` in production only. `next dev` changes chunk URLs
+ * often; an active SW then serves stale/missing `/_next/static` assets → unstyled
+ * pages and broken hydration. Test offline with `npm run build && npm run start`.
  */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
+
+    if (process.env.NODE_ENV === "development") {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          void registration.unregister();
+        }
+      });
+      if ("caches" in window) {
+        void caches.keys().then((names) =>
+          Promise.all(
+            names
+              .filter((n) => n.startsWith("bb-offline"))
+              .map((n) => caches.delete(n)),
+          ),
+        );
+      }
+      return;
+    }
+
     let alive = true;
     void (async () => {
       try {

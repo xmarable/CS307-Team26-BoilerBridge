@@ -3,7 +3,7 @@
  * BoilerBridge offline shell:
  * - HTML navigations: network-first (redirect: manual), then Cache Storage, then minimal HTML fallback.
  * - Group pages with an explicit Save for Offline (IndexedDB) get broader cache matching on refresh offline.
- * - /_next/static/*: cache-first.
+ * - /_next/static/* and same-origin style/script/font: cache-first.
  * - Selected GET APIs: network-first, then cache — not /api/auth/*.
  */
 
@@ -52,6 +52,15 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(staticCacheFirst(req));
+    return;
+  }
+
+  if (
+    req.destination === "style" ||
+    req.destination === "script" ||
+    req.destination === "font"
+  ) {
     event.respondWith(staticCacheFirst(req));
     return;
   }

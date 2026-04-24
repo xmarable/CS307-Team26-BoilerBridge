@@ -10,6 +10,7 @@ describe("public/sw-itinerary.js", () => {
     expect(src).toContain('req.mode === "navigate"');
     expect(src).toContain('req.destination === "document"');
     expect(src).toContain('pathname.startsWith("/_next/static/")');
+    expect(src).toContain('req.destination === "style"');
     expect(src).toContain("navNetworkFirst");
     expect(src).toContain("staticCacheFirst");
     expect(src).toContain("apiNetworkFirst");
