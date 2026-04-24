@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import mongoose, { Schema, Document, Model, mongo } from "mongoose";
 
-
 export interface IReview {
   reviewId: string;
   authorId: string;
@@ -62,14 +61,14 @@ export interface IActivity extends Document {
 
 const ReviewSchema = new Schema<IReview>(
   {
-    reviewId: {type: String, default: randomUUID()},
+    reviewId: { type: String, default: randomUUID() },
     authorId: { type: String, required: true },
     author: { type: String, required: true, trim: true },
     text: { type: String, required: true, trim: true },
     rating: { type: Number, required: true },
     time: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const ReferenceLinkSchema = new Schema<IReferenceLink>(
@@ -77,7 +76,7 @@ const ReferenceLinkSchema = new Schema<IReferenceLink>(
     title: { type: String, required: true, trim: true },
     url: { type: String, required: true, trim: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const ActivitySchema = new Schema<IActivity>(
@@ -111,10 +110,11 @@ const ActivitySchema = new Schema<IActivity>(
     cons: [{ type: String }],
     summaryCachedAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Activity: Model<IActivity> =
-  mongoose.models.Activity || mongoose.model<IActivity>("Activity", ActivitySchema);
+  mongoose.models.Activity ||
+  mongoose.model<IActivity>("Activity", ActivitySchema);
 
 export default Activity;

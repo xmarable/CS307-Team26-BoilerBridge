@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 
-
 const ActivitySchema = new mongoose.Schema({
   activityId: { type: String, required: false },
   /** Stable id for PATCH /api/itinerary/:id/section (distinct from catalog activityId). Assigned in application code / ensureItinerarySectionIds. */
@@ -23,11 +22,11 @@ const TripSchema = new mongoose.Schema(
     tripId: {
       type: mongoose.Schema.Types.UUID,
       default: randomUUID(),
-      unique: true
+      unique: true,
     },
     shareLink: {
       type: String,
-      default: ""
+      default: "",
     },
     groupID: {
       type: mongoose.Schema.Types.UUID,

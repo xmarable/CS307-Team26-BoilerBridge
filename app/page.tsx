@@ -7,16 +7,13 @@ import { authOptions } from "@/lib/auth";
 export default async function LandingPage() {
   const session = (await getServerSession(authOptions)) as any;
 
-  // Temporary debug log
-  console.log("SERVER SESSION:", session ? "Active" : "None");
-
-  if (session) {
+  if (session?.user?.email) {
     redirect("/dashboard");
     return null; // Ensure we don't render anything while redirecting
   }
   return (
     <div>
-      <Header />
+      <Header session={session} />
       <Landing />
     </div>
   );

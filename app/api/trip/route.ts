@@ -275,7 +275,34 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+function tripListItem(t: Record<string, unknown>) {
+  return {
+    tripID: t._id?.toString(),
+    userId: t.userId?.toString(),
+    groupID: t.groupID?.toString(),
+    fromCity: t.fromCity,
+    toCity: t.toCity,
+    fromDate: t.fromDate,
+    toDate: t.toDate,
+    mode: t.mode,
+    budget: t.budget,
+    tripConfirmed: t.tripConfirmed,
+    primaryItinerary: t.primaryItinerary,
+    rainyDayItinerary: t.rainyDayItinerary,
+    avoidActivities: t.avoidActivities ?? [],
+    avoidLocations: t.avoidLocations ?? [],
+    budgetMin: t.budgetMin,
+    budgetMax: t.budgetMax,
+  };
+}
+
+/**
+ * List trips the user "owns" in `Trip.userId` OR the trip for a group they
+ * belong to. The latter is required for group page itinerary UI: otherwise only
+ * the member who created the row sees it in GET /api/trip and
+ * `useGroupItineraryOffline` never sets tripActive.
+ */
+export async function GET(req: NextRequest) {
   try {
     await dbConnect();
 
@@ -286,26 +313,36 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const groupId = req.nextUrl.searchParams.get("groupId");
+
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    const payload = trips.map((t: Record<string, unknown>) => ({
-      tripID: t._id?.toString(),
-      userId: t.userId?.toString(),
-      groupID: t.groupID?.toString(),
-      fromCity: t.fromCity,
-      toCity: t.toCity,
-      fromDate: t.fromDate,
-      toDate: t.toDate,
-      mode: t.mode,
-      budget: t.budget,
-      tripConfirmed: t.tripConfirmed,
-      primaryItinerary: t.primaryItinerary,
-      rainyDayItinerary: t.rainyDayItinerary,
-      avoidActivities: t.avoidActivities ?? [],
-      avoidLocations: t.avoidLocations ?? [],
-      budgetMin: t.budgetMin,
-      budgetMax: t.budgetMax,
-    }));
+    const payload = trips.map((t) => tripListItem(t as Record<string, unknown>));
+    const seen = new Set(
+      payload.map((p) => p.tripID).filter((id): id is string => !!id),
+    );
+
+    if (groupId) {
+      const permissionResult = (await getMemberPermissions(
+        groupId,
+        userId,
+      )) as { error?: string; status?: number };
+      if (!permissionResult.error) {
+        const forGroup = await Trip.findOne({ groupID: groupId as never })
+          .sort({ createdAt: -1 })
+          .lean();
+        if (forGroup) {
+          const id = (forGroup as { _id: { toString(): string } })._id
+            .toString();
+          if (!seen.has(id)) {
+            seen.add(id);
+            payload.push(
+              tripListItem(forGroup as Record<string, unknown>),
+            );
+          }
+        }
+      }
+    }
 
     return NextResponse.json(payload, { status: 200 });
   } catch (err: any) {
