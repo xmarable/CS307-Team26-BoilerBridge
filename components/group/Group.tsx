@@ -53,6 +53,7 @@ import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
 import { RainyDayToggle } from "@/components/RainyDayToggle";
 import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { ItineraryOfflineControls } from "@/components/offline/ItineraryOfflineControls";
 import { setGroupTripPresence } from "@/lib/offline/groupTripPresence";
 import {
@@ -112,6 +113,7 @@ export default function GroupDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const groupId = params?.groupId as string | undefined;
+  const isOnline = useOnlineStatus();
 
   const [group, setGroup] = useState<GroupState | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -174,13 +176,36 @@ export default function GroupDashboard() {
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    const looksOffline =
+      !isOnline ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (looksOffline) {
+      const cached = readGroupShell<GroupState>(groupId);
+      if (
+        cached &&
+        typeof cached === "object" &&
+        typeof cached.groupID === "string"
+      ) {
+        setGroup(cached);
+        setError(null);
+      } else {
+        setGroup(null);
+        setError(
+          "You're offline. Open this group once while online so it can load here without internet.",
+        );
+      }
       setLoading(false);
       return;
     }
+    const netSignal =
+      typeof AbortSignal !== "undefined" &&
+      typeof AbortSignal.timeout === "function"
+        ? AbortSignal.timeout(12_000)
+        : undefined;
     try {
       const res = await fetch(`/api/groups/${groupId}`, {
         credentials: "include",
+        signal: netSignal,
       });
       if (res.status === 401) return setError("Please log in.");
       if (res.status === 403 || res.status === 404) {
@@ -195,15 +220,28 @@ export default function GroupDashboard() {
         cacheGroupShell(groupId, data.group);
       }
     } catch {
-      setError("Failed to load group.");
+      const cached = readGroupShell<GroupState>(groupId);
+      if (
+        cached &&
+        typeof cached === "object" &&
+        typeof cached.groupID === "string"
+      ) {
+        setGroup(cached);
+        setError(null);
+      } else {
+        setError("Failed to load group.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [groupId, router]);
+  }, [groupId, router, isOnline]);
 
   useLayoutEffect(() => {
-    if (!groupId || typeof navigator === "undefined") return;
-    if (navigator.onLine !== false) return;
+    if (!groupId) return;
+    const looksOffline =
+      !isOnline ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (!looksOffline) return;
     const cached = readGroupShell<GroupState>(groupId);
     if (
       cached &&
@@ -219,7 +257,7 @@ export default function GroupDashboard() {
       );
     }
     setLoading(false);
-  }, [groupId]);
+  }, [groupId, isOnline]);
 
   const fetchFriends = useCallback(async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -234,18 +272,41 @@ export default function GroupDashboard() {
     }
   }, []);
 
+  const setToggleState = useCallback(async () => {
+    if (!isOnline || !groupId) return;
+    try {
+      const shareSignal =
+        typeof AbortSignal !== "undefined" &&
+        typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(10_000)
+          : undefined;
+      const res = await fetch(`/api/itineraries/share?groupId=${groupId}`, {
+        signal: shareSignal,
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setAllowIteneraryShare(data.isActive);
+    } catch {
+      /* ignore */
+    }
+  }, [groupId, isOnline]);
+
   useEffect(() => {
     if (!groupId) {
       setLoading(false);
       return;
     }
-    if (typeof navigator !== "undefined" && navigator.onLine !== false) {
-      setLoading(true);
+    if (!isOnline) {
+      setLoading(false);
+      return;
     }
-    setToggleState();
-    fetchGroup();
-    fetchFriends();
-  }, [fetchGroup, fetchFriends, groupId]);
+    setLoading(true);
+    void setToggleState();
+    void fetchGroup();
+    void fetchFriends();
+  }, [fetchGroup, fetchFriends, groupId, isOnline, setToggleState]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -269,16 +330,6 @@ export default function GroupDashboard() {
     } finally {
       setIsInviting(false);
     }
-  };
-
-  const setToggleState = async () => {
-    const res = await fetch(`/api/itineraries/share?groupId=${groupId}`);
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    console.log(data.isActive);
-    setAllowIteneraryShare(data.isActive);
   };
 
   const handleToggle = async () => {
