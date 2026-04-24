@@ -53,6 +53,6 @@
   "mounts": [
     "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],
-  "postCreateCommand": "sudo chown -R node node_modules && curl -sL https://github.com/digitalocean/doctl/releases/download/v1.110.0/doctl-1.110.0-linux-amd64.tar.gz | tar -xzv && sudo mv doctl /usr/local/bin && npm install",
+  "postCreateCommand": "sudo chown -R node node_modules .next && curl -sL https://github.com/digitalocean/doctl/releases/download/v1.110.0/doctl-1.110.0-linux-amd64.tar.gz | tar -xzv && sudo mv doctl /usr/local/bin && npm install",
   "remoteUser": "node"
 }

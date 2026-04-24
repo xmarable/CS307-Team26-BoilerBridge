@@ -4,7 +4,6 @@
 // import your global styles here
 import "@/app/globals.css";
 
-
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
@@ -178,38 +177,13 @@ export default function GroupDashboard() {
     })();
   }, [groupId, tripIdInQuery, refreshTripItinerary]);
 
-  const refreshGroupTripDetail = useCallback(async () => {
-    if (!groupId || !tripActive) return;
-    try {
-      const listRes = await fetch("/api/trip", { credentials: "include" });
-      if (!listRes.ok) return;
-      const trips = await listRes.json();
-      if (!Array.isArray(trips)) return;
-      const mine = trips.find(
-        (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
-      );
-      const id = mine?.tripID;
-      if (!id || typeof id !== "string") return;
-      const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
-      if (!dRes.ok) return;
-      const d = await dRes.json();
-      if (
-        d?._id &&
-        Array.isArray(d.primaryItinerary) &&
-        Array.isArray(d.rainyDayItinerary)
-      ) {
-        setGroupTripDetail({
-          _id: String(d._id),
-          primaryItinerary: d.primaryItinerary,
-          rainyDayItinerary: d.rainyDayItinerary,
-          itineraryVersion:
-            typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
-        });
-      }
-    } catch {
-      /* ignore */
+  useEffect(() => {
+    if (!groupId) {
+      setLoading(false);
+      return;
     }
-  }, [groupId, tripActive]);
+    void refreshTripItinerary();
+  }, [groupId, tripActive, activeSection, refreshTripItinerary]);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
@@ -335,8 +309,8 @@ export default function GroupDashboard() {
       setLoading(false);
       return;
     }
-    void refreshGroupTripDetail();
-  }, [groupId, tripActive, activeSection, refreshGroupTripDetail]);
+    void refreshTripItinerary();
+  }, [groupId, tripActive, activeSection, refreshTripItinerary]);
 
   useEffect(() => {
     if (!groupId) {
@@ -383,7 +357,7 @@ export default function GroupDashboard() {
       setAllowIteneraryShare(nextToggle);
       const res = await fetch(`/api/itineraries/share`, {
         method: "PATCH",
-        body: JSON.stringify({ groupId: groupId, isActive: nextToggle })
+        body: JSON.stringify({ groupId: groupId, isActive: nextToggle }),
       });
     } catch (e) {}
   };
@@ -441,14 +415,14 @@ export default function GroupDashboard() {
   const handleGetShareLink = async () => {
     const res = await fetch(`/api/itineraries/share`, {
       method: "POST",
-      body: JSON.stringify({ groupId: groupId })
+      body: JSON.stringify({ groupId: groupId }),
     });
 
     if (!res.ok) return;
     const data = await res.json();
 
     await navigator.clipboard.writeText(data.shareURL);
-  }
+  };
 
   if (loading)
     return (
@@ -759,7 +733,7 @@ export default function GroupDashboard() {
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">
-                {(tripActive || isOffline) ? (
+                {tripActive || isOffline ? (
                   <ItineraryOfflineControls
                     isOnline={!isOffline}
                     userHasOfflineSave={userHasOfflineSave}
@@ -801,10 +775,13 @@ export default function GroupDashboard() {
                         Create Trip
                       </Link>
                       <div className="flex flex-l gap-4">
-                        <button className="text-amber-700 text-sm" onClick={() => handleGetShareLink()}>Copy Share Link</button>
-                        <p className="text-sm text-amber-700">
-                          Allow Share: 
-                        </p>
+                        <button
+                          className="text-amber-700 text-sm"
+                          onClick={() => handleGetShareLink()}
+                        >
+                          Copy Share Link
+                        </button>
+                        <p className="text-sm text-amber-700">Allow Share:</p>
                         <button
                           type="button"
                           onClick={() => handleToggle()}
@@ -833,11 +810,11 @@ export default function GroupDashboard() {
                     }
                     canEdit={userRole === "Leader" || userRole === "Admin"}
                     isLeader={isLeader}
-                    onTripPlanSynced={() => void refreshGroupTripDetail()}
+                    onTripPlanSynced={() => void refreshTripItinerary()}
                   />
                 </div>
               </section>
-              
+
               <section className="space-y-6 flex-1">
                 <div className="flex items-center gap-3 px-2">
                   <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
@@ -858,7 +835,7 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
-              {(tripActive || isOffline) ? (
+              {tripActive || isOffline ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">

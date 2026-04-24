@@ -37,7 +37,10 @@ const RegenerateBodySchema = z
       if (data.dateRange) return true;
       return false;
     },
-    { message: "Provide non-empty eventIds or dateRange (optionally with eventType)" },
+    {
+      message:
+        "Provide non-empty eventIds or dateRange (optionally with eventType)",
+    },
   );
 
 function serializeEvent(ev: {
@@ -118,7 +121,9 @@ export async function POST(
     }
     if (!permissionResult.canEdit) {
       return NextResponse.json(
-        { error: "Forbidden: insufficient permissions to regenerate itinerary" },
+        {
+          error: "Forbidden: insufficient permissions to regenerate itinerary",
+        },
         { status: 403 },
       );
     }
@@ -128,12 +133,18 @@ export async function POST(
       .lean();
     if (!trip) {
       return NextResponse.json(
-        { error: "No trip found for this group; create a trip before regenerating." },
+        {
+          error:
+            "No trip found for this group; create a trip before regenerating.",
+        },
         { status: 400 },
       );
     }
 
-    const mustHaveQuery: Record<string, unknown> = { groupId, status: "approved" };
+    const mustHaveQuery: Record<string, unknown> = {
+      groupId,
+      status: "approved",
+    };
     const mustHaveDocs = await MustHave.find(mustHaveQuery as never).lean();
 
     let targetDocs: Array<{
@@ -149,7 +160,9 @@ export async function POST(
     }>;
 
     if (data.eventIds && data.eventIds.length > 0) {
-      const invalid = data.eventIds.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+      const invalid = data.eventIds.filter(
+        (id) => !mongoose.Types.ObjectId.isValid(id),
+      );
       if (invalid.length > 0) {
         return NextResponse.json(
           { error: "Invalid event id(s)", invalid },
@@ -169,7 +182,23 @@ export async function POST(
           { status: 400 },
         );
       }
-      targetDocs = found as typeof targetDocs;
+      const lockedEvents = found.filter(
+        (e) => (e as { isLocked?: boolean }).isLocked,
+      );
+      const unlocked = found.filter(
+        (e) => !(e as { isLocked?: boolean }).isLocked,
+      );
+
+      if (unlocked.length === 0) {
+        return NextResponse.json(
+          {
+            error: "All selected events are locked and cannot be regenerated.",
+          },
+          { status: 400 },
+        );
+      }
+
+      targetDocs = unlocked as typeof targetDocs;
     } else {
       const { from, to } = data.dateRange!;
       if (to <= from) {
@@ -182,11 +211,14 @@ export async function POST(
         groupId,
         startTime: { $lt: to },
         endTime: { $gt: from },
+        isLocked: { $ne: true },
       };
       if (data.eventType) {
         q.eventType = data.eventType;
       }
-      targetDocs = (await CalendarEvent.find(q).sort({ startTime: 1 }).lean()) as typeof targetDocs;
+      targetDocs = (await CalendarEvent.find(q)
+        .sort({ startTime: 1 })
+        .lean()) as typeof targetDocs;
       if (targetDocs.length === 0) {
         return NextResponse.json(
           { error: "No events match the given filters" },
@@ -225,14 +257,20 @@ export async function POST(
       approvedMustHaves,
       targetEvents,
     });
-    proposed = normalizeProposedTimeline(proposed, { trip: tripCtx, slice: true });
+    proposed = normalizeProposedTimeline(proposed, {
+      trip: tripCtx,
+      slice: true,
+    });
     proposed = filterProposedEventsByAvoidLists(
       proposed,
       tripCtx.avoidActivities ?? [],
       tripCtx.avoidLocations ?? [],
       approvedMustHaves,
     );
-    let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
+    let linkRows = await resolveActivityLinksForProposals(
+      proposed,
+      approvedMustHaves,
+    );
     linkRows = await augmentResolvedLinksWithTextSearch(proposed, linkRows, {
       toCity: tripCtx.toCity,
       fromCity: tripCtx.fromCity,

@@ -13,8 +13,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CloudRain, Sun, Columns, ChevronRight, Pencil } from "lucide-react";
+import {
+  CloudRain,
+  Sun,
+  Columns,
+  ChevronRight,
+  Pencil,
+  GripVertical,
+} from "lucide-react";
 import { isValidActivityMongoId } from "@/lib/activityObjectId";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export type ItineraryActivityRow = {
   name?: string;
@@ -85,7 +107,23 @@ function groupActsByDay(acts: ItineraryActivityRow[]) {
   );
 }
 
-function ItineraryCard({
+// redistributes the time slots from the original order to the new order
+function redistributeTimes(
+  original: ItineraryActivityRow[],
+  reordered: ItineraryActivityRow[],
+): ItineraryActivityRow[] {
+  const slots = original.map((a) => ({
+    startTime: a.startTime,
+    endTime: a.endTime,
+  }));
+  return reordered.map((act, idx) => ({
+    ...act,
+    startTime: slots[idx]?.startTime ?? act.startTime,
+    endTime: slots[idx]?.endTime ?? act.endTime,
+  }));
+}
+
+function SortableCard({
   act,
   className,
   subtitle,
@@ -100,6 +138,24 @@ function ItineraryCard({
   canEdit?: boolean;
   onEditActivity?: (act: ItineraryActivityRow) => void;
 }) {
+  const id =
+    act.itineraryActivityId ?? `${act.dayId}-${act.name}-${act.startTime}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: !canEdit });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
   const detailHref = isValidActivityMongoId(act.activityId)
     ? `/dashboard/activities/${act.activityId}`
     : null;
@@ -109,7 +165,9 @@ function ItineraryCard({
   const titleBlock = (
     <div>
       <p className="font-medium">{act.name ?? "Activity"}</p>
-      <p className={`text-xs ${subtitleClassName ?? "text-gray-500"}`}>{subline}</p>
+      <p className={`text-xs ${subtitleClassName ?? "text-gray-500"}`}>
+        {subline}
+      </p>
       {act.startTime ? (
         <p className="text-xs text-gray-400 mt-1">
           {new Date(act.startTime).toLocaleString()}
@@ -121,45 +179,71 @@ function ItineraryCard({
     </div>
   );
 
-  const body = (
-    <CardContent className="p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          {detailHref ? (
-            <Link
-              href={detailHref}
-              className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-            >
-              <div className="flex items-start justify-between gap-2">
-                {titleBlock}
-                <ChevronRight
-                  className="h-4 w-4 text-amber-600 shrink-0 mt-1"
-                  aria-hidden
-                />
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={className}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-2">
+            {canEdit ? (
+              <button
+                type="button"
+                className="mt-1 shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-amber-500 transition-colors"
+                aria-label="Drag to reorder"
+                {...attributes}
+                {...listeners}
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            ) : (
+              <div
+                className="mt-1 shrink-0 text-gray-200 cursor-not-allowed"
+                title="Read-only: you cannot reorder activities"
+              >
+                <GripVertical className="h-4 w-4" />
               </div>
-              <p className="text-xs text-amber-700 mt-2 font-medium">View details</p>
-            </Link>
-          ) : (
-            titleBlock
-          )}
-        </div>
-        {canEdit && onEditActivity ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="shrink-0 rounded-lg border-amber-200 text-amber-800"
-            onClick={() => onEditActivity(act)}
-          >
-            <Pencil className="h-3.5 w-3.5 mr-1" />
-            Edit
-          </Button>
-        ) : null}
-      </div>
-    </CardContent>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  {detailHref ? (
+                    <Link
+                      href={detailHref}
+                      className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        {titleBlock}
+                        <ChevronRight
+                          className="h-4 w-4 text-amber-600 shrink-0 mt-1"
+                          aria-hidden
+                        />
+                      </div>
+                      <p className="text-xs text-amber-700 mt-2 font-medium">
+                        View details
+                      </p>
+                    </Link>
+                  ) : (
+                    titleBlock
+                  )}
+                </div>
+                {canEdit && onEditActivity ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 rounded-lg border-amber-200 text-amber-800"
+                    onClick={() => onEditActivity(act)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    Edit
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
-
-  return <Card className={className}>{body}</Card>;
 }
 
 export function RainyDayToggle({
@@ -171,14 +255,15 @@ export function RainyDayToggle({
   const [viewMode, setViewMode] = useState<"primary" | "rainy" | "compare">(
     "primary",
   );
-  const [localTrip, setLocalTrip] = useState<RainyDayTripInput>(() => cloneTrip(trip));
+  const [localTrip, setLocalTrip] = useState<RainyDayTripInput>(() =>
+    cloneTrip(trip),
+  );
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [dayDialogOpen, setDayDialogOpen] = useState(false);
   const [editKind, setEditKind] = useState<ItineraryKind>("primary");
-  const [editingActivity, setEditingActivity] = useState<ItineraryActivityRow | null>(
-    null,
-  );
+  const [editingActivity, setEditingActivity] =
+    useState<ItineraryActivityRow | null>(null);
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formLocation, setFormLocation] = useState("");
@@ -188,6 +273,10 @@ export function RainyDayToggle({
   const [formOutdoor, setFormOutdoor] = useState(false);
   const [formDayOutdoor, setFormDayOutdoor] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   useEffect(() => {
     setLocalTrip(cloneTrip(trip));
@@ -209,12 +298,12 @@ export function RainyDayToggle({
       rainyDayItinerary?: ItineraryActivityRow[];
     }) => {
       setLocalTrip((prev) => ({
-        primaryItinerary: (payload.primaryItinerary ?? prev.primaryItinerary).map(
-          (a) => ({ ...a }),
-        ),
-        rainyDayItinerary: (payload.rainyDayItinerary ?? prev.rainyDayItinerary).map(
-          (a) => ({ ...a }),
-        ),
+        primaryItinerary: (
+          payload.primaryItinerary ?? prev.primaryItinerary
+        ).map((a) => ({ ...a })),
+        rainyDayItinerary: (
+          payload.rainyDayItinerary ?? prev.rainyDayItinerary
+        ).map((a) => ({ ...a })),
         itineraryVersion: payload.itineraryVersion,
       }));
     },
@@ -238,7 +327,9 @@ export function RainyDayToggle({
       };
       if (!res.ok) {
         throw new Error(
-          typeof data?.error === "string" ? data.error : `Request failed (${res.status})`,
+          typeof data?.error === "string"
+            ? data.error
+            : `Request failed (${res.status})`,
         );
       }
       if (typeof data.itineraryVersion !== "number") {
@@ -251,14 +342,87 @@ export function RainyDayToggle({
       });
       onItinerarySynced?.({
         itineraryVersion: data.itineraryVersion,
-        primaryItinerary: (data.primaryItinerary ?? []) as ItineraryActivityRow[],
-        rainyDayItinerary: (data.rainyDayItinerary ?? []) as ItineraryActivityRow[],
+        primaryItinerary: (data.primaryItinerary ??
+          []) as ItineraryActivityRow[],
+        rainyDayItinerary: (data.rainyDayItinerary ??
+          []) as ItineraryActivityRow[],
       });
     },
     [tripId, applyServerPayload, onItinerarySynced],
   );
 
-  const openActivityEditor = (kind: ItineraryKind, act: ItineraryActivityRow) => {
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent, kind: ItineraryKind, dayId: string) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const key = kind === "primary" ? "primaryItinerary" : "rainyDayItinerary";
+      const prev = cloneTrip(localTrip);
+
+      setLocalTrip((lt) => {
+        const arr = lt[key];
+        const dayActs = arr.filter((a) => a.dayId === dayId);
+        const rest = arr.filter((a) => a.dayId !== dayId);
+
+        const oldIdx = dayActs.findIndex(
+          (a) =>
+            (a.itineraryActivityId ?? `${a.dayId}-${a.name}-${a.startTime}`) ===
+            active.id,
+        );
+        const newIdx = dayActs.findIndex(
+          (a) =>
+            (a.itineraryActivityId ?? `${a.dayId}-${a.name}-${a.startTime}`) ===
+            over.id,
+        );
+        if (oldIdx === -1 || newIdx === -1) return lt;
+
+        const reordered = arrayMove(dayActs, oldIdx, newIdx);
+        const withTimes = redistributeTimes(dayActs, reordered);
+
+        return { ...lt, [key]: [...rest, ...withTimes] };
+      });
+
+      try {
+        const arr = prev[key];
+        const dayActs = arr.filter((a) => a.dayId === dayId);
+        const oldIdx = dayActs.findIndex(
+          (a) =>
+            (a.itineraryActivityId ?? `${a.dayId}-${a.name}-${a.startTime}`) ===
+            active.id,
+        );
+        const newIdx = dayActs.findIndex(
+          (a) =>
+            (a.itineraryActivityId ?? `${a.dayId}-${a.name}-${a.startTime}`) ===
+            over.id,
+        );
+        if (oldIdx === -1 || newIdx === -1) return;
+
+        const reordered = arrayMove(dayActs, oldIdx, newIdx);
+        const withTimes = redistributeTimes(dayActs, reordered);
+
+        await patchSection({
+          scope: "reorder",
+          dayId,
+          itineraryKind: kind,
+          version: localTrip.itineraryVersion ?? 0,
+          order: withTimes.map((a) => ({
+            itineraryActivityId: a.itineraryActivityId,
+            startTime: a.startTime,
+            endTime: a.endTime,
+          })),
+        });
+      } catch (e) {
+        setLocalTrip(prev);
+        setSectionError(e instanceof Error ? e.message : "Reorder failed");
+      }
+    },
+    [localTrip, patchSection],
+  );
+
+  const openActivityEditor = (
+    kind: ItineraryKind,
+    act: ItineraryActivityRow,
+  ) => {
     setEditKind(kind);
     setEditingActivity(act);
     setFormName(act.name ?? "");
@@ -271,7 +435,11 @@ export function RainyDayToggle({
     setSectionError(null);
   };
 
-  const openDayEditor = (kind: ItineraryKind, dayId: string, acts: ItineraryActivityRow[]) => {
+  const openDayEditor = (
+    kind: ItineraryKind,
+    dayId: string,
+    acts: ItineraryActivityRow[],
+  ) => {
     setEditKind(kind);
     setEditingDayId(dayId);
     const outdoorCount = acts.filter((a) => a.isOutdoor).length;
@@ -281,7 +449,11 @@ export function RainyDayToggle({
   };
 
   const handleSaveActivity = async () => {
-    if (!tripId || !editingActivity?.dayId || !editingActivity.itineraryActivityId) {
+    if (
+      !tripId ||
+      !editingActivity?.dayId ||
+      !editingActivity.itineraryActivityId
+    ) {
       setSectionError("This activity is missing section ids; reload the page.");
       return;
     }
@@ -299,9 +471,12 @@ export function RainyDayToggle({
     };
 
     setLocalTrip((lt) => {
-      const key = editKind === "primary" ? "primaryItinerary" : "rainyDayItinerary";
+      const key =
+        editKind === "primary" ? "primaryItinerary" : "rainyDayItinerary";
       const next = lt[key].map((a) =>
-        a.itineraryActivityId === optimistic.itineraryActivityId ? { ...optimistic } : a,
+        a.itineraryActivityId === optimistic.itineraryActivityId
+          ? { ...optimistic }
+          : a,
       );
       return { ...lt, [key]: next };
     });
@@ -336,7 +511,8 @@ export function RainyDayToggle({
   const handleSaveDay = async () => {
     if (!tripId || !editingDayId) return;
     const prev = cloneTrip(localTrip);
-    const key = editKind === "primary" ? "primaryItinerary" : "rainyDayItinerary";
+    const key =
+      editKind === "primary" ? "primaryItinerary" : "rainyDayItinerary";
     setLocalTrip((lt) => ({
       ...lt,
       [key]: lt[key].map((a) =>
@@ -362,52 +538,79 @@ export function RainyDayToggle({
     }
   };
 
-  const renderPlan = (kind: ItineraryKind, byDay: [string, ItineraryActivityRow[]][]) => {
+  const renderPlan = (
+    kind: ItineraryKind,
+    byDay: [string, ItineraryActivityRow[]][],
+  ) => {
     const showEdit = !!(canEdit && tripId);
     return (
       <div className="space-y-6">
-        {byDay.map(([dayId, acts], idx) => (
-          <div key={dayId} className="space-y-2">
-            <div className="flex items-center justify-between gap-2 px-1">
-              <h4 className="text-sm font-bold text-gray-700">
-                Day {idx + 1}
-                {acts[0]?.startTime
-                  ? ` · ${new Date(acts[0].startTime).toLocaleDateString()}`
-                  : null}
-              </h4>
-              {showEdit && dayId !== "_ungrouped" ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-amber-700"
-                  onClick={() => openDayEditor(kind, dayId, acts)}
+        {byDay.map(([dayId, acts], idx) => {
+          const sortableIds = acts.map(
+            (a) =>
+              a.itineraryActivityId ?? `${a.dayId}-${a.name}-${a.startTime}`,
+          );
+          return (
+            <div key={dayId} className="space-y-2">
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h4 className="text-sm font-bold text-gray-700">
+                  Day {idx + 1}
+                  {acts[0]?.startTime
+                    ? ` · ${new Date(acts[0].startTime).toLocaleDateString()}`
+                    : null}
+                </h4>
+                {showEdit && dayId !== "_ungrouped" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-amber-700"
+                    onClick={() => openDayEditor(kind, dayId, acts)}
+                  >
+                    Edit day
+                  </Button>
+                ) : null}
+              </div>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(e) => void handleDragEnd(e, kind, dayId)}
+              >
+                <SortableContext
+                  items={sortableIds}
+                  strategy={verticalListSortingStrategy}
                 >
-                  Edit day
-                </Button>
-              ) : null}
+                  <div className="space-y-2">
+                    {acts.map((act) => (
+                      <SortableCard
+                        key={
+                          act.itineraryActivityId ??
+                          `${dayId}-${act.name}-${act.startTime}`
+                        }
+                        act={act}
+                        className={
+                          kind === "rainy"
+                            ? "border-blue-200 bg-blue-50/30"
+                            : act.isOutdoor
+                              ? "border-amber-200"
+                              : ""
+                        }
+                        subtitle={
+                          kind === "rainy" ? "Indoor Alternative" : undefined
+                        }
+                        subtitleClassName={
+                          kind === "rainy" ? "text-blue-600" : undefined
+                        }
+                        canEdit={showEdit}
+                        onEditActivity={(a) => openActivityEditor(kind, a)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
-            <div className="space-y-2">
-              {acts.map((act) => (
-                <ItineraryCard
-                  key={act.itineraryActivityId ?? `${dayId}-${act.name}-${act.startTime}`}
-                  act={act}
-                  className={
-                    kind === "rainy"
-                      ? "border-blue-200 bg-blue-50/30"
-                      : act.isOutdoor
-                        ? "border-amber-200"
-                        : ""
-                  }
-                  subtitle={kind === "rainy" ? "Indoor Alternative" : undefined}
-                  subtitleClassName={kind === "rainy" ? "text-blue-600" : undefined}
-                  canEdit={showEdit}
-                  onEditActivity={(a) => openActivityEditor(kind, a)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -453,7 +656,9 @@ export function RainyDayToggle({
 
         {(viewMode === "rainy" || viewMode === "compare") && (
           <div className="space-y-2">
-            <h3 className="font-bold text-center text-blue-600">Rainy Day Plan</h3>
+            <h3 className="font-bold text-center text-blue-600">
+              Rainy Day Plan
+            </h3>
             {renderPlan("rainy", rainyByDay)}
           </div>
         )}
@@ -525,7 +730,10 @@ export function RainyDayToggle({
             </label>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setActivityDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setActivityDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button

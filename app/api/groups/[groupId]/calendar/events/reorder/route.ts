@@ -7,12 +7,16 @@ import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import CalendarEvent from "@/models/CalendarEvent";
 
+import { Types } from "mongoose";
+
 const ReorderSchema = z.object({
   orders: z
     .array(
       z.object({
         eventId: z.string().min(1),
         displayOrder: z.number().int().min(0),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
       }),
     )
     .min(1),
@@ -36,7 +40,10 @@ export async function PATCH(
 
     const perms = await getMemberPermissions(groupId, userId);
     if ("error" in perms) {
-      return NextResponse.json({ error: perms.error }, { status: perms.status });
+      return NextResponse.json(
+        { error: perms.error },
+        { status: perms.status },
+      );
     }
     if (!perms.canEdit) {
       return NextResponse.json(
@@ -57,12 +64,35 @@ export async function PATCH(
     const { orders } = parsed.data;
 
     // Bulk-update displayOrder for each event — verify each belongs to this group
-    const bulkOps = orders.map(({ eventId, displayOrder }) => ({
-      updateOne: {
-        filter: { _id: eventId, groupId },
-        update: { $set: { displayOrder } },
-      },
-    }));
+    const bulkOps = orders.map(
+      ({
+        eventId,
+        displayOrder,
+        startTime,
+        endTime,
+      }: {
+        eventId: string;
+        displayOrder: number;
+        startTime?: string;
+        endTime?: string;
+      }) => ({
+        updateOne: {
+          filter: {
+            _id: Types.ObjectId.isValid(eventId)
+              ? new Types.ObjectId(eventId)
+              : eventId,
+            groupId,
+          },
+          update: {
+            $set: {
+              displayOrder,
+              ...(startTime ? { startTime: new Date(startTime) } : {}),
+              ...(endTime ? { endTime: new Date(endTime) } : {}),
+            },
+          },
+        },
+      }),
+    );
 
     await CalendarEvent.bulkWrite(bulkOps);
 

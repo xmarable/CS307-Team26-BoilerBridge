@@ -16,7 +16,7 @@
   "type": "module",
   "scripts": {
     "preinstall": "node -e \"if(process.version.split('.')[0].replace('v','') < 22) { console.error('\\n🚨 FATAL ERROR: node 22 is required. u r on ' + process.version + '\\nplease update node or use nvm install 22 && nvm use 22\\n'); process.exit(1); }\"",
-    "postinstall": "npx patch-package",
+    "postinstall": "npx --yes patch-package",
     "dev": "next dev --webpack",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
@@ -24,6 +24,7 @@
     "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config=jest.config.cjs --forceExit --colors --verbose 2>&1",
     "test:watch": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "test:precommit": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config=jest.config.cjs --forceExit --colors --verbose",
+    "serve": "npm run build && mkdir -p .next/standalone/.next/static && cp -r .next/static/. .next/standalone/.next/static/ && cp -r public/. .next/standalone/public/ 2>/dev/null || true && cp .env.local .next/standalone/.env 2>/dev/null || true && HOSTNAME=0.0.0.0 node .next/standalone/server.js",
     "lint": "eslint",
     "prepare": "husky"
   },

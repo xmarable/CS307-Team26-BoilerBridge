@@ -82,7 +82,7 @@ beforeEach(() => {
 
 // ─── AC1: Leader can remove a member immediately ───────────────────────────
 
-describe("AC1 — leader removes a member", () => {
+describe("AC1 — Given I am the group leader, When I click remove next to a member's name, Then they are immediately kicked from the group", () => {
   it("returns 200 and member is absent from the updated membersList", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
@@ -144,7 +144,7 @@ describe("AC1 — leader removes a member", () => {
 
 // ─── AC2: Admin / Viewer cannot trigger member removal ─────────────────────
 
-describe("AC2 — non-leader cannot remove members", () => {
+describe("AC2 — Given I am a regular Admin or Viewer, When I view the member list, Then the remove button is hidden and the API rejects the request with 403", () => {
   it("returns 403 when an Admin attempts to remove a Viewer", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
@@ -274,7 +274,7 @@ describe("AC2 — non-leader cannot remove members", () => {
 
 // ─── AC3: Removed user loses access to the group immediately ───────────────
 
-describe("AC3 — removed user cannot access group", () => {
+describe("AC3 — Given a user is removed, When they try to access the group link, Then they are redirected to their personal dashboard", () => {
   it("returns 403 on GET /api/groups/[groupId] after removal", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({

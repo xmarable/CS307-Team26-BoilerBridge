@@ -110,7 +110,7 @@ export function SignUp() {
                   <Input
                     id="username"
                     {...register("username")}
-                    placeholder="Xavy123"
+                    placeholder="username"
                     className="mt-1.5 text-black placeholder:text-gray-400 border-gray-300"
                   />
                   {errors.username && (

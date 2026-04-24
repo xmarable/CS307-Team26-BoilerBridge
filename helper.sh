@@ -3,12 +3,17 @@
 MONGO_URI=$(grep '^MONGODB_URI=' .env.local | cut -d '=' -f2-)
 
 if [ -z "$1" ]; then
-  echo "usage: ./dev.sh --mongo | --test"
+  echo "usage: ./dev.sh --mongo | --test | --tree"
   exit 1
 fi
 
 if [ "$1" == "--mongo" ]; then
   npx mongosh "$MONGO_URI"
+  exit 0
+fi
+
+if [ "$1" == "--tree" ]; then
+  tree -I node_modules,.next,.wolf,dist,build,coverage,public,src,__tests__,__mocks__,.claude,
   exit 0
 fi
 
@@ -37,5 +42,5 @@ if [ "$1" == "--test" ]; then
 fi
 
 echo "unknown argument: $1"
-echo "usage: ./dev.sh --mongo | --test"
+echo "usage: ./dev.sh --mongo | --test | --tree"
 exit 1

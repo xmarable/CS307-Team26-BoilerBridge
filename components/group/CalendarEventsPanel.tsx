@@ -84,6 +84,12 @@ import {
   hasAnyAccessibilityRequirement,
 } from "@/lib/travel/accessibility";
 import type { PlaceAccessibilityInfo } from "@/lib/travel/accessibility";
+import { useDroppable } from "@dnd-kit/core";
+import {
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
+} from "@dnd-kit/core";
 
 /* ---------- Types ---------- */
 type CalendarEvent = {
@@ -268,7 +274,10 @@ function AccessibilityDetailsTrigger({
               <span className="flex shrink-0 items-center gap-1 font-bold text-gray-900">
                 {row.status === "met" ? (
                   <>
-                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                    <Check
+                      className="h-3.5 w-3.5 text-emerald-600"
+                      aria-hidden
+                    />
                     Yes
                   </>
                 ) : row.status === "not_met" ? (
@@ -316,15 +325,47 @@ function AccessibilityDetailsTrigger({
           {allUnknown ? (
             <>
               {" "}
-              Use <span className="font-semibold text-gray-700">Load Google venue data</span>{" "}
-              above the activity list (with <span className="font-semibold text-gray-700">GOOGLE_MAPS_API_KEY</span>{" "}
-              set) to fill mobility fields from Google for linked places, or from
-              title and location when no place is linked yet.
+              Use{" "}
+              <span className="font-semibold text-gray-700">
+                Load Google venue data
+              </span>{" "}
+              above the activity list (with{" "}
+              <span className="font-semibold text-gray-700">
+                GOOGLE_MAPS_API_KEY
+              </span>{" "}
+              set) to fill mobility fields from Google for linked places, or
+              from title and location when no place is linked yet.
             </>
           ) : null}
         </p>
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+// replace the existing day heading span with this component above the return
+function DroppableDayHeader({
+  dayKey,
+  label,
+}: {
+  dayKey: string;
+  label: string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dayKey });
+  return (
+    <div ref={setNodeRef} className="flex items-center gap-3 px-1">
+      <div className="h-px flex-1 bg-gray-200" />
+      <span
+        className={`text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full transition-colors ${
+          isOver
+            ? "bg-amber-400 text-white border border-amber-500"
+            : "text-amber-800 bg-amber-50 border border-amber-100"
+        }`}
+      >
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-gray-200" />
+    </div>
   );
 }
 
@@ -608,7 +649,9 @@ function SortableEventCard({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="left">
-              {ev.isLocked ? "Locked — click to unlock" : "Lock to preserve during regeneration"}
+              {ev.isLocked
+                ? "Locked — click to unlock"
+                : "Lock to preserve during regeneration"}
             </TooltipContent>
           </Tooltip>
         )}
@@ -727,7 +770,8 @@ export default function CalendarEventsPanel({
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
   const [voteData, setVoteData] = useState<VoteData>({});
-  const [unlockDialogEvent, setUnlockDialogEvent] = useState<CalendarEvent | null>(null);
+  const [unlockDialogEvent, setUnlockDialogEvent] =
+    useState<CalendarEvent | null>(null);
 
   const { data: pollsData, mutate: mutatePolls } = useSWR(
     groupId ? `/api/groups/${groupId}/itinerary/votes` : null,
@@ -786,14 +830,9 @@ export default function CalendarEventsPanel({
     }
     return events.filter(
       (event) =>
-        event.source !== "itinerary" ||
-        event.accessibilityMatched === true,
+        event.source !== "itinerary" || event.accessibilityMatched === true,
     );
-  }, [
-    events,
-    hideNonMatchingByAccessibility,
-    activeAccessibilityRequirements,
-  ]);
+  }, [events, hideNonMatchingByAccessibility, activeAccessibilityRequirements]);
 
   const firstEventIdByOptionGroup = useMemo(() => {
     const sorted = [...events].sort(
@@ -814,9 +853,10 @@ export default function CalendarEventsPanel({
       const dayA = calendarDayKey(a.startTime);
       const dayB = calendarDayKey(b.startTime);
       if (dayA !== dayB) return dayA.localeCompare(dayB);
-      const orderA = a.displayOrder ?? new Date(a.startTime).getTime();
-      const orderB = b.displayOrder ?? new Date(b.startTime).getTime();
-      return orderA - orderB;
+      const startDiff =
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+      if (startDiff !== 0) return startDiff;
+      return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
     });
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of sorted) {
@@ -827,6 +867,19 @@ export default function CalendarEventsPanel({
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEventsForDisplay]);
+
+  const customCollision: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    const cardHits = pointerHits.filter(
+      (c) => !eventsGroupedByDay.some(([dayKey]) => dayKey === String(c.id)),
+    );
+    if (cardHits.length > 0) return cardHits;
+    const dayHits = pointerHits.filter((c) =>
+      eventsGroupedByDay.some(([dayKey]) => dayKey === String(c.id)),
+    );
+    if (dayHits.length > 0) return dayHits;
+    return [];
+  };
 
   /* ---------- API Calls ---------- */
   async function fetchEvents(
@@ -1273,8 +1326,7 @@ export default function CalendarEventsPanel({
 
   /* ---------- Drag-and-Drop ---------- */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
   );
 
   async function handleDragEnd(dragEvent: DragEndEvent) {
@@ -1285,29 +1337,167 @@ export default function CalendarEventsPanel({
     const overId = String(over.id);
 
     const draggedEvent = events.find((e) => e._id === activeId);
-    if (draggedEvent?.isLocked) {
+    if (!draggedEvent) return;
+    if (draggedEvent.isLocked) {
       setUnlockDialogEvent(draggedEvent);
       return;
     }
 
-    const dayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
+    const activeDayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
       dayEvents.some((e) => e._id === activeId),
     );
-    if (!dayEntry) return;
+    if (!activeDayEntry) return;
+    const [activeDay, activeDayEvents] = activeDayEntry;
 
-    const [, dayEvents] = dayEntry;
-    const oldIndex = dayEvents.findIndex((e) => e._id === activeId);
-    const newIndex = dayEvents.findIndex((e) => e._id === overId);
+    const overIsDayHeader = eventsGroupedByDay.some(
+      ([dayKey]) => dayKey === overId,
+    );
+    const overDayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
+      dayEvents.some((e) => e._id === overId),
+    );
+    const isCrossDay =
+      (overIsDayHeader && overId !== activeDay) ||
+      (!!overDayEntry && overDayEntry[0] !== activeDay);
+
+    if (isCrossDay) {
+      const targetDayKey = overIsDayHeader ? overId : overDayEntry![0];
+      const targetDayEvents =
+        eventsGroupedByDay.find(([k]) => k === targetDayKey)?.[1] ?? [];
+
+      const originalStart = new Date(draggedEvent.startTime);
+      const originalEnd = new Date(draggedEvent.endTime);
+      const durationMs = originalEnd.getTime() - originalStart.getTime();
+      const [yyyy, mm, dd] = targetDayKey.split("-").map(Number);
+
+      let finalStart: Date;
+      let finalEnd: Date;
+
+      if (!overIsDayHeader && overDayEntry) {
+        const targetDayWithoutDragged = targetDayEvents.filter(
+          (e) => e._id !== activeId,
+        );
+        const overIdx = targetDayWithoutDragged.findIndex(
+          (e) => e._id === overId,
+        );
+        const cardBefore = targetDayWithoutDragged[overIdx - 1] ?? null;
+        const cardAfter = targetDayWithoutDragged[overIdx] ?? null;
+
+        const gapStart = cardBefore
+          ? new Date(cardBefore.endTime)
+          : (() => {
+              const d = new Date(originalStart);
+              d.setFullYear(yyyy!, mm! - 1, dd!);
+              return d;
+            })();
+        const gapEnd = cardAfter ? new Date(cardAfter.startTime) : null;
+
+        const shiftedStart = new Date(gapStart);
+        const shiftedEnd = new Date(shiftedStart.getTime() + durationMs);
+
+        if (!gapEnd || shiftedEnd.getTime() <= gapEnd.getTime()) {
+          finalStart = shiftedStart;
+          finalEnd = shiftedEnd;
+        } else {
+          const lastEvent = [...targetDayWithoutDragged].sort(
+            (a, b) =>
+              new Date(b.endTime).getTime() - new Date(a.endTime).getTime(),
+          )[0];
+          finalStart = lastEvent
+            ? new Date(new Date(lastEvent.endTime).getTime() + 30 * 60 * 1000)
+            : gapStart;
+          finalEnd = new Date(finalStart.getTime() + durationMs);
+        }
+      } else {
+        const newStart = new Date(originalStart);
+        newStart.setFullYear(yyyy!, mm! - 1, dd!);
+        const newEnd = new Date(newStart.getTime() + durationMs);
+
+        const overlaps = targetDayEvents.some((e) => {
+          if (e._id === activeId) return false;
+          const eStart = new Date(e.startTime).getTime();
+          const eEnd = new Date(e.endTime).getTime();
+          return newStart.getTime() < eEnd && newEnd.getTime() > eStart;
+        });
+
+        if (!overlaps) {
+          finalStart = newStart;
+          finalEnd = newEnd;
+        } else {
+          const lastEvent = targetDayEvents
+            .filter((e) => e._id !== activeId)
+            .sort(
+              (a, b) =>
+                new Date(b.endTime).getTime() - new Date(a.endTime).getTime(),
+            )[0];
+          finalStart = lastEvent
+            ? new Date(new Date(lastEvent.endTime).getTime() + 30 * 60 * 1000)
+            : newStart;
+          finalEnd = new Date(finalStart.getTime() + durationMs);
+        }
+      }
+
+      setEvents((prev) =>
+        prev.map((e) =>
+          e._id === activeId
+            ? {
+                ...e,
+                startTime: finalStart.toISOString(),
+                endTime: finalEnd.toISOString(),
+              }
+            : e,
+        ),
+      );
+
+      try {
+        const res = await fetch(
+          `/api/groups/${groupId}/calendar/events/${activeId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              startTime: finalStart.toISOString(),
+              endTime: finalEnd.toISOString(),
+            }),
+          },
+        );
+        if (!res.ok) {
+          await fetchEvents();
+          const data = await res.json().catch(() => ({}));
+          setErr(
+            typeof data?.error === "string"
+              ? data.error
+              : "Failed to move activity.",
+          );
+        }
+      } catch {
+        await fetchEvents();
+      }
+      return;
+    }
+
+    const oldIndex = activeDayEvents.findIndex((e) => e._id === activeId);
+    const newIndex = activeDayEvents.findIndex((e) => e._id === overId);
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
-    const reordered = arrayMove(dayEvents, oldIndex, newIndex);
+    const reordered = arrayMove(activeDayEvents, oldIndex, newIndex);
+    const timeSlots = [...activeDayEvents]
+      .sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      )
+      .map((e) => ({ startTime: e.startTime, endTime: e.endTime }));
+    const reorderedWithTimes = reordered.map((ev, idx) => ({
+      ...ev,
+      startTime: timeSlots[idx]?.startTime ?? ev.startTime,
+      endTime: timeSlots[idx]?.endTime ?? ev.endTime,
+      displayOrder: idx,
+    }));
 
-    // Optimistic update
     setEvents((prev) => {
       const next = [...prev];
-      reordered.forEach((ev, idx) => {
+      reorderedWithTimes.forEach((ev) => {
         const i = next.findIndex((e) => e._id === ev._id);
-        if (i !== -1) next[i] = { ...next[i], displayOrder: idx };
+        if (i !== -1) next[i] = { ...next[i], ...ev };
       });
       return next;
     });
@@ -1317,9 +1507,11 @@ export default function CalendarEventsPanel({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orders: reordered.map((ev, idx) => ({
+          orders: reorderedWithTimes.map((ev) => ({
             eventId: ev._id,
-            displayOrder: idx,
+            displayOrder: ev.displayOrder,
+            startTime: ev.startTime,
+            endTime: ev.endTime,
           })),
         }),
       });
@@ -1347,7 +1539,9 @@ export default function CalendarEventsPanel({
   }, [tripIdFromUrl, tripOptions]);
 
   useEffect(() => {
-    const selectedTrip = tripOptions.find((trip) => trip._id === selectedTripId);
+    const selectedTrip = tripOptions.find(
+      (trip) => trip._id === selectedTripId,
+    );
     setActiveAccessibilityRequirements({
       ...emptyAccessibilityRequirements(),
       ...(selectedTrip?.accessibilityRequirements ?? {}),
@@ -1685,7 +1879,9 @@ export default function CalendarEventsPanel({
 
             {/* Action buttons */}
             <div className="flex items-end gap-2">
-              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements) ? (
+              {hasAnyAccessibilityRequirement(
+                activeAccessibilityRequirements,
+              ) ? (
                 <>
                   <label className="flex h-11 items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-900">
                     <input
@@ -1714,7 +1910,10 @@ export default function CalendarEventsPanel({
                           }
                         >
                           {loading ? (
-                            <Loader2 className="animate-spin mr-1.5" size={14} />
+                            <Loader2
+                              className="animate-spin mr-1.5"
+                              size={14}
+                            />
                           ) : null}
                           Load Google venue data
                         </Button>
@@ -1724,8 +1923,8 @@ export default function CalendarEventsPanel({
                       Uses Place Details for linked place IDs (up to 15), and
                       text search for rows without a link (up to 8), biased by
                       trip city when available. Mobility fields from Google fill
-                      unknown chips and are saved on linked activities; new place
-                      IDs are saved on the calendar row when found.
+                      unknown chips and are saved on linked activities; new
+                      place IDs are saved on the calendar row when found.
                     </TooltipContent>
                   </Tooltip>
                 </>
@@ -1783,9 +1982,9 @@ export default function CalendarEventsPanel({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs text-xs font-medium">
-                    Replaces the trip&apos;s Primary plan with Spark timeline rows
-                    for the chosen trip. With no selection, all non-dismissed
-                    itinerary events in the trip dates are used.
+                    Replaces the trip&apos;s Primary plan with Spark timeline
+                    rows for the chosen trip. With no selection, all
+                    non-dismissed itinerary events in the trip dates are used.
                   </TooltipContent>
                 </Tooltip>
               ) : null}
@@ -1810,7 +2009,7 @@ export default function CalendarEventsPanel({
         ) : (
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={customCollision}
             onDragEnd={(e) => void handleDragEnd(e)}
           >
             <div className="space-y-10">
@@ -1825,13 +2024,7 @@ export default function CalendarEventsPanel({
                 });
                 return (
                   <section key={dayKey} className="space-y-4">
-                    <div className="flex items-center gap-3 px-1">
-                      <div className="h-px flex-1 bg-gray-200" />
-                      <span className="text-xs font-black uppercase tracking-widest text-amber-800 bg-amber-50 border border-amber-100 px-4 py-1.5 rounded-full">
-                        {dayHeading}
-                      </span>
-                      <div className="h-px flex-1 bg-gray-200" />
-                    </div>
+                    <DroppableDayHeader dayKey={dayKey} label={dayHeading} />
                     <SortableContext
                       items={dayEvents.map((e) => e._id)}
                       strategy={verticalListSortingStrategy}
@@ -1849,7 +2042,9 @@ export default function CalendarEventsPanel({
                             polls={polls}
                             votingOptionId={votingOptionId}
                             finalizingGroupId={finalizingGroupId}
-                            firstEventIdByOptionGroup={firstEventIdByOptionGroup}
+                            firstEventIdByOptionGroup={
+                              firstEventIdByOptionGroup
+                            }
                             activeAccessibilityRequirements={
                               activeAccessibilityRequirements
                             }
@@ -2071,8 +2266,8 @@ export default function CalendarEventsPanel({
               {popupMsg}
               <span className="mt-3 block text-sm font-bold text-gray-400 leading-relaxed">
                 Your timeline has been refreshed with the new activities. If you
-                still do not see events, widen the &quot;View window&quot; dates above
-                the list.
+                still do not see events, widen the &quot;View window&quot; dates
+                above the list.
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -2106,7 +2301,9 @@ export default function CalendarEventsPanel({
       {/* ==================== */}
       <Dialog
         open={!!unlockDialogEvent}
-        onOpenChange={(open) => { if (!open) setUnlockDialogEvent(null); }}
+        onOpenChange={(open) => {
+          if (!open) setUnlockDialogEvent(null);
+        }}
       >
         <DialogContent className="rounded-[2.5rem] p-8 border border-amber-200 shadow-xl max-w-sm">
           <DialogHeader>
@@ -2115,8 +2312,11 @@ export default function CalendarEventsPanel({
               Unlock activity?
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-600 font-medium py-2 text-left">
-              <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
-              and will be preserved during regeneration. Unlock it to allow changes.
+              <span className="font-black text-gray-900">
+                &quot;{unlockDialogEvent?.title}&quot;
+              </span>{" "}
+              is locked and will be preserved during regeneration. Unlock it to
+              allow changes.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end pt-2">
@@ -2129,7 +2329,8 @@ export default function CalendarEventsPanel({
             </Button>
             <Button
               onClick={async () => {
-                if (unlockDialogEvent) await doToggleLock(unlockDialogEvent._id);
+                if (unlockDialogEvent)
+                  await doToggleLock(unlockDialogEvent._id);
                 setUnlockDialogEvent(null);
               }}
               className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black px-6 w-full sm:w-auto"
