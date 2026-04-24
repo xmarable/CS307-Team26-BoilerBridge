@@ -25,6 +25,7 @@
     "test:watch": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
     "test:precommit": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config=jest.config.cjs --forceExit --colors --verbose",
     "serve": "npm run build && mkdir -p .next/standalone/.next/static && cp -r .next/static/. .next/standalone/.next/static/ && cp -r public/. .next/standalone/public/ 2>/dev/null || true && cp .env.local .next/standalone/.env 2>/dev/null || true && HOSTNAME=0.0.0.0 node .next/standalone/server.js",
+    "serve:built": "mkdir -p .next/standalone/.next/static && cp -r .next/static/. .next/standalone/.next/static/ && cp -r public/. .next/standalone/public/ 2>/dev/null || true && cp .env.local .next/standalone/.env 2>/dev/null || true && HOSTNAME=0.0.0.0 node .next/standalone/server.js",
     "lint": "eslint",
     "prepare": "husky"
   },
