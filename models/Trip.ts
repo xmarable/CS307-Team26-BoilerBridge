@@ -22,8 +22,8 @@ const TripSchema = new mongoose.Schema(
   {
     tripId: {
       type: mongoose.Schema.Types.UUID,
-      default: randomUUID(),
-      unique: true
+      default: () => randomUUID(),
+      unique: true,
     },
     shareLink: {
       type: String,
