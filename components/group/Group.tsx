@@ -178,6 +178,39 @@ export default function GroupDashboard() {
     })();
   }, [groupId, tripIdInQuery, refreshTripItinerary]);
 
+  const refreshGroupTripDetail = useCallback(async () => {
+    if (!groupId || !tripActive) return;
+    try {
+      const listRes = await fetch("/api/trip", { credentials: "include" });
+      if (!listRes.ok) return;
+      const trips = await listRes.json();
+      if (!Array.isArray(trips)) return;
+      const mine = trips.find(
+        (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
+      );
+      const id = mine?.tripID;
+      if (!id || typeof id !== "string") return;
+      const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
+      if (!dRes.ok) return;
+      const d = await dRes.json();
+      if (
+        d?._id &&
+        Array.isArray(d.primaryItinerary) &&
+        Array.isArray(d.rainyDayItinerary)
+      ) {
+        setGroupTripDetail({
+          _id: String(d._id),
+          primaryItinerary: d.primaryItinerary,
+          rainyDayItinerary: d.rainyDayItinerary,
+          itineraryVersion:
+            typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [groupId, tripActive]);
+
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
     const looksOffline =
@@ -296,6 +329,14 @@ export default function GroupDashboard() {
       /* ignore */
     }
   }, [groupId, isOnline]);
+
+  useEffect(() => {
+    if (!groupId) {
+      setLoading(false);
+      return;
+    }
+    void refreshGroupTripDetail();
+  }, [groupId, tripActive, activeSection, refreshGroupTripDetail]);
 
   useEffect(() => {
     if (!groupId) {
@@ -786,10 +827,13 @@ export default function GroupDashboard() {
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125 space-y-6">
                   <CalendarEventsPanel
                     groupId={groupId!}
+                    groupName={group.groupName}
                     canPublishItinerary={
                       userRole === "Leader" || userRole === "Admin"
                     }
                     canEdit={userRole === "Leader" || userRole === "Admin"}
+                    isLeader={isLeader}
+                    onTripPlanSynced={() => void refreshGroupTripDetail()}
                   />
                 </div>
               </section>

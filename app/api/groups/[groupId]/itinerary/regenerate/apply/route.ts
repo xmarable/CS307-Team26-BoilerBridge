@@ -7,6 +7,7 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import CalendarEvent from "@/models/CalendarEvent";
+import ItineraryOptionVote from "@/models/ItineraryOptionVote";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
 import { ProposedEventSchema } from "@/lib/itinerary/schemas";
@@ -14,6 +15,9 @@ import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationC
 import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
 import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
 import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import { assignOptionGroupIds } from "@/lib/itinerary/clusterOptionGroups";
+import type { ProposedEventInput } from "@/lib/itinerary/schemas";
+import { filterProposedEventsByAccessibility } from "@/lib/itinerary/filterProposedByAccessibility";
 import { createTripNotif } from "@/lib/notifications";
 
 const ApplyBodySchema = z.object({
@@ -105,6 +109,24 @@ export async function POST(
         ? { toCity: tripCtx.toCity, fromCity: tripCtx.fromCity }
         : null,
     );
+    const accessibilityFiltered = await filterProposedEventsByAccessibility(
+      proposedEvents,
+      linkRows,
+      tripCtx?.accessibilityRequirements,
+    );
+    proposedEvents = accessibilityFiltered.proposed;
+    linkRows = accessibilityFiltered.linkRows;
+
+    if (proposedEvents.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No matching venues were found for the selected accessibility requirements. Try relaxing filters in trip preferences.",
+          removedByAccessibility: accessibilityFiltered.removedCount,
+        },
+        { status: 404 },
+      );
+    }
 
     const destCity = tripCtx?.toCity?.trim() ?? "";
 
@@ -129,6 +151,20 @@ export async function POST(
       );
     }
 
+    const touchedGroupIds = [
+      ...new Set(
+        existing
+          .map((e) => (e as { optionGroupId?: string }).optionGroupId)
+          .filter((g): g is string => typeof g === "string" && g.length > 0),
+      ),
+    ];
+    if (touchedGroupIds.length > 0) {
+      await ItineraryOptionVote.deleteMany({
+        groupId,
+        optionGroupId: { $in: touchedGroupIds },
+      } as never);
+    }
+
     const del = await CalendarEvent.deleteMany({
       _id: { $in: replaceEventIds },
       groupId,
@@ -140,6 +176,8 @@ export async function POST(
       );
     }
 
+    const optionGroupIds = assignOptionGroupIds(proposedEvents as ProposedEventInput[]);
+
     const docs = proposedEvents.map((ev, i) => ({
       title: ev.title,
       description: ev.description,
@@ -150,7 +188,10 @@ export async function POST(
       createdBy: userId,
       groupId,
       source: "itinerary" as const,
+      accessibilityMatched: true,
       timezone: ev.timezone ?? "UTC",
+      itineraryOptionStatus: "candidate" as const,
+      ...(optionGroupIds[i] ? { optionGroupId: optionGroupIds[i] } : {}),
       ...(destCity ? { itineraryDestinationCity: destCity } : {}),
       ...(linkRows[i]?.linkedActivityId
         ? { linkedActivityId: linkRows[i]!.linkedActivityId }
@@ -163,7 +204,7 @@ export async function POST(
     createTripNotif({
       groupID: groupId,
       userId: userId,
-      message: `Itinerary regenerated for ${tripDoc.toCity}`
+      message: `Itinerary regenerated${tripCtx?.toCity ? ` for ${tripCtx.toCity}` : ""}`,
     });
 
     return NextResponse.json({ events: inserted }, { status: 200 });

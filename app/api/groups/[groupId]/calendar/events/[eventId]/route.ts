@@ -10,6 +10,7 @@ import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 import CalendarEvent from "@/models/CalendarEvent";
 import { findCalendarEventOverlap } from "@/lib/calendar/findCalendarEventOverlap";
+import { getMemberPermissions } from "@/lib/roles";
 
 function isMemberOrLeader(group: any, userId: string) {
   const leader = group?.leaderID?.toString() === userId;
@@ -252,6 +253,67 @@ export async function DELETE(
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err: any) {
     console.error("DELETE calendar event error:", err);
+    return NextResponse.json(
+      { error: "Server error", details: err?.message ?? String(err) },
+      { status: 500 },
+    );
+  }
+}
+
+/** Toggle `isLocked` for reorder / regeneration preservation (no JSON body). */
+export async function PATCH(
+  _req: NextRequest,
+  { params }: { params: Promise<{ groupId: string; eventId: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.userId as string | undefined;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { groupId, eventId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return NextResponse.json({ error: "Invalid eventId" }, { status: 400 });
+    }
+
+    await dbConnect();
+
+    const permissionResult = await getMemberPermissions(groupId, userId);
+    if ("error" in permissionResult && permissionResult.error) {
+      return NextResponse.json(
+        { error: permissionResult.error },
+        { status: permissionResult.status },
+      );
+    }
+    if (!permissionResult.canEdit) {
+      return NextResponse.json(
+        { error: "Forbidden: viewers cannot lock or unlock activities" },
+        { status: 403 },
+      );
+    }
+
+    const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const nextLocked = !Boolean(event.isLocked);
+    event.isLocked = nextLocked;
+    await event.save();
+
+    return NextResponse.json(
+      {
+        event: {
+          _id: String(event._id),
+          isLocked: nextLocked,
+        },
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error("PATCH calendar event (lock) error:", err);
     return NextResponse.json(
       { error: "Server error", details: err?.message ?? String(err) },
       { status: 500 },

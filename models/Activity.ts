@@ -48,6 +48,11 @@ export interface IActivity extends Document {
   googlePhotoReference?: string;
   /** Places API (New) photo resource name for server-side media fetch. */
   googlePhotoMediaResource?: string;
+  wheelchairAccessible?: boolean;
+  stepFree?: boolean;
+  accessibleRestroom?: boolean;
+  hearingAssistance?: boolean;
+  visualAssistance?: boolean;
   /** Expedia Rapid property id — enables US16 property deep link when Rapid keys are set */
   expediaPropertyId?: string;
   /** Cached summary fields */
@@ -104,6 +109,11 @@ const ActivitySchema = new Schema<IActivity>(
     openingHoursSummary: { type: String, trim: true },
     googlePhotoReference: { type: String, trim: true },
     googlePhotoMediaResource: { type: String, trim: true },
+    wheelchairAccessible: { type: Boolean },
+    stepFree: { type: Boolean },
+    accessibleRestroom: { type: Boolean },
+    hearingAssistance: { type: Boolean },
+    visualAssistance: { type: Boolean },
     expediaPropertyId: { type: String, trim: true },
     sentimentSummary: { type: String },
     highlights: [{ type: String }],

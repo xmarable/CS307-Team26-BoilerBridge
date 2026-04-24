@@ -250,6 +250,12 @@ const travelGroupSchema = new mongoose.Schema(
       type: [pollSchema],
       default: [],
     },
+    /** Opaque secret for unauthenticated calendar subscription URL (GET export/ics?token=) */
+    calendarExportToken: {
+      type: String,
+      trim: true,
+      sparse: true,
+    },
   },
   { timestamps: true },
 );

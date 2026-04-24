@@ -6,9 +6,13 @@ import CalendarEventsPanel from "./CalendarEventsPanel";
 export function TimelineSection({
   groupId,
   canPublishItinerary = false,
+  isLeader = false,
+  groupName,
 }: {
   groupId: string;
   canPublishItinerary?: boolean;
+  isLeader?: boolean;
+  groupName?: string;
 }) {
   return (
     <section className="space-y-6 flex-1 min-w-0">
@@ -23,7 +27,9 @@ export function TimelineSection({
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-187.5 overflow-y-auto custom-scrollbar">
         <CalendarEventsPanel
           groupId={groupId}
+          groupName={groupName}
           canPublishItinerary={canPublishItinerary}
+          isLeader={isLeader}
         />
       </div>
     </section>

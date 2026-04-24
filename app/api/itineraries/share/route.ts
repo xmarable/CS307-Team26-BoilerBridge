@@ -86,6 +86,7 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "Malformed" }, { status: 400 });
     }
 
+    await dbConnect();
     const userId = session.user.userId;
     const { groupId, isActive } = parsed.data;
 
@@ -94,13 +95,17 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const shared = await SharedItineraryLink.findOneAndUpdate(
-        { groupId: groupId },
-        { isActive: isActive },
-    )
-    if (!shared) {
+    const trip = await Trip.findOne({ groupID: groupId });
+    if (!trip) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    const token = randomBytes(24).toString("hex");
+    await SharedItineraryLink.findOneAndUpdate(
+        { groupId },
+        { $set: { isActive }, $setOnInsert: { tripId: trip.tripId, token } },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
 
     return NextResponse.json({ message: "success"}, { status: 200 })
 }
@@ -111,18 +116,25 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const rawGroupId = req.nextUrl.searchParams.get("groupId");
+    const parsed = GetIteneraryShareSchema.safeParse({ groupId: rawGroupId ?? "" });
+    if (!parsed.success) {
+        return NextResponse.json({ error: "Malformed" }, { status: 400 });
+    }
+
+    await dbConnect();
     const userId = session.user.userId;
-    const groupId = req.nextUrl.searchParams.get("groupId");
+    const { groupId } = parsed.data;
+
     const group = await TravelGroup.findOne({ groupID: groupId, "membersList.userId": userId });
     if (!group) {
         return NextResponse.json({ error: "Group Not found" }, { status: 404 });
     }
 
-    const shared = await SharedItineraryLink.findOne(
-        { groupId: groupId }
-    )
+    const shared = await SharedItineraryLink.findOne({ groupId });
+    // No share row yet is normal — avoid 404 so global fetch error UI does not treat it as a failure.
     if (!shared) {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
+        return NextResponse.json({ isActive: false }, { status: 200 });
     }
 
     return NextResponse.json({ isActive: shared.isActive }, { status: 200 })

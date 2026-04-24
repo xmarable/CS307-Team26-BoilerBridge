@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -42,6 +44,9 @@ import {
   GripVertical,
   Lock,
   Unlock,
+  Check,
+  X,
+  CircleHelp,
 } from "lucide-react";
 import {
   DndContext,
@@ -65,8 +70,20 @@ import ItineraryRegeneratePreviewModal, {
   type PreviewProposedRow,
 } from "@/components/group/ItineraryRegeneratePreviewModal";
 import { ActivityVoting } from "@/components/group/ActivityVoting";
+import {
+  OptionGroupVoting,
+  type PollData,
+} from "@/components/group/OptionGroupVoting";
 import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
+import { ItineraryExportMenu } from "@/components/group/ItineraryExportMenu";
 import { buildCalendarActivityDetailHref } from "@/lib/calendarActivityDetailLink";
+import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
+import { emptyAccessibilityRequirements } from "@/lib/accessibilityRequirements";
+import {
+  accessibilityRowsForVenue,
+  hasAnyAccessibilityRequirement,
+} from "@/lib/travel/accessibility";
+import type { PlaceAccessibilityInfo } from "@/lib/travel/accessibility";
 
 /* ---------- Types ---------- */
 type CalendarEvent = {
@@ -87,6 +104,11 @@ type CalendarEvent = {
   itineraryDestinationCity?: string;
   displayOrder?: number;
   isLocked?: boolean;
+  itineraryOptionStatus?: "candidate" | "removed" | "final";
+  optionGroupId?: string;
+  accessibilityMatched?: boolean;
+  /** From GET /calendar/events — Activity place fields when linked. */
+  venueAccessibility?: PlaceAccessibilityInfo | null;
 };
 
 type GroupTripOption = {
@@ -95,6 +117,7 @@ type GroupTripOption = {
   toCity?: string;
   fromDate?: string;
   toDate?: string;
+  accessibilityRequirements?: AccessibilityRequirements;
 };
 
 type VoteData = Record<
@@ -106,6 +129,12 @@ type Props = {
   groupId: string;
   canPublishItinerary?: boolean;
   canEdit?: boolean;
+  /** Leader-only: finalize option-group polls */
+  isLeader?: boolean;
+  /** For export filename hint */
+  groupName?: string;
+  /** After calendar rows are copied into Trip.primaryItinerary, refetch trip plan in parent. */
+  onTripPlanSynced?: () => void;
 };
 
 /* ---------- Helper Functions ---------- */
@@ -138,6 +167,40 @@ function toDateLabel(value?: string) {
   });
 }
 
+const calendarRangeStorageKey = (gid: string) => `bb-cal-range:${gid}`;
+
+function readStoredCalendarRange(
+  groupId: string,
+): { from: string; to: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(calendarRangeStorageKey(groupId));
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { from?: string; to?: string };
+    if (typeof o.from === "string" && typeof o.to === "string") {
+      return { from: o.from, to: o.to };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function persistCalendarRange(
+  groupId: string,
+  fromStr: string,
+  toStr: string,
+): void {
+  try {
+    sessionStorage.setItem(
+      calendarRangeStorageKey(groupId),
+      JSON.stringify({ from: fromStr, to: toStr }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function formatScheduleConflictMessage(data: {
   error?: string;
   conflictWith?: { title?: string; startTime?: string; endTime?: string };
@@ -162,29 +225,150 @@ function formatScheduleConflictMessage(data: {
   return `${base} Conflicts with “${c.title}” (${startLabel}–${endLabel}).`;
 }
 
+function isDismissibleCandidate(ev: CalendarEvent): boolean {
+  if (ev.source !== "itinerary") return false;
+  const s = ev.itineraryOptionStatus;
+  return s === "candidate" || s === undefined;
+}
+
+function AccessibilityDetailsTrigger({
+  rows,
+}: {
+  rows: ReturnType<typeof accessibilityRowsForVenue>;
+}) {
+  if (rows.length === 0) return null;
+
+  const allUnknown = rows.every((r) => r.status === "unknown");
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-sky-800 hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70"
+          aria-label="Accessibility: compare trip requirements to venue data"
+        >
+          Details
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-sm border border-gray-200 bg-white p-3 text-gray-900 shadow-md"
+      >
+        <p className="text-[11px] font-black uppercase tracking-wide text-gray-500">
+          Trip requirement vs venue data
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex items-start justify-between gap-3 text-xs"
+            >
+              <span className="font-semibold text-gray-800">{row.label}</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-gray-900">
+                {row.status === "met" ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                    Yes
+                  </>
+                ) : row.status === "not_met" ? (
+                  <>
+                    <X className="h-3.5 w-3.5 text-red-600" aria-hidden />
+                    No
+                  </>
+                ) : (
+                  <>
+                    <CircleHelp
+                      className="h-3.5 w-3.5 text-amber-600"
+                      aria-hidden
+                    />
+                    Unknown
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 border-t border-gray-100 pt-2">
+          <p className="text-[10px] font-black uppercase tracking-wide text-gray-400">
+            When venue data is known
+          </p>
+          <ul className="mt-1.5 space-y-1 text-[11px] text-gray-600">
+            <li className="flex items-start justify-between gap-3">
+              <span className="text-gray-500">Example: requirement met</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-emerald-700">
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                Yes
+              </span>
+            </li>
+            <li className="flex items-start justify-between gap-3">
+              <span className="text-gray-500">Example: not met at venue</span>
+              <span className="flex shrink-0 items-center gap-1 font-bold text-red-700">
+                <X className="h-3.5 w-3.5" aria-hidden />
+                No
+              </span>
+            </li>
+          </ul>
+        </div>
+        <p className="mt-2 border-t border-gray-100 pt-2 text-[11px] leading-snug text-gray-500">
+          Unknown means the linked catalog place did not list that field, or
+          this row is not linked to a catalog place yet.
+          {allUnknown ? (
+            <>
+              {" "}
+              Use <span className="font-semibold text-gray-700">Load Google venue data</span>{" "}
+              above the activity list (with <span className="font-semibold text-gray-700">GOOGLE_MAPS_API_KEY</span>{" "}
+              set) to fill mobility fields from Google for linked places, or from
+              title and location when no place is linked yet.
+            </>
+          ) : null}
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 /* ---------- Sortable Event Card ---------- */
 type SortableEventCardProps = {
   ev: CalendarEvent;
   canEdit: boolean;
+  isLeader: boolean;
   groupId: string;
   selectedIds: Set<string>;
   voteData: VoteData;
+  polls: Record<string, PollData>;
+  votingOptionId: string | null;
+  finalizingGroupId: string | null;
+  firstEventIdByOptionGroup: Map<string, string>;
+  activeAccessibilityRequirements: AccessibilityRequirements;
   onToggleSelect: (id: string) => void;
   onEdit: (ev: CalendarEvent) => void;
   onDelete: (id: string) => void;
   onToggleLock: (ev: CalendarEvent) => void;
+  onDismiss: (ev: CalendarEvent) => void;
+  onOptionGroupVote: (optionGroupId: string, optionId: string) => void;
+  onFinalizePoll: (optionGroupId: string) => void;
 };
 
 function SortableEventCard({
   ev,
   canEdit,
+  isLeader,
   groupId,
   selectedIds,
   voteData,
+  polls,
+  votingOptionId,
+  finalizingGroupId,
+  firstEventIdByOptionGroup,
+  activeAccessibilityRequirements,
   onToggleSelect,
   onEdit,
   onDelete,
   onToggleLock,
+  onDismiss,
+  onOptionGroupVote,
+  onFinalizePoll,
 }: SortableEventCardProps) {
   const {
     attributes,
@@ -195,11 +379,20 @@ function SortableEventCard({
     isDragging,
   } = useSortable({ id: ev._id });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const accessibilityRows =
+    ev.source === "itinerary" &&
+    hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+      ? accessibilityRowsForVenue(
+          activeAccessibilityRequirements,
+          ev.venueAccessibility ?? undefined,
+        )
+      : [];
 
   const detailHref = buildCalendarActivityDetailHref(ev);
   const linkableClass =
@@ -229,6 +422,9 @@ function SortableEventCard({
         >
           {ev.eventType}
         </Badge>
+        {accessibilityRows.length > 0 ? (
+          <AccessibilityDetailsTrigger rows={accessibilityRows} />
+        ) : null}
       </div>
 
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-4 gap-y-1.5 text-sm font-bold text-gray-900">
@@ -261,6 +457,29 @@ function SortableEventCard({
           {ev.description}
         </p>
       )}
+
+      {accessibilityRows.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {accessibilityRows.map((row) => (
+            <span
+              key={row.key}
+              className="inline-flex max-w-full items-center gap-1 rounded-lg border border-sky-100 bg-sky-50/90 px-2 py-0.5 text-[10px] font-bold text-sky-900"
+              title={row.label}
+            >
+              <span className="truncate">{row.label}</span>
+              <span className="shrink-0 inline-flex items-center" aria-hidden>
+                {row.status === "met" ? (
+                  <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />
+                ) : row.status === "not_met" ? (
+                  <X className="h-3 w-3 text-red-600" strokeWidth={3} />
+                ) : (
+                  <CircleHelp className="h-3 w-3 text-amber-600" />
+                )}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 
@@ -336,13 +555,36 @@ function SortableEventCard({
         )}
 
         <div className="mt-2">
-          <ActivityVoting
-            activityId={ev._id}
-            groupId={groupId}
-            initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
-            initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
-            userVote={voteData[ev._id]?.userVote ?? null}
-          />
+          {ev.optionGroupId && isDismissibleCandidate(ev) ? (
+            <OptionGroupVoting
+              eventId={ev._id}
+              optionGroupId={ev.optionGroupId}
+              poll={
+                polls[ev.optionGroupId] ?? {
+                  optionGroupId: ev.optionGroupId,
+                  tallies: {},
+                  myVote: null,
+                  candidates: [],
+                }
+              }
+              voting={votingOptionId === ev._id}
+              onPick={() => void onOptionGroupVote(ev.optionGroupId!, ev._id)}
+              showFinalize={
+                isLeader &&
+                firstEventIdByOptionGroup.get(ev.optionGroupId!) === ev._id
+              }
+              finalizing={finalizingGroupId === ev.optionGroupId}
+              onFinalize={() => void onFinalizePoll(ev.optionGroupId!)}
+            />
+          ) : (
+            <ActivityVoting
+              activityId={ev._id}
+              groupId={groupId}
+              initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+              initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+              userVote={voteData[ev._id]?.userVote ?? null}
+            />
+          )}
         </div>
       </div>
 
@@ -381,17 +623,30 @@ function SortableEventCard({
           <Edit3 size={16} />
           Edit
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(ev._id)}
-          disabled={!canEdit}
-          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
-        >
-          <Trash2 size={16} className="inline mr-1" />
-          Remove
-        </Button>
+        {canEdit &&
+          (isDismissibleCandidate(ev) ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void onDismiss(ev)}
+              className="rounded-xl text-amber-800 hover:text-amber-900 hover:bg-amber-50 font-semibold h-9"
+            >
+              <Trash2 size={16} className="inline mr-1" />
+              Dismiss
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(ev._id)}
+              className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
+            >
+              <Trash2 size={16} className="inline mr-1" />
+              Remove
+            </Button>
+          ))}
       </div>
     </div>
   );
@@ -402,6 +657,9 @@ export default function CalendarEventsPanel({
   groupId,
   canPublishItinerary = false,
   canEdit = false,
+  isLeader = false,
+  groupName,
+  onTripPlanSynced,
 }: Props) {
   const searchParams = useSearchParams();
   const showSparkReadyHint = searchParams.get("sparkReady") === "1";
@@ -421,8 +679,14 @@ export default function CalendarEventsPanel({
   const [errorPopupTripLink, setErrorPopupTripLink] = useState(false);
 
   // Form fields for creating a new event
-  const [from, setFrom] = useState(() => toDatetimeLocalValue(new Date()));
+  const [from, setFrom] = useState(() => {
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) return stored.from;
+    return toDatetimeLocalValue(new Date());
+  });
   const [to, setTo] = useState(() => {
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) return stored.to;
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return toDatetimeLocalValue(d);
@@ -458,11 +722,30 @@ export default function CalendarEventsPanel({
   );
   const [regenerating, setRegenerating] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [syncingTripPlan, setSyncingTripPlan] = useState(false);
   const [tripOptions, setTripOptions] = useState<GroupTripOption[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string>("");
   const [voteData, setVoteData] = useState<VoteData>({});
   const [unlockDialogEvent, setUnlockDialogEvent] = useState<CalendarEvent | null>(null);
+
+  const { data: pollsData, mutate: mutatePolls } = useSWR(
+    groupId ? `/api/groups/${groupId}/itinerary/votes` : null,
+    async (url: string) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Failed to load polls");
+      return r.json() as Promise<{ polls: Record<string, PollData> }>;
+    },
+  );
+  const polls = pollsData?.polls ?? {};
+  const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
+  const [finalizingGroupId, setFinalizingGroupId] = useState<string | null>(
+    null,
+  );
+  const [hideNonMatchingByAccessibility, setHideNonMatchingByAccessibility] =
+    useState(true);
+  const [activeAccessibilityRequirements, setActiveAccessibilityRequirements] =
+    useState<AccessibilityRequirements>(emptyAccessibilityRequirements());
 
   /* ---------- Derived Values ---------- */
   // Query string for the date range picker
@@ -494,12 +777,43 @@ export default function CalendarEventsPanel({
     [events],
   );
 
+  const filteredEventsForDisplay = useMemo(() => {
+    if (
+      !hideNonMatchingByAccessibility ||
+      !hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+    ) {
+      return events;
+    }
+    return events.filter(
+      (event) =>
+        event.source !== "itinerary" ||
+        event.accessibilityMatched === true,
+    );
+  }, [
+    events,
+    hideNonMatchingByAccessibility,
+    activeAccessibilityRequirements,
+  ]);
+
+  const firstEventIdByOptionGroup = useMemo(() => {
+    const sorted = [...events].sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
+    const m = new Map<string, string>();
+    for (const e of sorted) {
+      const og = e.optionGroupId?.trim();
+      if (!og) continue;
+      if (!m.has(og)) m.set(og, e._id);
+    }
+    return m;
+  }, [events]);
+
   const eventsGroupedByDay = useMemo(() => {
-    const sorted = events.slice().sort((a, b) => {
+    const sorted = filteredEventsForDisplay.slice().sort((a, b) => {
       const dayA = calendarDayKey(a.startTime);
       const dayB = calendarDayKey(b.startTime);
       if (dayA !== dayB) return dayA.localeCompare(dayB);
-      // Within the same day, respect explicit displayOrder; fall back to startTime
       const orderA = a.displayOrder ?? new Date(a.startTime).getTime();
       const orderB = b.displayOrder ?? new Date(b.startTime).getTime();
       return orderA - orderB;
@@ -512,15 +826,27 @@ export default function CalendarEventsPanel({
       map.set(k, arr);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [events]);
+  }, [filteredEventsForDisplay]);
 
   /* ---------- API Calls ---------- */
-  async function fetchEvents() {
+  async function fetchEvents(
+    rangeOverride?: { from: string; to: string },
+    opts?: { enrichAccessibility?: boolean },
+  ) {
     try {
       setLoading(true);
       setErr(null);
+      const qs = new URLSearchParams();
+      const fromVal = rangeOverride?.from ?? from;
+      const toVal = rangeOverride?.to ?? to;
+      qs.set("from", new Date(fromVal).toISOString());
+      qs.set("to", new Date(toVal).toISOString());
+      if (opts?.enrichAccessibility) {
+        qs.set("enrichAccessibility", "true");
+      }
+      const query = `?${qs.toString()}`;
       const res = await fetch(
-        `/api/groups/${groupId}/calendar/events${rangeQuery}`,
+        `/api/groups/${groupId}/calendar/events${query}`,
         { credentials: "include" },
       );
       const data = await res.json();
@@ -539,6 +865,7 @@ export default function CalendarEventsPanel({
           setVoteData(voteJson.votes ?? {});
         }
       }
+      await mutatePolls();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load events.");
     } finally {
@@ -646,7 +973,21 @@ export default function CalendarEventsPanel({
         } else {
           setPopupMsg(data?.message || "Itinerary sparked successfully.");
           setShowSuccessPopup(true);
-          await fetchEvents();
+          const trip = tripOptions.find((t) => t._id === selectedTripId);
+          let rangeOverride: { from: string; to: string } | undefined;
+          if (trip?.fromDate && trip?.toDate) {
+            const start = new Date(String(trip.fromDate));
+            const end = new Date(String(trip.toDate));
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            const fromStr = toDatetimeLocalValue(start);
+            const toStr = toDatetimeLocalValue(end);
+            setFrom(fromStr);
+            setTo(toStr);
+            rangeOverride = { from: fromStr, to: toStr };
+            persistCalendarRange(groupId, fromStr, toStr);
+          }
+          await fetchEvents(rangeOverride);
         }
       }
     } catch (e: any) {
@@ -709,8 +1050,74 @@ export default function CalendarEventsPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
       await fetchEvents();
+      await mutatePolls();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete event.");
+    }
+  }
+
+  async function handleDismissCandidate(ev: CalendarEvent) {
+    const prev = events;
+    setEvents((list) => list.filter((x) => x._id !== ev._id));
+    try {
+      setErr(null);
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/options/${ev._id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "dismiss" }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setEvents(prev);
+        throw new Error(data?.error || "Failed to dismiss option.");
+      }
+      await mutatePolls();
+      await fetchEvents();
+    } catch (e: unknown) {
+      setEvents(prev);
+      setErr(e instanceof Error ? e.message : "Failed to dismiss option.");
+    }
+  }
+
+  async function handleOptionGroupVote(
+    optionGroupId: string,
+    optionId: string,
+  ) {
+    try {
+      setVotingOptionId(optionId);
+      const res = await fetch(`/api/groups/${groupId}/itinerary/votes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionGroupId, optionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Vote failed");
+      await mutatePolls();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Vote failed");
+    } finally {
+      setVotingOptionId(null);
+    }
+  }
+
+  async function handleFinalizePoll(optionGroupId: string) {
+    try {
+      setFinalizingGroupId(optionGroupId);
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/votes/${optionGroupId}/finalize`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Finalize failed");
+      await mutatePolls();
+      await fetchEvents();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Finalize failed");
+    } finally {
+      setFinalizingGroupId(null);
     }
   }
 
@@ -763,6 +1170,45 @@ export default function CalendarEventsPanel({
     }
   }
 
+  async function handleApplyToTripPlan() {
+    if (!canEdit || !selectedTripId) {
+      setErr(
+        "Choose a trip in “Trip Source” above, then apply Spark activities to the trip plan.",
+      );
+      return;
+    }
+    try {
+      setSyncingTripPlan(true);
+      setErr(null);
+      const body: { tripId: string; eventIds?: string[] } = {
+        tripId: selectedTripId,
+      };
+      if (selectedIds.size > 0) {
+        body.eventIds = Array.from(selectedIds);
+      }
+      const res = await fetch(
+        `/api/groups/${groupId}/itinerary/apply-to-trip`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string" ? data.error : "Apply to trip failed",
+        );
+      }
+      onTripPlanSynced?.();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Apply to trip failed");
+    } finally {
+      setSyncingTripPlan(false);
+    }
+  }
+
   async function handleApplyPreview() {
     try {
       setApplying(true);
@@ -785,6 +1231,7 @@ export default function CalendarEventsPanel({
       setPreviewProposed([]);
       setSelectedIds(new Set());
       await fetchEvents();
+      await mutatePolls();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to apply changes";
       setErr(msg);
@@ -817,7 +1264,7 @@ export default function CalendarEventsPanel({
   function selectAllForDay(dayKey: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      for (const ev of events) {
+      for (const ev of filteredEventsForDisplay) {
         if (calendarDayKey(ev.startTime) === dayKey) next.add(ev._id);
       }
       return next;
@@ -899,6 +1346,37 @@ export default function CalendarEventsPanel({
     }
   }, [tripIdFromUrl, tripOptions]);
 
+  useEffect(() => {
+    const selectedTrip = tripOptions.find((trip) => trip._id === selectedTripId);
+    setActiveAccessibilityRequirements({
+      ...emptyAccessibilityRequirements(),
+      ...(selectedTrip?.accessibilityRequirements ?? {}),
+    });
+  }, [selectedTripId, tripOptions]);
+
+  /** Restore calendar view window after navigation, or default to trip dates. */
+  useEffect(() => {
+    if (!groupId || tripOptions.length === 0) return;
+    const stored = readStoredCalendarRange(groupId);
+    if (stored) {
+      setFrom(stored.from);
+      setTo(stored.to);
+      return;
+    }
+    const tid = selectedTripId || tripOptions[0]?._id;
+    const trip = tripOptions.find((t) => t._id === tid);
+    if (trip?.fromDate && trip?.toDate) {
+      const start = new Date(String(trip.fromDate));
+      const end = new Date(String(trip.toDate));
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      const fromStr = toDatetimeLocalValue(start);
+      const toStr = toDatetimeLocalValue(end);
+      setFrom(fromStr);
+      setTo(toStr);
+    }
+  }, [groupId, tripOptions, selectedTripId]);
+
   /* ---------- Render ---------- */
   return (
     <div className="space-y-8">
@@ -911,18 +1389,26 @@ export default function CalendarEventsPanel({
       {/*   Date‑range selector (From / To) + Refresh button   */}
       {/* ====================================================== */}
       <div className="bg-gray-50 rounded-4xl p-6 border border-gray-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <Clock size={16} /> View Window
           </h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchEvents}
-            className="rounded-xl text-amber-600 hover:bg-amber-50"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <ItineraryExportMenu
+              groupId={groupId}
+              groupName={groupName}
+              rangeFrom={from}
+              rangeTo={to}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void fetchEvents()}
+              className="rounded-xl text-amber-600 hover:bg-amber-50"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -932,7 +1418,11 @@ export default function CalendarEventsPanel({
             <Input
               type="datetime-local"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFrom(v);
+                persistCalendarRange(groupId, v, to);
+              }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -943,7 +1433,11 @@ export default function CalendarEventsPanel({
             <Input
               type="datetime-local"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTo(v);
+                persistCalendarRange(groupId, from, v);
+              }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
           </div>
@@ -1158,7 +1652,7 @@ export default function CalendarEventsPanel({
               Upcoming Activities
             </h3>
             <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
-              {events.length} Events Found
+              {filteredEventsForDisplay.length} Events Found
             </Badge>
           </div>
 
@@ -1191,6 +1685,51 @@ export default function CalendarEventsPanel({
 
             {/* Action buttons */}
             <div className="flex items-end gap-2">
+              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements) ? (
+                <>
+                  <label className="flex h-11 items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-900">
+                    <input
+                      type="checkbox"
+                      checked={hideNonMatchingByAccessibility}
+                      onChange={(e) =>
+                        setHideNonMatchingByAccessibility(e.target.checked)
+                      }
+                      className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                    />
+                    Hide non-matching venues
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-11 rounded-2xl border-sky-200 text-xs font-bold text-sky-900"
+                          disabled={loading}
+                          onClick={() =>
+                            void fetchEvents(undefined, {
+                              enrichAccessibility: true,
+                            })
+                          }
+                        >
+                          {loading ? (
+                            <Loader2 className="animate-spin mr-1.5" size={14} />
+                          ) : null}
+                          Load Google venue data
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs font-medium">
+                      Uses Place Details for linked place IDs (up to 15), and
+                      text search for rows without a link (up to 8), biased by
+                      trip city when available. Mobility fields from Google fill
+                      unknown chips and are saved on linked activities; new place
+                      IDs are saved on the calendar row when found.
+                    </TooltipContent>
+                  </Tooltip>
+                </>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -1217,6 +1756,39 @@ export default function CalendarEventsPanel({
                 )}
                 Regenerate Selected
               </Button>
+
+              {canEdit ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void handleApplyToTripPlan()}
+                        disabled={
+                          syncingTripPlan ||
+                          loading ||
+                          loadingTrips ||
+                          !selectedTripId
+                        }
+                        className="rounded-2xl h-11 font-black border-2 border-emerald-700/30 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 gap-2"
+                      >
+                        {syncingTripPlan ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                          <MapPin size={18} />
+                        )}
+                        Apply to trip plan
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs font-medium">
+                    Replaces the trip&apos;s Primary plan with Spark timeline rows
+                    for the chosen trip. With no selection, all non-dismissed
+                    itinerary events in the trip dates are used.
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1226,11 +1798,13 @@ export default function CalendarEventsPanel({
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-amber-500" size={32} />
           </div>
-        ) : events.length === 0 ? (
+        ) : filteredEventsForDisplay.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
             <Calendar className="mx-auto text-gray-300 mb-2" size={40} />
             <p className="text-gray-400 font-bold">
-              No events scheduled for this window.
+              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
+                ? "No venues match your selected accessibility requirements in this window."
+                : "No events scheduled for this window."}
             </p>
           </div>
         ) : (
@@ -1268,13 +1842,24 @@ export default function CalendarEventsPanel({
                             key={ev._id}
                             ev={ev}
                             canEdit={canEdit}
+                            isLeader={isLeader}
                             groupId={groupId}
                             selectedIds={selectedIds}
                             voteData={voteData}
+                            polls={polls}
+                            votingOptionId={votingOptionId}
+                            finalizingGroupId={finalizingGroupId}
+                            firstEventIdByOptionGroup={firstEventIdByOptionGroup}
+                            activeAccessibilityRequirements={
+                              activeAccessibilityRequirements
+                            }
                             onToggleSelect={toggleSelected}
                             onEdit={openEdit}
                             onDelete={handleDelete}
                             onToggleLock={handleToggleLock}
+                            onDismiss={handleDismissCandidate}
+                            onOptionGroupVote={handleOptionGroupVote}
+                            onFinalizePoll={handleFinalizePoll}
                           />
                         ))}
                       </div>
@@ -1445,21 +2030,22 @@ export default function CalendarEventsPanel({
             <DialogTitle className="text-4xl font-black text-red-600 uppercase tracking-tighter flex items-center gap-3">
               <Zap fill="currentColor" size={32} /> Trip Error
             </DialogTitle>
+            <DialogDescription asChild>
+              <div className="py-8 space-y-4 text-left">
+                <p className="text-xl font-black text-gray-900 leading-tight whitespace-pre-line">
+                  {popupMsg}
+                </p>
+                {errorPopupTripLink && (
+                  <Link
+                    href={`/dashboard/groups/${groupId}/trip`}
+                    className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+                  >
+                    Open trip settings
+                  </Link>
+                )}
+              </div>
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="py-8 space-y-4">
-            <p className="text-xl font-black text-gray-900 leading-tight whitespace-pre-line">
-              {popupMsg}
-            </p>
-            {errorPopupTripLink && (
-              <Link
-                href={`/dashboard/groups/${groupId}/trip`}
-                className="inline-block text-lg font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
-              >
-                Open trip settings
-              </Link>
-            )}
-          </div>
 
           <DialogFooter>
             <Button
@@ -1477,34 +2063,27 @@ export default function CalendarEventsPanel({
       {/* ==================== */}
       <Dialog open={showSuccessPopup} onOpenChange={setShowSuccessPopup}>
         <DialogContent className="rounded-[2.5rem] border-4 border-amber-500 p-0 bg-white shadow-[10px_10px_0px_0px_rgba(245,158,11,1)] max-w-md mx-auto overflow-hidden">
-          {/* forced centering container */}
-          <div className="flex flex-col items-center justify-center p-10 w-full text-center">
-            {/* title section */}
-            <div className="flex flex-col items-center justify-center gap-3 mb-8">
-              <h2 className="text-4xl font-black text-amber-500 uppercase tracking-tighter">
-                Sparked
-              </h2>
-            </div>
+          <DialogHeader className="flex flex-col items-center justify-center p-10 pb-0 text-center space-y-6">
+            <DialogTitle className="text-4xl font-black text-amber-500 uppercase tracking-tighter border-0 p-0">
+              Sparked
+            </DialogTitle>
+            <DialogDescription className="text-xl font-black text-gray-900 leading-tight mb-2 max-w-md">
+              {popupMsg}
+              <span className="mt-3 block text-sm font-bold text-gray-400 leading-relaxed">
+                Your timeline has been refreshed with the new activities. If you
+                still do not see events, widen the &quot;View window&quot; dates above
+                the list.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
 
-            {/* body section */}
-            <div className="mb-10">
-              <p className="text-xl font-black text-gray-900 leading-tight mb-2">
-                {popupMsg}
-              </p>
-              <p className="text-sm font-bold text-gray-400 leading-relaxed">
-                Your timeline has been refreshed with the new activities
-              </p>
-            </div>
-
-            {/* button */}
-            <div className="w-full">
-              <Button
-                onClick={() => setShowSuccessPopup(false)}
-                className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
-              >
-                Nice
-              </Button>
-            </div>
+          <div className="flex flex-col items-center px-10 pb-10 w-full">
+            <Button
+              onClick={() => setShowSuccessPopup(false)}
+              className="w-full h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all text-xl uppercase tracking-widest"
+            >
+              Nice
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1535,11 +2114,11 @@ export default function CalendarEventsPanel({
               <Unlock size={20} className="text-amber-500" />
               Unlock activity?
             </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 font-medium py-2 text-left">
+              <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
+              and will be preserved during regeneration. Unlock it to allow changes.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-gray-600 font-medium py-2">
-            <span className="font-black text-gray-900">&quot;{unlockDialogEvent?.title}&quot;</span> is locked
-            and will be preserved during regeneration. Unlock it to allow changes.
-          </p>
           <DialogFooter className="gap-2 flex-col sm:flex-row sm:justify-end pt-2">
             <Button
               variant="outline"

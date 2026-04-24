@@ -52,7 +52,7 @@ describe("GET /api/activities/[activityId]", () => {
     expect(mockFindOne).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when activity id not found", async () => {
+  it("returns 404 when activity id is not found (catalog activityId)", async () => {
     mockGetServerSession.mockResolvedValue({
       user: { id: "user1" },
     });
@@ -86,9 +86,10 @@ describe("GET /api/activities/[activityId]", () => {
       user: { id: "user1" },
     });
 
+    const oid = "507f1f77bcf86cd799439011";
     const doc = {
-      _id: "507f1f77bcf86cd799439011",
-      activityId: "507f1f77bcf86cd799439011",
+      _id: oid,
+      activityId: oid,
       placeId: "p1",
       name: "Museum Tour",
       address: "123 Main St",
@@ -107,7 +108,6 @@ describe("GET /api/activities/[activityId]", () => {
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
-    const oid = "507f1f77bcf86cd799439011";
     const req = new Request(`http://localhost/api/activities/${oid}`);
     const res = await GET(req as never, {
       params: Promise.resolve({ activityId: oid }),
@@ -130,9 +130,10 @@ describe("GET /api/activities/[activityId]", () => {
       user: { id: "user1" },
     });
 
+    const oid = "507f1f77bcf86cd799439011";
     const doc = {
-      _id: "507f1f77bcf86cd799439011",
-      activityId: "507f1f77bcf86cd799439011",
+      _id: oid,
+      activityId: oid,
       placeId: "p1",
       name: "City Park",
       address: "1 Green Way",
@@ -145,7 +146,6 @@ describe("GET /api/activities/[activityId]", () => {
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
-    const oid = "507f1f77bcf86cd799439011";
     const req = new Request(`http://localhost/api/activities/${oid}`);
     const res = await GET(req as never, {
       params: Promise.resolve({ activityId: oid }),
@@ -164,9 +164,10 @@ describe("GET /api/activities/[activityId]", () => {
       user: { id: "user1" },
     });
 
+    const oid = "507f1f77bcf86cd799439011";
     const doc = {
-      _id: "507f1f77bcf86cd799439011",
-      activityId: "507f1f77bcf86cd799439011",
+      _id: oid,
+      activityId: oid,
       placeId: "p1",
       name: "Sketchy Venue",
       bookingUrl: "javascript:alert(1)",
@@ -177,7 +178,6 @@ describe("GET /api/activities/[activityId]", () => {
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
-    const oid = "507f1f77bcf86cd799439011";
     const req = new Request(`http://localhost/api/activities/${oid}`);
     const res = await GET(req as never, {
       params: Promise.resolve({ activityId: oid }),

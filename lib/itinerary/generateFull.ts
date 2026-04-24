@@ -12,6 +12,7 @@ import {
 import type { MustHaveContext, TripContext } from "@/lib/itinerary/generatePartial";
 import { inferPlanningTimezone } from "@/lib/itinerary/inferPlanningTimezone";
 import { coerceOllamaJsonToProposedEvents } from "@/lib/itinerary/coerceOllamaItineraryJson";
+import { getActiveAccessibilityRequirements } from "@/lib/travel/accessibility";
 
 export type { TripContext, MustHaveContext } from "@/lib/itinerary/generatePartial";
 
@@ -50,6 +51,13 @@ function buildFullTripPrompt(
           .join("\n");
 
   const planningTz = inferPlanningTimezone(trip.toCity, trip.fromCity);
+  const accessibilityNeeds = getActiveAccessibilityRequirements(
+    trip.accessibilityRequirements,
+  );
+  const accessibilityLine =
+    accessibilityNeeds.length === 0
+      ? "(none)"
+      : accessibilityNeeds.join(", ");
 
   return `You are a travel planner. Output JSON only.
 
@@ -59,6 +67,7 @@ Transport mode: ${trip.mode} (use this for realistic travel pacing: flights need
 Budget hint: ${trip.budget}${budgetRange}.
 Avoid activities: ${(trip.avoidActivities ?? []).join(", ") || "(none)"}.
 Avoid locations: ${(trip.avoidLocations ?? []).join(", ") || "(none)"}.
+Accessibility requirements: ${accessibilityLine}.
 
 Approved must-include items:
 ${mh}

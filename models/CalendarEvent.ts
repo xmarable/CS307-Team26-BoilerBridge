@@ -22,6 +22,14 @@ export interface ICalendarEvent extends Document {
   linkedPlaceId?: string;
   /** Trip destination city when row was created from Spark (for destination-aware preview links) */
   itineraryDestinationCity?: string;
+  /** Generator-backed option lifecycle (US11/US12); manual rows use "final". */
+  itineraryOptionStatus?: "candidate" | "removed" | "final";
+  /** Cluster of competing activity options for voting (US12). */
+  optionGroupId?: string;
+  /** True when an itinerary row passed strict accessibility filtering */
+  accessibilityMatched?: boolean;
+  /** When true, row is preserved during reorder/regeneration flows */
+  isLocked?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +83,13 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
     linkedActivityId: { type: String, trim: true },
     linkedPlaceId: { type: String, trim: true },
     itineraryDestinationCity: { type: String, trim: true },
+    itineraryOptionStatus: {
+      type: String,
+      enum: ["candidate", "removed", "final"],
+    },
+    optionGroupId: { type: String, trim: true, index: true },
+    accessibilityMatched: { type: Boolean, default: undefined },
+    isLocked: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

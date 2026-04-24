@@ -9,6 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, MapPin, Plus, Search, Star, AlertCircle } from "lucide-react";
+import {
+  ACCESSIBILITY_REQUIREMENT_OPTIONS,
+  emptyAccessibilityRequirements,
+} from "@/lib/accessibilityRequirements";
+import type { AccessibilityRequirements } from "@/lib/itinerary/schemas";
+import {
+  hasAnyAccessibilityRequirement,
+  matchesAccessibilityRequirements,
+} from "@/lib/travel/accessibility";
 
 
 interface BrowseActivity {
@@ -17,6 +26,11 @@ interface BrowseActivity {
   address?: string;
   rating?: number;
   reviewCount: number;
+  wheelchairAccessible?: boolean;
+  stepFree?: boolean;
+  accessibleRestroom?: boolean;
+  hearingAssistance?: boolean;
+  visualAssistance?: boolean;
 }
 
 type SearchRow = {
@@ -28,6 +42,14 @@ type SearchRow = {
   rating?: number;
   reviewCount?: number;
   primaryType?: string;
+  accessibility?: {
+    wheelchairAccessible?: boolean;
+    stepFree?: boolean;
+    accessibleRestroom?: boolean;
+    hearingAssistance?: boolean;
+    visualAssistance?: boolean;
+  };
+  accessibilityMatch?: boolean;
 };
 
 const DEBOUNCE_MS = 320;
@@ -45,6 +67,9 @@ export default function ActivitiesPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [googlePartial, setGooglePartial] = useState(false);
+  const [accessibilityRequirements, setAccessibilityRequirements] =
+    useState<AccessibilityRequirements>(emptyAccessibilityRequirements());
+  const [hideNonMatching, setHideNonMatching] = useState(true);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -67,7 +92,7 @@ export default function ActivitiesPage() {
     return () => window.clearTimeout(t);
   }, [query]);
 
-  const runSearch = useCallback(async (q: string) => {
+  const runSearch = useCallback(async (q: string, reqs: AccessibilityRequirements) => {
     if (q.length < 2) {
       setSearchResults(null);
       setSearchError(null);
@@ -77,8 +102,13 @@ export default function ActivitiesPage() {
     setSearchLoading(true);
     setSearchError(null);
     try {
+      const qs = new URLSearchParams();
+      qs.set("q", q);
+      for (const option of ACCESSIBILITY_REQUIREMENT_OPTIONS) {
+        if (reqs[option.key]) qs.set(option.key, "true");
+      }
       const res = await fetch(
-        `/api/activities/search?q=${encodeURIComponent(q)}`,
+        `/api/activities/search?${qs.toString()}`,
         { credentials: "include" },
       );
       const data = await res.json().catch(() => ({}));
@@ -107,10 +137,25 @@ export default function ActivitiesPage() {
       setGooglePartial(false);
       return;
     }
-    runSearch(debouncedQuery);
-  }, [debouncedQuery, runSearch]);
+    runSearch(debouncedQuery, accessibilityRequirements);
+  }, [debouncedQuery, runSearch, accessibilityRequirements]);
 
   const searchActive = debouncedQuery.length >= 2;
+  const hasAccessibilityFilters = hasAnyAccessibilityRequirement(
+    accessibilityRequirements,
+  );
+  const filteredSearchResults =
+    !searchResults || !hideNonMatching || !hasAccessibilityFilters
+      ? searchResults
+      : searchResults.filter((row) =>
+          matchesAccessibilityRequirements(row.accessibility, accessibilityRequirements),
+        );
+  const filteredBrowseActivities =
+    !hideNonMatching || !hasAccessibilityFilters
+      ? browseActivities
+      : browseActivities.filter((row) =>
+          matchesAccessibilityRequirements(row, accessibilityRequirements),
+        );
 
   const hrefForRow = (row: SearchRow) => {
     if (row.source === "saved" && row.activityId) {
@@ -180,6 +225,50 @@ export default function ActivitiesPage() {
           )}
         </div>
 
+        <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50/70 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm font-semibold text-gray-800">
+              Accessibility filters
+            </p>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={hideNonMatching}
+                onChange={(e) => setHideNonMatching(e.target.checked)}
+                className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+              />
+              Hide non-matching results
+            </label>
+          </div>
+          <p className="text-xs text-gray-600">
+            Strict mode: places with unknown accessibility data are treated as non-matching.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ACCESSIBILITY_REQUIREMENT_OPTIONS.map((option) => (
+              <label
+                key={option.key}
+                className="flex items-start gap-2 rounded-md border border-sky-100 bg-white px-3 py-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(accessibilityRequirements[option.key])}
+                  onChange={(e) =>
+                    setAccessibilityRequirements((prev) => ({
+                      ...prev,
+                      [option.key]: e.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                />
+                <span className="text-xs text-gray-700">
+                  <span className="block font-semibold">{option.label}</span>
+                  <span className="text-gray-500">{option.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         {browseError && (
           <p className="text-red-600 text-sm mb-4" role="alert">
             {browseError}
@@ -215,11 +304,11 @@ export default function ActivitiesPage() {
               </div>
             )}
             {!searchLoading &&
-              searchResults &&
-              searchResults.length === 0 &&
+              filteredSearchResults &&
+              filteredSearchResults.length === 0 &&
               !searchError && (
                 <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 text-sm">
-                  No matches yet. Try different words, or{" "}
+                  No venues match your query and accessibility filters. Try relaxing filters or{" "}
                   <Link
                     href="/dashboard/activities/new"
                     className="text-amber-700 font-medium underline underline-offset-2"
@@ -229,9 +318,9 @@ export default function ActivitiesPage() {
                   for the community.
                 </div>
               )}
-            {!searchLoading && searchResults && searchResults.length > 0 && (
+            {!searchLoading && filteredSearchResults && filteredSearchResults.length > 0 && (
               <ul className="space-y-2">
-                {searchResults.map((row) => (
+                {filteredSearchResults.map((row) => (
                   <li key={`${row.source}-${row.activityId ?? row.placeId}`}>
                     <Link href={hrefForRow(row)}>
                       <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-amber-400 hover:shadow-md transition-all text-left w-full">
@@ -264,6 +353,16 @@ export default function ActivitiesPage() {
                               </p>
                             ) : null}
                             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                              {row.accessibility?.wheelchairAccessible ? (
+                                <Badge variant="outline" className="text-[10px]">
+                                  Wheelchair
+                                </Badge>
+                              ) : null}
+                              {row.accessibility?.accessibleRestroom ? (
+                                <Badge variant="outline" className="text-[10px]">
+                                  Restroom
+                                </Badge>
+                              ) : null}
                               {typeof row.rating === "number" ? (
                                 <span className="inline-flex items-center gap-0.5 font-medium text-gray-800">
                                   <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
@@ -291,19 +390,18 @@ export default function ActivitiesPage() {
         ) : (
           <>
             {browseLoading && <p className="text-gray-500 text-sm">Loading activities…</p>}
-            {!browseLoading && browseActivities.length === 0 && !browseError && (
+            {!browseLoading && filteredBrowseActivities.length === 0 && !browseError && (
               <p className="text-gray-500">
-                No activities yet. Be the first to add one, or use search once other travelers
-                contribute.
+                No venues match your selected accessibility requirements right now.
               </p>
             )}
-            {!browseLoading && browseActivities.length > 0 && (
+            {!browseLoading && filteredBrowseActivities.length > 0 && (
               <section aria-label="All community activities">
                 <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
                   Community activities
                 </h2>
                 <ul className="space-y-3">
-                  {browseActivities.map((a) => (
+                  {filteredBrowseActivities.map((a) => (
                     <li key={a.activityId}>
                       <Link href={`/dashboard/activities/${a.activityId}`}>
                         <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-amber-300 hover:shadow-sm transition-all">
@@ -324,6 +422,18 @@ export default function ActivitiesPage() {
                                   {a.address}
                                 </p>
                               )}
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {a.wheelchairAccessible ? (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Wheelchair
+                                  </Badge>
+                                ) : null}
+                                {a.accessibleRestroom ? (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Restroom
+                                  </Badge>
+                                ) : null}
+                              </div>
                               {a.reviewCount > 0 && (
                                 <p className="text-xs text-amber-600 mt-1">
                                   {a.reviewCount} review{a.reviewCount !== 1 ? "s" : ""}

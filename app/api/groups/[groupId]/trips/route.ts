@@ -46,6 +46,7 @@ export async function GET(
         toDate: t.toDate,
         mode: t.mode,
         budget: t.budget,
+        accessibilityRequirements: t.accessibilityRequirements ?? {},
         createdAt: t.createdAt,
       };
     });

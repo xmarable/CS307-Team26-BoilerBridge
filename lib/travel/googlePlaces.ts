@@ -25,6 +25,7 @@ const DETAIL_FIELD_MASK = [
   "nationalPhoneNumber",
   "regularOpeningHours",
   "photos",
+  "accessibilityOptions",
 ].join(",");
 
 /**
@@ -45,6 +46,7 @@ const SEARCH_FIELD_MASK_BROWSE = [
   "places.rating",
   "places.userRatingCount",
   "places.types",
+  "places.accessibilityOptions",
 ].join(",");
 
 const fetchOpts: RequestInit = {
@@ -76,6 +78,9 @@ export type GooglePlaceEnrichment = {
   googlePhotoReference?: string;
   /** Places API (New) photo resource name, e.g. places/ChIJ…/photos/… */
   googlePhotoMediaResource?: string;
+  wheelchairAccessible?: boolean;
+  stepFree?: boolean;
+  accessibleRestroom?: boolean;
 };
 
 function normalizePlaceId(raw: string | undefined | null): string | null {
@@ -89,7 +94,7 @@ const LEGACY_TEXTSEARCH =
   "https://maps.googleapis.com/maps/api/place/textsearch/json";
 const LEGACY_DETAILS = "https://maps.googleapis.com/maps/api/place/details/json";
 const LEGACY_DETAIL_FIELDS =
-  "place_id,name,formatted_address,rating,user_ratings_total,reviews,website,url,editorial_summary,types,price_level,formatted_phone_number,opening_hours,photos";
+  "place_id,name,formatted_address,rating,user_ratings_total,reviews,website,url,editorial_summary,types,price_level,formatted_phone_number,opening_hours,photos,wheelchair_accessible_entrance";
 
 /** New API disabled / not enabled for project — same key often works on legacy. */
 function shouldFallbackToLegacyPlaces(errorBody: string): boolean {
@@ -183,6 +188,14 @@ function mapLegacyDetailsToEnrichment(
     nationalPhoneNumber,
     weekdayDescriptions,
     googlePhotoReference,
+    wheelchairAccessible:
+      typeof result.wheelchair_accessible_entrance === "boolean"
+        ? result.wheelchair_accessible_entrance
+        : undefined,
+    stepFree:
+      typeof result.wheelchair_accessible_entrance === "boolean"
+        ? result.wheelchair_accessible_entrance
+        : undefined,
   };
 }
 
@@ -361,6 +374,7 @@ function parsePlaceObject(place: Record<string, unknown>): GooglePlaceEnrichment
     nationalPhoneNumber,
     weekdayDescriptions,
     googlePhotoMediaResource,
+    ...parseAccessibilityOptions(place.accessibilityOptions),
   };
 }
 
@@ -489,7 +503,37 @@ export type GooglePlaceSearchHit = {
   rating?: number;
   userRatingCount?: number;
   types?: string[];
+  wheelchairAccessible?: boolean;
+  stepFree?: boolean;
+  accessibleRestroom?: boolean;
 };
+
+function parseAccessibilityOptions(
+  raw: unknown,
+): Pick<
+  GooglePlaceSearchHit,
+  "wheelchairAccessible" | "stepFree" | "accessibleRestroom"
+> {
+  if (!raw || typeof raw !== "object") return {};
+  const options = raw as Record<string, unknown>;
+  const wheelchairAccessible =
+    typeof options.wheelchairAccessibleEntrance === "boolean"
+      ? options.wheelchairAccessibleEntrance
+      : undefined;
+  const stepFree =
+    typeof options.wheelchairAccessibleEntrance === "boolean"
+      ? options.wheelchairAccessibleEntrance
+      : undefined;
+  const accessibleRestroom =
+    typeof options.wheelchairAccessibleRestroom === "boolean"
+      ? options.wheelchairAccessibleRestroom
+      : undefined;
+  return {
+    wheelchairAccessible,
+    stepFree,
+    accessibleRestroom,
+  };
+}
 
 function parseSearchHitFromNew(place: Record<string, unknown>): GooglePlaceSearchHit | null {
   const placeId = extractPlaceIdFromSearchHit(place);
@@ -506,7 +550,15 @@ function parseSearchHitFromNew(place: Record<string, unknown>): GooglePlaceSearc
   const types = Array.isArray(place.types)
     ? place.types.filter((t): t is string => typeof t === "string")
     : undefined;
-  return { placeId, name, address, rating, userRatingCount, types };
+  return {
+    placeId,
+    name,
+    address,
+    rating,
+    userRatingCount,
+    types,
+    ...parseAccessibilityOptions(place.accessibilityOptions),
+  };
 }
 
 async function legacyTextSearchMulti(
@@ -552,7 +604,22 @@ async function legacyTextSearchMulti(
     const types = Array.isArray(r.types)
       ? r.types.filter((t): t is string => typeof t === "string")
       : undefined;
-    out.push({ placeId: pid, name, address, rating, userRatingCount, types });
+    out.push({
+      placeId: pid,
+      name,
+      address,
+      rating,
+      userRatingCount,
+      types,
+      wheelchairAccessible:
+        typeof r.wheelchair_accessible_entrance === "boolean"
+          ? r.wheelchair_accessible_entrance
+          : undefined,
+      stepFree:
+        typeof r.wheelchair_accessible_entrance === "boolean"
+          ? r.wheelchair_accessible_entrance
+          : undefined,
+    });
   }
   return out;
 }
@@ -707,6 +774,11 @@ export type ResolvedPlaceFieldsForDb = {
   openingHoursSummary?: string;
   googlePhotoReference?: string;
   googlePhotoMediaResource?: string;
+  wheelchairAccessible?: boolean;
+  stepFree?: boolean;
+  accessibleRestroom?: boolean;
+  hearingAssistance?: boolean;
+  visualAssistance?: boolean;
 };
 
 export async function resolvePlaceFieldsForCreate(
@@ -745,5 +817,8 @@ export async function resolvePlaceFieldsForCreate(
       : undefined,
     googlePhotoReference: g.googlePhotoReference,
     googlePhotoMediaResource: g.googlePhotoMediaResource,
+    wheelchairAccessible: g.wheelchairAccessible,
+    stepFree: g.stepFree,
+    accessibleRestroom: g.accessibleRestroom,
   };
 }

@@ -2,12 +2,14 @@ import { z } from "zod";
 
 import {
   ProposedEventSchema,
+  type AccessibilityRequirements,
   type ProposedEventInput,
 } from "@/lib/itinerary/schemas";
 import {
   ollamaChatJson,
   parseJsonFromOllamaContent,
 } from "@/lib/itinerary/ollamaClient";
+import { getActiveAccessibilityRequirements } from "@/lib/travel/accessibility";
 
 export { ProposedEventSchema, type ProposedEventInput } from "@/lib/itinerary/schemas";
 
@@ -22,6 +24,7 @@ export type TripContext = {
   budgetMax?: number;
   avoidActivities?: string[];
   avoidLocations?: string[];
+  accessibilityRequirements?: AccessibilityRequirements;
 };
 
 export type MustHaveContext = {
@@ -82,6 +85,13 @@ function buildPrompt(input: GeneratePartialItineraryInput): string {
         `- ${e.title} (${e.startTime.toISOString()}–${e.endTime.toISOString()})${e.location ? ` @ ${e.location}` : ""}${e.eventType ? ` [${e.eventType}]` : ""}${e.description ? ` — ${e.description}` : ""}`,
     )
     .join("\n");
+  const accessibilityNeeds = getActiveAccessibilityRequirements(
+    trip.accessibilityRequirements,
+  );
+  const accessibilityLine =
+    accessibilityNeeds.length === 0
+      ? "(none)"
+      : accessibilityNeeds.join(", ");
 
   return `You are a travel itinerary assistant.
 
@@ -90,6 +100,7 @@ Transport: ${trip.mode}. Budget hint: ${trip.budget}${budgetRange}.
 Destination city is "${trip.toCity.trim()}". Replacement activities must be real venues in or near ${trip.toCity.trim()} (not other cities). For chain brands, make the "location" field explicitly local to ${trip.toCity.trim()}.
 Avoid activities: ${(trip.avoidActivities ?? []).join(", ") || "(none)"}.
 Avoid locations: ${(trip.avoidLocations ?? []).join(", ") || "(none)"}.
+Accessibility requirements: ${accessibilityLine}.
 
 Approved must-have places (must stay reflected in replacements where relevant):
 ${mustHaveBlock}

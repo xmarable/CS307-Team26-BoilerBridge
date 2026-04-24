@@ -1,4 +1,8 @@
 import type { TripContext } from "@/lib/itinerary/generateFull";
+import {
+  AccessibilityRequirementsSchema,
+  type AccessibilityRequirements,
+} from "@/lib/itinerary/schemas";
 
 type TripDocLike = {
   fromCity?: unknown;
@@ -11,6 +15,7 @@ type TripDocLike = {
   budgetMax?: unknown;
   avoidActivities?: unknown;
   avoidLocations?: unknown;
+  accessibilityRequirements?: unknown;
 };
 
 function normalizeStringArray(value: unknown): string[] {
@@ -33,6 +38,9 @@ export function mapTripToGenerationContext(trip: TripDocLike): TripContext {
   const budgetMin = Number.isFinite(parsedBudgetMin) ? parsedBudgetMin : undefined;
   const budgetMax = Number.isFinite(parsedBudgetMax) ? parsedBudgetMax : undefined;
 
+  const accessibilityRequirements: AccessibilityRequirements =
+    AccessibilityRequirementsSchema.parse(trip.accessibilityRequirements ?? {});
+
   return {
     fromCity:
       typeof trip.fromCity === "string" && trip.fromCity.trim().length > 0
@@ -53,5 +61,6 @@ export function mapTripToGenerationContext(trip: TripDocLike): TripContext {
     budgetMax,
     avoidActivities: normalizeStringArray(trip.avoidActivities),
     avoidLocations: normalizeStringArray(trip.avoidLocations),
+    accessibilityRequirements,
   };
 }

@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+import { AccessibilityRequirementsSchema } from "@/lib/itinerary/schemas";
 import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
 import { createTripNotif } from "@/lib/notifications";
 
@@ -24,6 +25,7 @@ const TripPatchSchema = z
     avoidLocations: z.array(z.string()).optional(),
     budgetMin: z.union([z.number(), z.null()]).optional(),
     budgetMax: z.union([z.number(), z.null()]).optional(),
+    accessibilityRequirements: AccessibilityRequirementsSchema.optional(),
     primaryItinerary: z.array(z.unknown()).optional(),
     rainyDayItinerary: z.array(z.unknown()).optional(),
   })
@@ -122,6 +124,7 @@ export async function GET(
       avoidLocations: t.avoidLocations ?? [],
       budgetMin: t.budgetMin,
       budgetMax: t.budgetMax,
+      accessibilityRequirements: t.accessibilityRequirements ?? {},
       mustHaves,
     });
   } catch (err: unknown) {
@@ -182,6 +185,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: parsed.error.issues[0]?.message ?? "Invalid input",
+          details: parsed.error.flatten(),
         },
         { status: 400 },
       );

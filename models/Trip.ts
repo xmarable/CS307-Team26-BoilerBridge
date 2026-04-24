@@ -18,6 +18,17 @@ const ActivitySchema = new mongoose.Schema({
   location: { type: String },
 });
 
+const AccessibilityRequirementsSchema = new mongoose.Schema(
+  {
+    wheelchairAccessible: { type: Boolean, default: false },
+    stepFree: { type: Boolean, default: false },
+    accessibleRestroom: { type: Boolean, default: false },
+    hearingAssistance: { type: Boolean, default: false },
+    visualAssistance: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const TripSchema = new mongoose.Schema(
   {
     tripId: {
@@ -89,6 +100,10 @@ const TripSchema = new mongoose.Schema(
     /** Optional budget range for suggestions (US14) */
     budgetMin: { type: Number, default: undefined },
     budgetMax: { type: Number, default: undefined },
+    accessibilityRequirements: {
+      type: AccessibilityRequirementsSchema,
+      default: () => ({}),
+    },
 
     /** Incremented on successful PATCH /api/itinerary/:id/section; optional optimistic check via request body `version`. */
     itineraryVersion: { type: Number, default: 0 },

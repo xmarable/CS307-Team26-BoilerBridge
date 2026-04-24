@@ -35,10 +35,6 @@ beforeAll(async () => {
   await TravelGroup.deleteMany({});
   await User.deleteMany({});
 
-  // sync indexes to manage race conditions
-  await User.syncIndexes();
-  await TravelGroup.syncIndexes();
-
   try {
     const db = mongoose.connection.db;
     if (db) {

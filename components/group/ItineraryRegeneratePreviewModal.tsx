@@ -3,6 +3,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -67,10 +68,10 @@ export default function ItineraryRegeneratePreviewModal({
           <DialogTitle className="text-2xl font-black text-gray-900">
             Regeneration preview
           </DialogTitle>
-          <p className="text-sm text-gray-500 font-medium">
+          <DialogDescription className="text-sm text-gray-500 font-medium">
             Compare proposed events with your selection. Accept to replace the
             originals, or cancel to keep the current itinerary.
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">

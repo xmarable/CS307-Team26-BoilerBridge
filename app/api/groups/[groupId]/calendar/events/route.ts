@@ -5,6 +5,7 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import CalendarEvent from "@/models/CalendarEvent";
+import { attachVenueAccessibilityToCalendarEvents } from "@/lib/calendarExport";
 import { getMemberPermissions } from "@/lib/roles";
 import { findCalendarEventOverlap } from "@/lib/calendar/findCalendarEventOverlap";
 
@@ -87,6 +88,7 @@ export async function POST(
       );
     }
 
+    const src = data.source ?? "manual";
     const created = await CalendarEvent.create({
       title: data.title,
       description: data.description,
@@ -96,9 +98,10 @@ export async function POST(
       eventType: data.eventType ?? "general",
       createdBy: userMongoId,
       groupId: groupId,
-      source: data.source ?? "manual",
+      source: src,
       externalId: data.externalId,
       timezone: data.timezone ?? "UTC",
+      itineraryOptionStatus: src === "manual" ? "final" : "candidate",
     });
 
     return NextResponse.json({ event: created }, { status: 201 });
@@ -146,6 +149,9 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const fromStr = searchParams.get("from");
     const toStr = searchParams.get("to");
+    const enrichRaw = (searchParams.get("enrichAccessibility") ?? "").toLowerCase();
+    const liveEnrichVenueAccessibility =
+      enrichRaw === "1" || enrichRaw === "true" || enrichRaw === "yes";
 
     const now = new Date();
     const from = fromStr ? new Date(fromStr) : now;
@@ -170,9 +176,26 @@ export async function GET(
       groupId,
       startTime: { $lt: to },
       endTime: { $gt: from },
-    }).sort({ startTime: 1 });
+      itineraryOptionStatus: { $ne: "removed" },
+    })
+      .sort({ startTime: 1 })
+      .lean();
 
-    return NextResponse.json({ events }, { status: 200 });
+    if (liveEnrichVenueAccessibility) {
+      console.info("[venue-accessibility]", "GET /calendar/events enrichAccessibility", {
+        groupId,
+        eventsInWindow: events.length,
+        googleMapsApiKeyConfigured: Boolean(
+          process.env.GOOGLE_MAPS_API_KEY?.trim(),
+        ),
+      });
+    }
+
+    const enriched = await attachVenueAccessibilityToCalendarEvents(events, {
+      liveEnrich: liveEnrichVenueAccessibility,
+    });
+
+    return NextResponse.json({ events: enriched }, { status: 200 });
   } catch (err: any) {
     console.error("GET calendar events error:", err);
     return NextResponse.json(
