@@ -26,7 +26,13 @@ if (process.env.NODE_ENV === "test") {
   MONGODB_URI = process.env.MONGODB_URI;
 }
 
-const options: MongoClientOptions = {};
+// Align with lib/dbConnect.js (Mongoose): cap connect / server selection so
+// a bad MONGODB_URI or offline DB fails in ~10s instead of the driver default
+// (~30s+), which looked like a hung dev server during auth/session.
+const options: MongoClientOptions = {
+  serverSelectionTimeoutMS: 10_000,
+  connectTimeoutMS: 10_000,
+};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;

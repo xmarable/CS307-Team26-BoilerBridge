@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 
-const mockFindById = jest.fn<any>();
+const mockFindOne = jest.fn<any>();
 const mockUpdateOne = jest.fn<any>().mockResolvedValue({ acknowledged: true });
 const mockDbConnect = jest.fn<any>().mockResolvedValue(undefined);
 
@@ -20,7 +20,7 @@ await jest.unstable_mockModule("@/lib/dbConnect", () => ({
 }));
 
 await jest.unstable_mockModule("@/models/Activity", () => ({
-  default: { findById: mockFindById, updateOne: mockUpdateOne },
+  default: { findOne: mockFindOne, updateOne: mockUpdateOne },
 }));
 
 beforeAll(async () => {
@@ -49,25 +49,28 @@ describe("GET /api/activities/[activityId]", () => {
       params: Promise.resolve({ activityId: oid }),
     });
     expect(res.status).toBe(401);
-    expect(mockFindById).not.toHaveBeenCalled();
+    expect(mockFindOne).not.toHaveBeenCalled();
   });
 
-  it("returns 400 for invalid activity id", async () => {
+  it("returns 404 when activity id not found", async () => {
     mockGetServerSession.mockResolvedValue({
       user: { id: "user1" },
+    });
+    mockFindOne.mockReturnValue({
+      lean: jest.fn<any>().mockResolvedValue(null),
     });
     const req = new Request("http://localhost/api/activities/not-valid");
     const res = await GET(req as never, {
       params: Promise.resolve({ activityId: "not-valid" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 
   it("returns 404 when activity missing", async () => {
     mockGetServerSession.mockResolvedValue({
       user: { id: "user1" },
     });
-    mockFindById.mockReturnValue({
+    mockFindOne.mockReturnValue({
       lean: jest.fn<any>().mockResolvedValue(null),
     });
     const oid = "507f1f77bcf86cd799439011";
@@ -85,6 +88,7 @@ describe("GET /api/activities/[activityId]", () => {
 
     const doc = {
       _id: "507f1f77bcf86cd799439011",
+      activityId: "507f1f77bcf86cd799439011",
       placeId: "p1",
       name: "Museum Tour",
       address: "123 Main St",
@@ -99,7 +103,7 @@ describe("GET /api/activities/[activityId]", () => {
       bookingUrl: "https://tickets.example/museum",
     };
 
-    mockFindById.mockReturnValue({
+    mockFindOne.mockReturnValue({
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
@@ -110,6 +114,7 @@ describe("GET /api/activities/[activityId]", () => {
     });
 
     expect(res.status).toBe(200);
+    expect(mockFindOne).toHaveBeenCalledWith({ activityId: oid });
     const json = await res.json();
     expect(json.activity.name).toBe("Museum Tour");
     expect(json.activity.description).toBe("A great museum.");
@@ -127,6 +132,7 @@ describe("GET /api/activities/[activityId]", () => {
 
     const doc = {
       _id: "507f1f77bcf86cd799439011",
+      activityId: "507f1f77bcf86cd799439011",
       placeId: "p1",
       name: "City Park",
       address: "1 Green Way",
@@ -135,7 +141,7 @@ describe("GET /api/activities/[activityId]", () => {
       googleTypes: ["park", "tourist_attraction"],
     };
 
-    mockFindById.mockReturnValue({
+    mockFindOne.mockReturnValue({
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 
@@ -160,13 +166,14 @@ describe("GET /api/activities/[activityId]", () => {
 
     const doc = {
       _id: "507f1f77bcf86cd799439011",
+      activityId: "507f1f77bcf86cd799439011",
       placeId: "p1",
       name: "Sketchy Venue",
       bookingUrl: "javascript:alert(1)",
       reviewCount: 0,
     };
 
-    mockFindById.mockReturnValue({
+    mockFindOne.mockReturnValue({
       lean: jest.fn<any>().mockResolvedValue(doc),
     });
 

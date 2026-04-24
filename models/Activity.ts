@@ -62,7 +62,7 @@ export interface IActivity extends Document {
 
 const ReviewSchema = new Schema<IReview>(
   {
-    reviewId: {type: String, default: randomUUID()},
+    reviewId: { type: String, default: () => randomUUID() },
     authorId: { type: String, required: true },
     author: { type: String, required: true, trim: true },
     text: { type: String, required: true, trim: true },
@@ -82,7 +82,7 @@ const ReferenceLinkSchema = new Schema<IReferenceLink>(
 
 const ActivitySchema = new Schema<IActivity>(
   {
-    activityId: { type: String, default: randomUUID(), unique: true },
+    activityId: { type: String, default: () => randomUUID(), unique: true },
     placeId: { type: String, index: true },
     name: { type: String, required: true, trim: true },
     address: { type: String, trim: true },

@@ -26,9 +26,14 @@ function validateFullResponseStrict(raw: unknown): ProposedEventInput[] | null {
   return parsed.data.events;
 }
 
+function sortByStart(events: ProposedEventInput[]): ProposedEventInput[] {
+  return [...events].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+}
+
 function buildFullTripPrompt(
   trip: TripContext,
   approvedMustHaves: MustHaveContext[],
+  chronologyCorrectionNote?: string,
 ): string {
   const budgetRange =
     trip.budgetMin != null || trip.budgetMax != null
@@ -59,7 +64,8 @@ Approved must-include items:
 ${mh}
 
 Planning timezone (use for the "timezone" field on every event): "${planningTz}".
-Destination city for this trip is "${trip.toCity.trim()}". Every real-world venue, meal, or attraction (except explicit intercity travel blocks) MUST be a plausible location in or immediately next to ${trip.toCity.trim()} — not other metros. For national chains (e.g. bakeries, restaurants), put the neighborhood or street context in the "location" field so it is clearly the ${trip.toCity.trim()} branch (e.g. include "${trip.toCity.trim()}" or a well-known local area in that city). Do not schedule NYC/LA/Miami/etc. locations when the destination is ${trip.toCity.trim()}.
+Destination city "${trip.toCity.trim()}" is the vacation city: schedule **only** destination dining, sights, and hotels **between** outbound arrival and return departure (no extra vacation days beyond ${trip.toDate.toISOString().slice(0, 10)}). Do **not** add origin-city (${trip.fromCity.trim()}) sightseeing during those middle days except travel to/from airports. At most **one** outbound and **one** return intercity block; do not duplicate departure/arrival rituals. Arrival/departure titles must match direction (e.g. do not title "Arrival in ${trip.fromCity.trim()}" with only ${trip.toCity.trim()} airport in "location"). "location" must match the city implied by the title (Chicago-area addresses for Chicago; ${trip.toCity.trim()}-area for ${trip.toCity.trim()}).
+Every real-world venue, meal, or attraction (except explicit intercity travel blocks) MUST be a plausible location in or immediately next to ${trip.toCity.trim()} — not other metros. For national chains (e.g. bakeries, restaurants), put the neighborhood or street context in the "location" field so it is clearly the ${trip.toCity.trim()} branch (e.g. include "${trip.toCity.trim()}" or a well-known local area in that city). Do not schedule NYC/LA/Miami/etc. locations when the destination is ${trip.toCity.trim()}.
 Schedule human-style days: morning / afternoon / evening. Typical attractions: about 1–3 hours; meals about 1–1.5 hours.
 If ${trip.fromCity.trim()} and ${trip.toCity.trim()} are different cities, do NOT place normal sightseeing before a realistic arrival on day 1 — start day 1 with an explicit travel/transit block or begin attractions mid/late afternoon after implied arrival.
 Leave modest gaps between stops in the destination (implicit buffer); do not stack back-to-back all-day attractions.
@@ -67,10 +73,17 @@ Never use absurd same-day windows like 00:00→12:00 for a museum or neighborhoo
 
 Return a single JSON object: { "events": [ { "title": string, "description"?: string, "startTime": string (ISO 8601), "endTime": string (ISO 8601), "location"?: string, "eventType"?: string, "timezone"?: string } ] }
 
-Rules:
-- endTime strictly after startTime for every event.
-- Include approved must-haves as real events at sensible times; use eventType "travel" or "transit" for intercity legs when appropriate.
-- Set "timezone" to "${planningTz}" on every event (ISO timestamps must match that zone's local intent).`;
+Rules (must all hold):
+- The "events" array is strictly chronological by startTime across the whole trip (sort before returning).
+- Same calendar day: no overlapping intervals; leave realistic buffer travel time between stops.
+- Every event: endTime strictly after startTime; typical blocks 1–3h (meals ~1–1.5h), not impossible all-day "arrival" windows.
+- If ${trip.fromCity.trim()} and ${trip.toCity.trim()} differ: the first substantive leg from origin to destination must be a transport event (eventType "transport", "travel", or "transit", or title clearly states flight/train/bus/taxi between the two cities) and must END before any "arrival", hotel check-in, or destination-only activities that day. Do not schedule "arrival" in ${trip.toCity.trim()} before that outbound transport completes.
+- Do not invent multiple redundant "arrival" blocks the same day; at most one arrival/check-in at the destination after the inbound transport leg.
+- Use eventType "transport", "travel", or "transit" **only** for real intercity or airport-to-city moves — never for neighborhood walks, meals, or museums. Meals → "food"; normal sights → "activity" or "general". Use concrete titles (e.g. "Flight: Chicago → Miami").
+- Every event's start/end must fall inside the trip date window in "${planningTz}"; do not end an activity after local midnight on the same ISO calendar date unless the end timestamp is explicitly the **next** calendar day (true overnight). Prefer dinner before 11pm local.
+- Include approved must-haves as real events at sensible times after you have logically arrived.
+- Set "timezone" to "${planningTz}" on every event (ISO timestamps must match that zone's local intent).
+${chronologyCorrectionNote ? `\n\nRegenerate fixing this validation feedback from the previous attempt:\n${chronologyCorrectionNote}\n` : ""}`;
 }
 
 function stubFullTrip(
@@ -127,12 +140,17 @@ function stubFullTrip(
 export async function generateFullTripEvents(
   trip: TripContext,
   approvedMustHaves: MustHaveContext[],
+  opts?: { chronologyCorrectionNote?: string },
 ): Promise<ProposedEventInput[]> {
   if (process.env.OLLAMA_SKIP === "1") {
     return stubFullTrip(trip, approvedMustHaves);
   }
 
-  const prompt = buildFullTripPrompt(trip, approvedMustHaves);
+  const prompt = buildFullTripPrompt(
+    trip,
+    approvedMustHaves,
+    opts?.chronologyCorrectionNote,
+  );
   const content = await ollamaChatJson([{ role: "user", content: prompt }]);
   let raw: unknown;
   try {
@@ -148,18 +166,18 @@ export async function generateFullTripEvents(
         ? ev
         : { ...ev, endTime: new Date(ev.startTime.getTime() + 90 * 60 * 1000) },
     );
-    return repaired;
+    return sortByStart(repaired);
   }
 
   const strict = validateFullResponseStrict(raw);
-  if (strict && strict.length > 0) return strict;
+  if (strict && strict.length > 0) return sortByStart(strict);
 
   const coerced = coerceOllamaJsonToProposedEvents(raw);
   if (coerced.length > 0) {
     console.warn(
       "[itinerary] Ollama JSON used relaxed coercion (alternate keys, snake_case, or nested arrays).",
     );
-    return coerced;
+    return sortByStart(coerced);
   }
 
   console.warn(
@@ -168,5 +186,5 @@ export async function generateFullTripEvents(
       ? Object.keys(raw as object).join(", ")
       : typeof raw,
   );
-  return stubFullTrip(trip, approvedMustHaves);
+  return sortByStart(stubFullTrip(trip, approvedMustHaves));
 }

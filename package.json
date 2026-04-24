@@ -17,7 +17,8 @@
   "scripts": {
     "preinstall": "node -e \"if(process.version.split('.')[0].replace('v','') < 22) { console.error('\\n🚨 FATAL ERROR: node 22 is required. u r on ' + process.version + '\\nplease update node or use nvm install 22 && nvm use 22\\n'); process.exit(1); }\"",
     "postinstall": "npx patch-package",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "test": "NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config=jest.config.cjs --forceExit --colors --verbose 2>&1",
@@ -125,6 +126,7 @@
     "dotenv": "^17.3.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.1.6",
+    "fake-indexeddb": "^6.2.5",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.3.0",

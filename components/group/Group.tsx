@@ -5,8 +5,8 @@
 import "@/app/globals.css";
 
 
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -51,10 +51,21 @@ import GroupMessagesPanel from "@/components/messaging/GroupMessagesPanel";
 import GroupPhotosPanel from "@/components/photos/GroupPhotoPanel";
 import { Badge } from "@/components/ui/badge";
 import GroupPollsPanel from "@/components/polls/GroupPollsPanel";
+import { RainyDayToggle } from "@/components/RainyDayToggle";
+import { useGroupItineraryOffline } from "@/hooks/useGroupItineraryOffline";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { ItineraryOfflineControls } from "@/components/offline/ItineraryOfflineControls";
+import { setGroupTripPresence } from "@/lib/offline/groupTripPresence";
 import {
-  RainyDayToggle,
-  type RainyDayTripInput,
-} from "@/components/RainyDayToggle";
+  cacheGroupShell,
+  clearGroupShell,
+  readGroupShell,
+} from "@/lib/offline/groupShellCache";
+import {
+  deleteTripItineraryCache,
+  getTripIdForGroup,
+  putGroupTripIdMapping,
+} from "@/lib/offline/tripItineraryCache";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
@@ -101,7 +112,9 @@ type Activity = {
 export default function GroupDashboard() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const groupId = params?.groupId as string | undefined;
+  const isOnline = useOnlineStatus();
 
   const [group, setGroup] = useState<GroupState | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -127,19 +140,77 @@ export default function GroupDashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteScope, setDeleteScope] = useState<"trip" | "group" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [tripActive, setTripActive] = useState(false);
-  const [groupTripDetail, setGroupTripDetail] = useState<
-    (RainyDayTripInput & { _id: string }) | null
-  >(null);
+
+  const {
+    tripActive,
+    groupTripDetail,
+    tripPlanLoading,
+    tripPlanError,
+    isOffline,
+    onItinerarySynced,
+    resetAfterTripDelete,
+    refreshTripItinerary,
+    userHasOfflineSave,
+    savedAt,
+    lastSyncedAt,
+    idbSupported,
+    removeLocalItineraryCopy,
+    saveForOffline,
+    itinerarySyncState,
+    offlineActionBusy,
+  } = useGroupItineraryOffline({
+    groupId,
+    itinerarySectionOpen: activeSection === "itinerary",
+  });
+
+  const tripIdInQuery = searchParams.get("tripId");
+  // After itinerary generation / prefs save, the group URL often includes
+  // ?tripId= so we can resolve the row even before GET /api/trip lists it.
+  useEffect(() => {
+    if (!groupId || !tripIdInQuery) return;
+    void (async () => {
+      await putGroupTripIdMapping(groupId, tripIdInQuery);
+      setGroupTripPresence(groupId, tripIdInQuery);
+      await refreshTripItinerary();
+    })();
+  }, [groupId, tripIdInQuery, refreshTripItinerary]);
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
+    const looksOffline =
+      !isOnline ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (looksOffline) {
+      const cached = readGroupShell<GroupState>(groupId);
+      if (
+        cached &&
+        typeof cached === "object" &&
+        typeof cached.groupID === "string"
+      ) {
+        setGroup(cached);
+        setError(null);
+      } else {
+        setGroup(null);
+        setError(
+          "You're offline. Open this group once while online so it can load here without internet.",
+        );
+      }
+      setLoading(false);
+      return;
+    }
+    const netSignal =
+      typeof AbortSignal !== "undefined" &&
+      typeof AbortSignal.timeout === "function"
+        ? AbortSignal.timeout(12_000)
+        : undefined;
     try {
       const res = await fetch(`/api/groups/${groupId}`, {
         credentials: "include",
+        signal: netSignal,
       });
       if (res.status === 401) return setError("Please log in.");
       if (res.status === 403 || res.status === 404) {
+        clearGroupShell(groupId);
         router.push("/dashboard");
         return;
       }
@@ -147,15 +218,52 @@ export default function GroupDashboard() {
       const data = await res.json();
       if (data?.group) {
         setGroup(data.group);
+        cacheGroupShell(groupId, data.group);
       }
     } catch {
-      setError("Failed to load group.");
+      const cached = readGroupShell<GroupState>(groupId);
+      if (
+        cached &&
+        typeof cached === "object" &&
+        typeof cached.groupID === "string"
+      ) {
+        setGroup(cached);
+        setError(null);
+      } else {
+        setError("Failed to load group.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [groupId, router]);
+  }, [groupId, router, isOnline]);
+
+  useLayoutEffect(() => {
+    if (!groupId) return;
+    const looksOffline =
+      !isOnline ||
+      (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (!looksOffline) return;
+    const cached = readGroupShell<GroupState>(groupId);
+    if (
+      cached &&
+      typeof cached === "object" &&
+      typeof cached.groupID === "string"
+    ) {
+      setGroup(cached);
+      setError(null);
+    } else {
+      setGroup(null);
+      setError(
+        "You're offline. Open this group once while online so it can load here without internet.",
+      );
+    }
+    setLoading(false);
+  }, [groupId, isOnline]);
 
   const fetchFriends = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return;
+    }
     try {
       const res = await fetch("/api/friends", { credentials: "include" });
       const data = await res.json();
@@ -165,63 +273,41 @@ export default function GroupDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    setToggleState();
-    fetchGroup();
-    fetchFriends();
-    if (groupId) {
-      fetch(`/api/trip`, { credentials: "include" })
-        .then((r) => r.json())
-        .then((data) => {
-          const trips = Array.isArray(data) ? data : [];
-          setTripActive(trips.some((t) => t.groupID === groupId));
-        })
-        .catch(() => {});
+  const setToggleState = useCallback(async () => {
+    if (!isOnline || !groupId) return;
+    try {
+      const shareSignal =
+        typeof AbortSignal !== "undefined" &&
+        typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(10_000)
+          : undefined;
+      const res = await fetch(`/api/itineraries/share?groupId=${groupId}`, {
+        signal: shareSignal,
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setAllowIteneraryShare(data.isActive);
+    } catch {
+      /* ignore */
     }
-  }, [fetchGroup, fetchFriends, groupId]);
+  }, [groupId, isOnline]);
 
   useEffect(() => {
-    if (!groupId || !tripActive || activeSection !== "itinerary") {
-      setGroupTripDetail(null);
+    if (!groupId) {
+      setLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const listRes = await fetch("/api/trip", { credentials: "include" });
-        if (!listRes.ok) return;
-        const trips = await listRes.json();
-        if (!Array.isArray(trips)) return;
-        const mine = trips.find(
-          (t: { groupID?: string; tripID?: string }) => t.groupID === groupId,
-        );
-        const id = mine?.tripID;
-        if (!id || typeof id !== "string") return;
-        const dRes = await fetch(`/api/trip/${id}`, { credentials: "include" });
-        if (!dRes.ok) return;
-        const d = await dRes.json();
-        if (
-          !cancelled &&
-          d?._id &&
-          Array.isArray(d.primaryItinerary) &&
-          Array.isArray(d.rainyDayItinerary)
-        ) {
-          setGroupTripDetail({
-            _id: String(d._id),
-            primaryItinerary: d.primaryItinerary,
-            rainyDayItinerary: d.rainyDayItinerary,
-            itineraryVersion:
-              typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
-          });
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, tripActive, activeSection]);
+    if (!isOnline) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void setToggleState();
+    void fetchGroup();
+    void fetchFriends();
+  }, [fetchGroup, fetchFriends, groupId, isOnline, setToggleState]);
 
   const handleInvite = async (email: string) => {
     const targetEmail = email || invitationEmail.trim();
@@ -245,16 +331,6 @@ export default function GroupDashboard() {
     } finally {
       setIsInviting(false);
     }
-  };
-
-  const setToggleState = async () => {
-    const res = await fetch(`/api/itineraries/share?groupId=${groupId}`);
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    console.log(data.isActive);
-    setAllowIteneraryShare(data.isActive);
   };
 
   const handleToggle = async () => {
@@ -282,9 +358,12 @@ export default function GroupDashboard() {
         return;
       }
       if (deleteScope === "group") {
+        clearGroupShell(groupId);
         router.push("/dashboard/groups");
       } else {
-        setTripActive(false);
+        const tid = groupTripDetail?._id ?? (await getTripIdForGroup(groupId));
+        if (tid) void deleteTripItineraryCache(tid, groupId);
+        resetAfterTripDelete();
         setDeleteDialogOpen(false);
         setDeleteScope(null);
         await fetchGroup();
@@ -624,6 +703,30 @@ export default function GroupDashboard() {
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">
+                {(tripActive || isOffline) ? (
+                  <ItineraryOfflineControls
+                    isOnline={!isOffline}
+                    userHasOfflineSave={userHasOfflineSave}
+                    savedAt={savedAt}
+                    lastSyncedAt={lastSyncedAt}
+                    tripPlanError={tripPlanError}
+                    hasTripContent={!!groupTripDetail}
+                    idbSupported={idbSupported}
+                    itinerarySyncState={itinerarySyncState}
+                    offlineActionBusy={offlineActionBusy}
+                    tripPlanLoading={tripPlanLoading}
+                    onSaveForOffline={() => {
+                      void (async () => {
+                        await saveForOffline();
+                        if (groupId && group) {
+                          cacheGroupShell(groupId, group);
+                        }
+                      })();
+                    }}
+                    onRemoveOffline={() => void removeLocalItineraryCopy()}
+                    onRetrySync={() => void refreshTripItinerary()}
+                  />
+                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-2">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
@@ -665,7 +768,7 @@ export default function GroupDashboard() {
                     </div>
                   )}
                 </div>
-                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125">
+                <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125 space-y-6">
                   <CalendarEventsPanel
                     groupId={groupId!}
                     canPublishItinerary={
@@ -697,33 +800,44 @@ export default function GroupDashboard() {
               </section>
 
               {tripActive && groupTripDetail ? (
+              {(tripActive || isOffline) ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
                       <MapPin size={24} />
                     </div>
-                    <h2 className="text-3xl font-black text-bb-text tracking-tight">
-                      Trip plan
-                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-3xl font-black text-bb-text tracking-tight">
+                        Trip plan
+                      </h2>
+                      {userHasOfflineSave && idbSupported && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-bold border-emerald-200 bg-emerald-50 text-emerald-800"
+                        >
+                          Available offline
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full">
-                    <RainyDayToggle
-                      trip={groupTripDetail}
-                      tripId={groupTripDetail._id}
-                      canEdit={!isViewer}
-                      onItinerarySynced={(payload) => {
-                        setGroupTripDetail((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                primaryItinerary: payload.primaryItinerary,
-                                rainyDayItinerary: payload.rainyDayItinerary,
-                                itineraryVersion: payload.itineraryVersion,
-                              }
-                            : prev,
-                        );
-                      }}
-                    />
+                  <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 w-full space-y-4">
+                    {tripPlanLoading && !groupTripDetail ? (
+                      <div
+                        className="flex items-center justify-center py-8 text-amber-700"
+                        role="status"
+                        aria-label="Loading itinerary"
+                      >
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : null}
+                    {groupTripDetail ? (
+                      <RainyDayToggle
+                        trip={groupTripDetail}
+                        tripId={groupTripDetail._id}
+                        canEdit={!isViewer && !isOffline}
+                        onItinerarySynced={onItinerarySynced}
+                      />
+                    ) : null}
                   </div>
                 </section>
               ) : null}
