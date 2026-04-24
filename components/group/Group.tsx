@@ -11,6 +11,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   Calendar,
+  CalendarDays,
   DollarSign,
   MessageSquare,
   Users,
@@ -68,6 +69,8 @@ import {
 } from "@/lib/offline/tripItineraryCache";
 import SplitCostsPanel from "@/components/group/SplitCostsPanel";
 import SharedCostsPanel from "@/components/group/SharedCostsPanel";
+import ExternalCalendarPanel from "@/components/calendar/ExternalCalendarPanel";
+import ItineraryMapPanel from "@/components/group/ItineraryMapPanel";
 import GroupNotification from "@/components/Notification/GroupNotification";
 import { GroupBoard } from "@/components/GroupBoard";
 import { ActivityVoting } from "./ActivityVoting";
@@ -635,7 +638,7 @@ export default function GroupDashboard() {
       </div>
 
       <div className="flex flex-col gap-6">
-        <nav className="bg-bb-surface border border-bb-border rounded-4xl p-2 flex gap-1 shadow-sm w-full">
+        <nav className="bg-bb-surface border border-bb-border rounded-4xl p-2 flex gap-1 shadow-sm w-full overflow-x-auto scrollbar-none">
           <TabButton
             active={activeSection === "overview"}
             onClick={() => setActiveSection("overview")}
@@ -685,6 +688,18 @@ export default function GroupDashboard() {
             onClick={() => setActiveSection("expenses")}
             icon={<DollarSign size={18} />}
             label="Expenses"
+          />
+          <TabButton
+            active={activeSection === "map"}
+            onClick={() => setActiveSection("map")}
+            icon={<MapPin size={18} />}
+            label="Map"
+          />
+          <TabButton
+            active={activeSection === "calendar"}
+            onClick={() => setActiveSection("calendar")}
+            icon={<CalendarDays size={18} />}
+            label="Calendar"
           />
         </nav>
 
@@ -799,7 +814,6 @@ export default function GroupDashboard() {
                 </div>
               </section>
 
-              {tripActive && groupTripDetail ? (
               {(tripActive || isOffline) ? (
                 <section className="col-span-full w-full space-y-4 mt-6">
                   <div className="flex items-center gap-3 px-2">
@@ -1063,6 +1077,18 @@ export default function GroupDashboard() {
                   refreshKey={paymentRequestsRefresh}
                 />
               )}
+            </div>
+          )}
+
+          {activeSection === "map" && (
+            <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <ItineraryMapPanel groupId={groupId!} />
+            </div>
+          )}
+
+          {activeSection === "calendar" && (
+            <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <ExternalCalendarPanel groupId={groupId!} />
             </div>
           )}
 

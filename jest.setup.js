@@ -22,6 +22,9 @@ if (process.env.NODE_ENV === "test") {
     process.env.TEST_MONGODB_URI =
       "mongodb://127.0.0.1:27017/boilerbridge-jest-isolated";
   }
+  process.env.TOKEN_ENCRYPTION_KEY =
+    process.env.TOKEN_ENCRYPTION_KEY || "test-encryption-key-32-bytes-ok!!";
+  process.env.CALENDAR_PROVIDER_OVERRIDE = "mock";
 }
 
 // polyfill globals used by next.js and api routes in jest node environment

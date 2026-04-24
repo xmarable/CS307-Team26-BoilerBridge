@@ -91,7 +91,7 @@ export function dedupeStrictIntercityLegs(
       isStrictOutboundIntercityLeg(e, trip) && zonedDayKey(e.startTime, tz) === firstKey ? i : -1,
     )
     .filter((i) => i >= 0);
-  let drop = new Set<number>();
+  const drop = new Set<number>();
   if (outboundIdx.length > 1) {
     const keep = outboundIdx[0]!;
     for (const i of outboundIdx) {
