@@ -19,7 +19,7 @@ beforeAll(async () => {
   // clear cache so dbConnect evaluates fresh and sees NODE_ENV="test"
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -67,7 +67,8 @@ beforeAll(async () => {
       { userId: memberId, role: "Viewer" },
     ],
   });
-  groupId = group.groupID.toString();
+  // Routes use TravelGroup.groupID (UUID), not Mongo _id
+  groupId = String(group.groupID);
 
   const collectionRoute =
     await import("@/app/api/groups/[groupId]/shared-costs/route");

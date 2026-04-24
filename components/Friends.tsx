@@ -67,7 +67,6 @@ export function Friends({ initialData }: FriendsProps) {
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(!initialData);
 
-  // References to track state inside the polling interval for cross-session sync
   const friendsRef = useRef(friends);
   const inboundRef = useRef(inboundRequests);
   const sentRef = useRef(sentRequests);
@@ -78,7 +77,6 @@ export function Friends({ initialData }: FriendsProps) {
     sentRef.current = sentRequests;
   }, [friends, inboundRequests, sentRequests]);
 
-  // Search debounce logic
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (query.length > 2) {
@@ -90,7 +88,6 @@ export function Friends({ initialData }: FriendsProps) {
     return () => clearTimeout(delayDebounceFn);
   }, [query]);
 
-  // Parallel pre-fetching and Polling loop for multi-session synchronization
   useEffect(() => {
     const loadSocialData = async () => {
       try {
@@ -127,7 +124,6 @@ export function Friends({ initialData }: FriendsProps) {
 
     if (session?.user) {
       loadSocialData();
-      // Poll every 3 seconds so the sender's screen updates when you accept
       const interval = setInterval(loadSocialData, 3000);
       return () => clearInterval(interval);
     }
@@ -201,8 +197,9 @@ export function Friends({ initialData }: FriendsProps) {
           ...prev,
           { userId: senderId, username: senderName, email: senderEmail },
         ]);
-        // Optional: Manual reload to force global component sync
-        // window.location.reload();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "failed to accept request");
       }
     } catch (error) {
       console.error("Accept error:", error);

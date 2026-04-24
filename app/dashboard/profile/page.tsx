@@ -1,13 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/mongodb";
-import ProfilePage from "@/components/ProfilePage";
 import { redirect } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
-import { Sidebar } from "@/components/Sidebar";
 import dbConnect from "@/lib/dbConnect";
 import User from "@/models/User";
-import SettingsPage from "@/components/SettingsPage";
+import ProfileSettingsLayout from "@/components/ProfileSettingsLayout";
 
 export default async function MePage() {
   await dbConnect();
@@ -36,18 +32,29 @@ export default async function MePage() {
   };
 
   const settingsData = {
-    tripReminders: dbUser.settings.notifications.tripReminders,
-    friendRequests: dbUser.settings.notifications.friendRequests,
-    groupInvites: dbUser.settings.notifications.groupInvites,
-    groupNotifitaions: dbUser.settings.notifications.groupNotifitaions,
+    tripReminders: {
+      inApp: dbUser.settings.notifications.tripReminders.inApp ?? false,
+      email: dbUser.settings.notifications.tripReminders.email ?? false
+    },
+    friendRequests: {
+      inApp: dbUser.settings.notifications.friendRequests.inApp ?? false,
+      email: dbUser.settings.notifications.friendRequests.email ?? false
+    },
+    groupInvites: {
+      inApp: dbUser.settings.notifications.groupInvites.inApp ?? false,
+      email: dbUser.settings.notifications.groupInvites.email ?? false
+    },
+    groupNotifications: {
+      inApp: dbUser.settings.notifications.groupNotifications.inApp ?? false,
+      email: dbUser.settings.notifications.groupNotifications.email ?? false
+    },
   }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <div className="flex flex-1 overflow-hidden">
         <main className="gap-8 flex-1 overflow-y-auto p-8 md:p-12 flex justify-center items-start">
-          <ProfilePage initialData={profileData} />
-          <SettingsPage initialData={settingsData} />
+          <ProfileSettingsLayout profileData={profileData} settingsData={settingsData} />
         </main>
       </div>
     </div>

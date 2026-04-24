@@ -14,7 +14,7 @@ export async function PATCH(req: Request) {
 
   try {
     const client = await clientPromise;
-    const db = client.db("BoilerBridge");
+    const db = client.db();
     const body = await req.json();
     const { name, username, school, location, profileImage } = body;
 
@@ -69,7 +69,7 @@ export async function PATCH(req: Request) {
     if (profileImage && profileImage.startsWith("data:image")) {
       try {
         updateData.image = await uploadImage(profileImage);
-      } catch (err) {
+      } catch {
         return NextResponse.json(
           { error: "Image upload failed" },
           { status: 500 },

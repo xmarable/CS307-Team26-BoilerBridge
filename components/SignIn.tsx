@@ -6,7 +6,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { Footer } from "./Footer";
 
 export function SignIn() {
@@ -25,8 +25,9 @@ export function SignIn() {
     });
 
     if (res?.ok) {
+        await getSession();
         router.refresh();
-        router.push("/");
+        router.replace("/dashboard");
     } else {
         alert("Invalid Credentials");
     }

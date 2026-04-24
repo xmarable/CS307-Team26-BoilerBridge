@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import Trip from "@/models/Trip";
+import MustHave from "@/models/MustHave";
 import dbConnect from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
+import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
 
-const createInitialItinerary = (fromDate: Date, toDate: Date) => {
+type ItineraryActivityInput = {
+  activityId: string;
+  name: string;
+  startTime: Date;
+  endTime: Date;
+  isOutdoor?: boolean;
+  category?: string;
+  location?: string;
+};
+
+const createInitialItinerary = async (
+  fromDate: Date,
+  toDate: Date,
+  rainyDayItinerary?: ItineraryActivityInput[],
+) => {
   const MOCK_ACTIVITIES = [
     { name: "Morning Park Walk", category: "Nature", isOutdoor: true },
     { name: "Downtown Sightseeing", category: "Tourism", isOutdoor: true },
@@ -33,12 +49,38 @@ const createInitialItinerary = (fromDate: Date, toDate: Date) => {
     };
   });
 
-  const rainyDay = generateRainyDayPlan(primary);
+  const rainyDay =
+    rainyDayItinerary && rainyDayItinerary.length > 0
+      ? rainyDayItinerary
+      : await generateRainyDayPlan(primary);
   return { primary, rainyDay };
 };
 
+const itineraryActivitySchema = z.object({
+  activityId: z.string().min(1),
+  name: z.string().min(1),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+  isOutdoor: z.boolean().optional(),
+  category: z.string().optional(),
+  location: z.string().optional(),
+});
+
+const rainyDayItinerarySchema = z
+  .array(itineraryActivitySchema.partial())
+  .optional();
+
+function sanitizeRainyDayItinerary(
+  rainyDayItinerary?: Array<Partial<ItineraryActivityInput>>,
+): ItineraryActivityInput[] {
+  if (!Array.isArray(rainyDayItinerary)) return [];
+  return rainyDayItinerary
+    .map((item) => itineraryActivitySchema.safeParse(item))
+    .filter((parsed) => parsed.success)
+    .map((parsed) => parsed.data);
+}
+
 const tripSchema = z.object({
-  // changed to accept groupId from frontend while keeping UUID validation
   groupId: z.string().uuid().optional(),
   groupID: z.string().uuid().optional(),
   fromCity: z.string().min(1),
@@ -48,6 +90,19 @@ const tripSchema = z.object({
   mode: z.enum(["flight", "train", "bus", "taxi"]),
   budget: z.coerce.number().positive("Budget must be a positive number."),
   tripConfirmed: z.boolean().optional(),
+  avoidActivities: z.array(z.string()).optional(),
+  avoidLocations: z.array(z.string()).optional(),
+  budgetMin: z.coerce.number().optional(),
+  budgetMax: z.coerce.number().optional(),
+  mustHaves: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        address: z.string().optional(),
+      }),
+    )
+    .optional(),
+  rainyDayItinerary: rainyDayItinerarySchema,
 });
 
 export async function POST(req: NextRequest) {
@@ -71,7 +126,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // logic: Normalize the ID from either groupId or groupID to match the model
     const groupID = result.data.groupID || result.data.groupId;
 
     if (!groupID) {
@@ -81,13 +135,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const fromCity = result.data.fromCity;
-    const toCity = result.data.toCity;
-    const fromDate = result.data.fromDate;
-    const toDate = result.data.toDate;
-    const mode = result.data.mode;
-    const budget = result.data.budget;
-    const tripConfirmed = result.data.tripConfirmed;
+    const {
+      fromCity,
+      toCity,
+      fromDate,
+      toDate,
+      mode,
+      budget,
+      tripConfirmed,
+      avoidActivities,
+      avoidLocations,
+      budgetMin,
+      budgetMax,
+      mustHaves,
+      rainyDayItinerary,
+    } = result.data;
 
     const permissionResult = (await getMemberPermissions(
       groupID,
@@ -108,41 +170,101 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { primary, rainyDay } = createInitialItinerary(
-      new Date(fromDate),
-      new Date(toDate),
+    const existing = await Trip.findOne({ groupID });
+
+    let primary: unknown;
+    let rainyDay: unknown;
+
+    if (existing) {
+      primary = existing.primaryItinerary;
+      rainyDay = existing.rainyDayItinerary;
+    } else {
+      const sanitizedRainyDayItinerary =
+        sanitizeRainyDayItinerary(rainyDayItinerary);
+      const created = await createInitialItinerary(
+        new Date(fromDate),
+        new Date(toDate),
+        sanitizedRainyDayItinerary,
+      );
+      primary = created.primary;
+      rainyDay = created.rainyDay;
+    }
+
+    const ensuredPrimary = ensureItinerarySectionIds(
+      (primary ?? []) as Parameters<typeof ensureItinerarySectionIds>[0],
+    );
+    const ensuredRainy = ensureItinerarySectionIds(
+      (rainyDay ?? []) as Parameters<typeof ensureItinerarySectionIds>[0],
+    );
+    primary = ensuredPrimary.next;
+    rainyDay = ensuredRainy.next;
+
+    const trip = await Trip.findOneAndUpdate(
+      { groupID },
+      {
+        $set: {
+          userId,
+          groupID,
+          fromCity,
+          toCity,
+          fromDate: new Date(fromDate),
+          toDate: new Date(toDate),
+          mode,
+          budget: Number(budget),
+          tripConfirmed: tripConfirmed ?? false,
+          primaryItinerary: primary,
+          rainyDayItinerary: rainyDay,
+          ...(avoidActivities != null && { avoidActivities }),
+          ...(avoidLocations != null && { avoidLocations }),
+          ...(budgetMin != null && { budgetMin }),
+          ...(budgetMax != null && { budgetMax }),
+        },
+      },
+      { upsert: true, new: true },
     );
 
-    const trip = await Trip.create({
-      userId,
-      groupID,
-      fromCity,
-      toCity,
-      fromDate: new Date(fromDate),
-      toDate: new Date(toDate),
-      mode,
-      budget: Number(budget),
-      tripConfirmed: tripConfirmed ?? false,
-      primaryItinerary: primary,
-      rainyDayItinerary: rainyDay,
-    });
+    const sanitizedMustHaves =
+      mustHaves
+        ?.map((item) => ({
+          name: item.name.trim(),
+          address: item.address?.trim() || undefined,
+        }))
+        .filter((item) => item.name.length > 0) ?? [];
 
+    if (sanitizedMustHaves.length > 0) {
+      await MustHave.insertMany(
+        sanitizedMustHaves.map((item) => ({
+          groupId: groupID,
+          name: item.name,
+          address: item.address,
+          addedBy: userId,
+          status: "approved" as const,
+          priority: 3,
+        })),
+      );
+    }
+
+    const t = trip as Record<string, unknown>;
     return NextResponse.json(
       {
-        tripID: trip._id.toString(),
-        userId: trip.userId.toString(),
-        groupID: trip.groupID.toString(),
-        fromCity: trip.fromCity,
-        toCity: trip.toCity,
-        fromDate: trip.fromDate,
-        toDate: trip.toDate,
-        mode: trip.mode,
-        budget: trip.budget,
-        tripConfirmed: trip.tripConfirmed,
-        primaryItinerary: trip.primaryItinerary,
-        rainyDayItinerary: trip.rainyDayItinerary,
+        tripID: t._id?.toString(),
+        userId: t.userId?.toString(),
+        groupID: t.groupID?.toString(),
+        fromCity: t.fromCity,
+        toCity: t.toCity,
+        fromDate: t.fromDate,
+        toDate: t.toDate,
+        mode: t.mode,
+        budget: t.budget,
+        tripConfirmed: t.tripConfirmed,
+        primaryItinerary: t.primaryItinerary,
+        rainyDayItinerary: t.rainyDayItinerary,
+        avoidActivities: t.avoidActivities ?? [],
+        avoidLocations: t.avoidLocations ?? [],
+        budgetMin: t.budgetMin,
+        budgetMax: t.budgetMax,
       },
-      { status: 201 },
+      { status: existing != null ? 200 : 201 },
     );
   } catch (err: any) {
     console.error("POST /api/trip error:", err);
@@ -153,7 +275,34 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+function tripListItem(t: Record<string, unknown>) {
+  return {
+    tripID: t._id?.toString(),
+    userId: t.userId?.toString(),
+    groupID: t.groupID?.toString(),
+    fromCity: t.fromCity,
+    toCity: t.toCity,
+    fromDate: t.fromDate,
+    toDate: t.toDate,
+    mode: t.mode,
+    budget: t.budget,
+    tripConfirmed: t.tripConfirmed,
+    primaryItinerary: t.primaryItinerary,
+    rainyDayItinerary: t.rainyDayItinerary,
+    avoidActivities: t.avoidActivities ?? [],
+    avoidLocations: t.avoidLocations ?? [],
+    budgetMin: t.budgetMin,
+    budgetMax: t.budgetMax,
+  };
+}
+
+/**
+ * List trips the user "owns" in `Trip.userId` OR the trip for a group they
+ * belong to. The latter is required for group page itinerary UI: otherwise only
+ * the member who created the row sees it in GET /api/trip and
+ * `useGroupItineraryOffline` never sets tripActive.
+ */
+export async function GET(req: NextRequest) {
   try {
     await dbConnect();
 
@@ -164,22 +313,36 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const groupId = req.nextUrl.searchParams.get("groupId");
+
     const trips = await Trip.find({ userId }).sort({ createdAt: -1 }).lean();
 
-    const payload = trips.map((t: any) => ({
-      tripID: t._id.toString(),
-      userId: t.userId.toString(),
-      groupID: t.groupID?.toString(),
-      fromCity: t.fromCity,
-      toCity: t.toCity,
-      fromDate: t.fromDate,
-      toDate: t.toDate,
-      mode: t.mode,
-      budget: t.budget,
-      tripConfirmed: t.tripConfirmed,
-      primaryItinerary: t.primaryItinerary,
-      rainyDayItinerary: t.rainyDayItinerary,
-    }));
+    const payload = trips.map((t) => tripListItem(t as Record<string, unknown>));
+    const seen = new Set(
+      payload.map((p) => p.tripID).filter((id): id is string => !!id),
+    );
+
+    if (groupId) {
+      const permissionResult = (await getMemberPermissions(
+        groupId,
+        userId,
+      )) as { error?: string; status?: number };
+      if (!permissionResult.error) {
+        const forGroup = await Trip.findOne({ groupID: groupId as never })
+          .sort({ createdAt: -1 })
+          .lean();
+        if (forGroup) {
+          const id = (forGroup as { _id: { toString(): string } })._id
+            .toString();
+          if (!seen.has(id)) {
+            seen.add(id);
+            payload.push(
+              tripListItem(forGroup as Record<string, unknown>),
+            );
+          }
+        }
+      }
+    }
 
     return NextResponse.json(payload, { status: 200 });
   } catch (err: any) {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -28,7 +29,9 @@ export default function FriendCard({
       return;
     }
 
-    if (sessionStatus === "loading" || !session?.user?.id) {
+    const requesterUserId = (session?.user as any)?.userId;
+
+    if (sessionStatus === "loading" || !requesterUserId) {
       return;
     }
 
@@ -40,7 +43,7 @@ export default function FriendCard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requesterId: session.user.id,
+          requesterId: requesterUserId,
           recipientId: targetUserId,
         }),
       });
@@ -62,13 +65,18 @@ export default function FriendCard({
     }
   };
 
-  const isSelf = session?.user?.id === targetUserId;
+  const currentUserId = (session?.user as any)?.userId;
+  const isSelf = currentUserId === targetUserId;
 
   const userFriendsList =
     (session?.user as any)?.friendsList ||
     (session?.user as any)?.friends ||
     [];
-  const isAlreadyFriend = userFriendsList.includes(targetUserId);
+
+  // logic fix: ensure we compare strings to strings for the includes check
+  const isAlreadyFriend = userFriendsList.some(
+    (id: any) => id.toString() === targetUserId.toString(),
+  );
 
   return (
     <div className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-white mb-3">

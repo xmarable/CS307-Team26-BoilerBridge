@@ -28,22 +28,45 @@ const EMERGENCY_NUMBERS: Record<
   },
 };
 
-export function SOSButton({ initialLocation = "US" }: { initialLocation?: string }) {
+export function SOSButton({
+  initialLocation = "US",
+}: {
+  initialLocation?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
-  const [locationCode] = useState(initialLocation);
+  const [locationCode, setLocationCode] = useState(initialLocation);
 
   const openModal = useCallback(() => {
     setIsOpen(true);
   }, []);
 
   useEffect(() => {
-    // Listen ONLY for the custom event to prevent double-firing
+    setLocationCode(initialLocation);
+  }, [initialLocation]);
+
+  useEffect(() => {
+    // Only infer from timezone when using the default seed; explicit codes
+    // (e.g. tests or SSR hints) must not be overwritten by the dev machine TZ.
+    if (initialLocation === "US") {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz.includes("London") || tz.includes("Europe/London")) {
+          setLocationCode("UK");
+        } else if (tz.includes("Paris")) {
+          setLocationCode("FR");
+        } else if (tz.includes("America")) {
+          setLocationCode("US");
+        }
+      } catch (e) {
+        console.error("failed to detect location", e);
+      }
+    }
     window.addEventListener("open-sos", openModal);
 
     return () => {
       window.removeEventListener("open-sos", openModal);
     };
-  }, [openModal]);
+  }, [initialLocation, openModal]);
 
   const emergency =
     EMERGENCY_NUMBERS[locationCode] || EMERGENCY_NUMBERS.DEFAULT;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { jest } from "@jest/globals";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
@@ -13,6 +14,7 @@ let GETGroups: any,
 let User: any, TravelGroup: any, dbConnect: any, bcrypt: any;
 let mockGetServerSession: jest.MockedFunction<any>;
 
+// logic: stable mocks for next-auth
 await jest.unstable_mockModule("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
@@ -21,6 +23,7 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
+// logic: params must be resolved as a promise in nextjs 15 lol
 function paramsManage(p: { groupId: string; memberId?: string }) {
   return Promise.resolve(p);
 }
@@ -30,7 +33,7 @@ const CONNECTION_CLEANUP_DELAY_MS = 500;
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -56,6 +59,7 @@ beforeAll(async () => {
 
   const leaderRoute = await import("@/app/api/groups/[groupId]/leader/route");
   PATCHLeader = leaderRoute.PATCH as any;
+
   const leaveRoute = await import("@/app/api/groups/[groupId]/leave/route");
   POSTLeave = leaveRoute.POST as any;
 });
@@ -370,10 +374,12 @@ describe("POST /api/groups/[groupId]/members", () => {
         { userId: member.userId, role: "Viewer" },
       ],
     });
+
     mockGetServerSession.mockResolvedValue({
       user: { userId: member.userId.toString() },
       expires: "",
     });
+
     const res = await POSTMember(
       new Request("http://localhost", {
         method: "POST",
@@ -383,12 +389,15 @@ describe("POST /api/groups/[groupId]/members", () => {
       { params: paramsManage({ groupId: group.groupID.toString() }) },
     );
     const data = await res.json();
+
     expect(res.status).toBe(403);
     expect(data.error).toMatch(/leader/i);
+
     const unchanged = await TravelGroup.findOne({
       groupID: group.groupID.toString(),
     });
     expect(unchanged!.membersList).toHaveLength(2);
+
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
     await User.deleteMany({
       userId: {
@@ -423,10 +432,12 @@ describe("POST /api/groups/[groupId]/members", () => {
         { userId: member.userId, role: "Viewer" },
       ],
     });
+
     mockGetServerSession.mockResolvedValue({
       user: { userId: leader.userId.toString() },
       expires: "",
     });
+
     const res = await POSTMember(
       new Request("http://localhost", {
         method: "POST",
@@ -436,8 +447,10 @@ describe("POST /api/groups/[groupId]/members", () => {
       { params: paramsManage({ groupId: group.groupID.toString() }) },
     );
     const data = await res.json();
+
     expect(res.status).toBe(400);
     expect(data.error).toMatch(/already in the group/i);
+
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
     await User.deleteMany({
       userId: { $in: [leader.userId.toString(), member.userId.toString()] },
@@ -463,10 +476,12 @@ describe("POST /api/groups/[groupId]/members", () => {
       leaderID: leader.userId,
       membersList: [{ userId: leader.userId, role: "Leader" }],
     });
+
     mockGetServerSession.mockResolvedValue({
       user: { userId: leader.userId.toString() },
       expires: "",
     });
+
     const res = await POSTMember(
       new Request("http://localhost", {
         method: "POST",
@@ -476,16 +491,23 @@ describe("POST /api/groups/[groupId]/members", () => {
       { params: paramsManage({ groupId: group.groupID.toString() }) },
     );
     const data = await res.json();
+
     expect(res.status).toBe(201);
-    const pendingEmails = data.group.pendingRequests.map((r: any) => r.email);
+
+    // logic: add optional chaining to prevent crash if data.group is missing
+    const pendingEmails = (data.group?.pendingRequests || []).map(
+      (r: any) => r.email,
+    );
     expect(pendingEmails).toContain(newUser.email.toLowerCase());
+
     const updated = await TravelGroup.findOne({
       groupID: group.groupID.toString(),
     });
-    const updatedIds = updated!.membersList.map((m: any) =>
-      m.userId.toString(),
+    const pendingList = updated!.pendingRequests.map((r: any) =>
+      r.email.toLowerCase(),
     );
-    expect(updatedIds).toContain(newUser.userId.toString());
+    expect(pendingList).toContain(newUser.email.toLowerCase());
+
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
     await User.deleteMany({
       userId: { $in: [leader.userId.toString(), newUser.userId.toString()] },

@@ -9,6 +9,7 @@ import { authOptions } from "@/lib/auth";
 
 import TravelGroup from "@/models/TravelGroup";
 import CalendarEvent from "@/models/CalendarEvent";
+import { findCalendarEventOverlap } from "@/lib/calendar/findCalendarEventOverlap";
 
 function isMemberOrLeader(group: any, userId: string) {
   const leader = group?.leaderID?.toString() === userId;
@@ -54,6 +55,12 @@ export async function PUT(
     // we need the full group document (not lean) because we might save reminders to it
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
+      console.error(
+        "[PUT] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
@@ -63,6 +70,14 @@ export async function PUT(
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
+      console.error(
+        "[PUT] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -86,11 +101,45 @@ export async function PUT(
 
     const updates = parsed.data;
 
-    // track if the startTime is actually changing to avoid unnecessary loops
     const timeChanged =
       updates.startTime !== undefined &&
       new Date(updates.startTime).getTime() !==
         new Date(event.startTime).getTime();
+
+    const nextStart =
+      updates.startTime !== undefined
+        ? new Date(updates.startTime)
+        : new Date(event.startTime);
+    const nextEnd =
+      updates.endTime !== undefined
+        ? new Date(updates.endTime)
+        : new Date(event.endTime);
+
+    if (nextEnd <= nextStart) {
+      return NextResponse.json(
+        { error: "Invalid time range: endTime must be after startTime" },
+        { status: 400 },
+      );
+    }
+
+    const overlap = await findCalendarEventOverlap(
+      groupId,
+      { start: nextStart, end: nextEnd },
+      eventId,
+    );
+    if (overlap) {
+      return NextResponse.json(
+        {
+          error: "That time overlaps another activity in the timeline.",
+          conflictWith: {
+            title: overlap.title,
+            startTime: overlap.startTime.toISOString(),
+            endTime: overlap.endTime.toISOString(),
+          },
+        },
+        { status: 409 },
+      );
+    }
 
     if (updates.title !== undefined) event.title = updates.title;
     if (updates.description !== undefined)
@@ -98,15 +147,8 @@ export async function PUT(
     if (updates.location !== undefined) event.location = updates.location;
     if (updates.eventType !== undefined) event.eventType = updates.eventType;
     if (updates.timezone !== undefined) event.timezone = updates.timezone;
-    if (updates.startTime !== undefined) event.startTime = updates.startTime;
-    if (updates.endTime !== undefined) event.endTime = updates.endTime;
-
-    if (event.endTime <= event.startTime) {
-      return NextResponse.json(
-        { error: "Invalid time range: endTime must be after startTime" },
-        { status: 400 },
-      );
-    }
+    event.startTime = nextStart;
+    event.endTime = nextEnd;
 
     await event.save();
 
@@ -161,6 +203,12 @@ export async function DELETE(
 
     const group: any = await TravelGroup.findOne({ groupID: groupId });
     if (!group) {
+      console.error(
+        "[DELETE] group not found — groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
@@ -170,6 +218,14 @@ export async function DELETE(
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
+      console.error(
+        "[DELETE] event not found — eventId:",
+        eventId,
+        "| groupId:",
+        groupId,
+        "| userId:",
+        userId,
+      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 

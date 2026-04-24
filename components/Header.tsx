@@ -1,16 +1,22 @@
 import { Button } from "./ui/button";
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
 
 interface HeaderProps {
   readonly user?: any;
+  /** When the parent page already called getServerSession, pass it to avoid duplicate work. */
+  readonly session?: Session | null;
 }
 
-export async function Header(user: HeaderProps) {
-  const session = await getServerSession(authOptions);
-  const isAuthed = !!session;
+export async function Header({ session: sessionProp }: HeaderProps) {
+  const session =
+    sessionProp !== undefined
+      ? sessionProp
+      : await getServerSession(authOptions);
+  const isAuthed = !!session?.user;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
@@ -44,7 +50,7 @@ export async function Header(user: HeaderProps) {
             >
               Testimonials
             </a>
-            {session ? (
+            {isAuthed ? (
               <Link href="/dashboard">
                 <Button variant="ghost" className="text-gray-700">
                   Dashboard

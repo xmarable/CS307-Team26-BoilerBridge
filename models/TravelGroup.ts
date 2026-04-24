@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 import { randomUUID } from "crypto";
 
 const expenseSchema = new mongoose.Schema(
@@ -77,7 +76,7 @@ const groupMemberSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const SMSSchema = new mongoose.Schema({
+const NotificationSchema = new mongoose.Schema({
   smsID: {
     type: mongoose.Types.UUID,
     default: () => randomUUID(),
@@ -113,6 +112,40 @@ const photoSchema = new mongoose.Schema({
   },
 });
 
+const paymentRequestSchema = new mongoose.Schema(
+  {
+    requestID: {
+      type: mongoose.Schema.Types.UUID,
+      default: () => randomUUID(),
+    },
+    requesterID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+      required: true,
+    },
+    targetMemberID: {
+      type: mongoose.Schema.Types.UUID,
+      ref: "User",
+      required: true,
+    },
+    amount: { type: Number, required: true },
+    expenseID: {
+      type: mongoose.Schema.Types.UUID,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "paid", "declined"],
+      default: "pending",
+    },
+    createdAt: { type: Date, default: Date.now },
+    confirmedAt: { type: Date },
+    message: { type: String },
+    declineReason: { type: String },
+  },
+  { _id: false },
+);
+
 // New schema for tracking invitations that haven't been accepted yet
 const pendingRequestSchema = new mongoose.Schema(
   {
@@ -132,6 +165,10 @@ const pollChoiceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    voters: {
+      type: [mongoose.Types.UUID],
+      default: [],
+    }
   },
   { _id: false }
 );
@@ -188,8 +225,13 @@ const travelGroupSchema = new mongoose.Schema(
       default: [],
     },
     ledger: [expenseSchema],
-    smsLogs: {
-      type: [SMSSchema],
+    iteneraryId: {
+      type: mongoose.Schema.Types.UUID,
+      //required: true,
+      ref: "Itenerary"
+    },
+    notifications: {
+      type: [NotificationSchema],
       default: [],
     },
     chatLogs: {
@@ -198,6 +240,10 @@ const travelGroupSchema = new mongoose.Schema(
     },
     photos: {
       type: [photoSchema],
+      default: [],
+    },
+    paymentRequests: {
+      type: [paymentRequestSchema],
       default: [],
     },
     polls: {

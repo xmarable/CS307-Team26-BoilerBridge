@@ -25,8 +25,15 @@ export async function GET() {
       .select("username userId email school")
       .lean();
 
-    return NextResponse.json(friends);
-  } catch (error) {
+    return NextResponse.json(
+      friends.map((f: any) => ({
+        userId: f.userId?.toString(),
+        username: f.username,
+        email: f.email,
+        school: f.school,
+      })),
+    );
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

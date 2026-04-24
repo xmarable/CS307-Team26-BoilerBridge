@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import FriendRequest from "@/models/FriendRequest";
 import User from "@/models/User";
 import dbConnect from "@/lib/dbConnect";
+import mongoose from "mongoose";
 
 export async function GET() {
   try {
@@ -14,8 +15,10 @@ export async function GET() {
     if (!myUUID)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const binaryUUID = new (mongoose.Types as any).UUID(myUUID);
+
     const sentRequests = await FriendRequest.find({
-      requesterId: myUUID,
+      requesterId: binaryUUID,
       status: "pending",
     }).lean();
 
@@ -25,16 +28,16 @@ export async function GET() {
           .select("username email")
           .lean();
         return {
-          id: req.requestId,
-          recipientName: recipient?.username || "Unknown User",
-          recipientEmail: recipient?.email,
+          id: req.requestId?.toString(),
+          recipientName: (recipient as any)?.username || "Unknown User",
+          recipientEmail: (recipient as any)?.email || "",
           createdAt: req.createdAt,
         };
       }),
     );
 
     return NextResponse.json(formattedRequests, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

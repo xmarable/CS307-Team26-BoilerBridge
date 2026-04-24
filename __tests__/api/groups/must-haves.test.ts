@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 import { jest } from "@jest/globals";
 import mongoose from "mongoose";
 
@@ -23,10 +25,39 @@ await jest.unstable_mockModule("@/lib/auth", () => ({
   authOptions: {},
 }));
 
+await jest.unstable_mockModule("@/lib/itinerary/generateFull", () => ({
+  generateFullTripEvents: jest.fn(async (ctx: any, mustHaves: any[]) => {
+    if (!mustHaves.length) {
+      const s = new Date(ctx.fromDate.getTime() + 10 * 3600000);
+      const e = new Date(ctx.fromDate.getTime() + 12 * 3600000);
+      return [
+        {
+          title: `Explore ${ctx.toCity}`,
+          description: "Mock itinerary with no must-haves",
+          startTime: s,
+          endTime: e,
+          location: ctx.toCity,
+          eventType: "activity",
+          timezone: "UTC",
+        },
+      ];
+    }
+    return mustHaves.map((mh: any, i: number) => ({
+      title: mh.name,
+      description: mh.notes || "Mock description",
+      startTime: new Date(ctx.fromDate.getTime() + i * 3600000),
+      endTime: new Date(ctx.fromDate.getTime() + (i + 1) * 3600000),
+      location: mh.address,
+      eventType: mh.category || "activity",
+      timezone: "UTC",
+    }));
+  }),
+}));
+
 beforeAll(async () => {
   jest.resetModules();
 
-  const nextAuth = await import("next-auth");
+  const nextAuth = (await import("next-auth")) as any;
   mockGetServerSession = nextAuth.getServerSession as any;
 
   ({ default: bcrypt } = await import("bcryptjs"));
@@ -611,30 +642,47 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
   });
 
   it("generates calendar events from approved must-haves", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
       params: Promise.resolve({ groupId: groupUUID }),
     });
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.count).toBe(2);
+    // finalizeItineraryProposedEvents injects outbound + return travel for intercity trips
+    expect(data.count).toBe(4);
     expect(data.message).toMatch(/itinerary/i);
 
     const events = await CalendarEvent.find({
       groupId: groupUUID,
       source: "itinerary",
     } as any);
-    expect(events.length).toBe(2);
+    expect(events.length).toBe(4);
     const titles = events.map((e: { title: any }) => e.title);
     expect(titles).toContain("Eiffel Tower");
     expect(titles).toContain("Louvre Museum");
+    expect(titles.some((t: string) => /Travel:.*→/.test(t))).toBe(true);
   });
 
   it("prioritizes higher-priority must-haves (sorted by priority desc)", async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+
     const events = await CalendarEvent.find({
       groupId: groupUUID,
       source: "itinerary",
     } as any).sort({ startTime: 1 });
-    expect(events[0].title).toBe("Eiffel Tower");
+    const eiffel = events.find((ev: { title: string }) => ev.title === "Eiffel Tower");
+    const louvre = events.find((ev: { title: string }) => ev.title === "Louvre Museum");
+    expect(eiffel && louvre).toBeTruthy();
+    expect(new Date(eiffel.startTime).getTime()).toBeLessThan(
+      new Date(louvre.startTime).getTime(),
+    );
   });
 
   it("does not include proposed or rejected must-haves in the itinerary", async () => {
@@ -655,6 +703,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       },
     ] as any[]);
 
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: leaderId },
+      expires: "9999",
+    });
+
     const res = await GENERATE(makeGenerateRequest(groupUUID), {
       params: Promise.resolve({ groupId: groupUUID }),
     });
@@ -669,7 +722,7 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
     expect(titles).not.toContain("Rejected Spot");
   });
 
-  it("returns 400 when no approved must-haves exist", async () => {
+  it("still generates an itinerary when no approved must-haves exist", async () => {
     const hash = await bcrypt.hash("pass", 10);
     const emptyLeader = await User.create({
       username: "gen_empty_leader",
@@ -695,12 +748,17 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       budget: 1000,
     } as any);
 
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: emptyLeader.userId.toString() },
+      expires: "9999",
+    });
+
     const res = await GENERATE(makeGenerateRequest(emptyUUID), {
       params: Promise.resolve({ groupId: emptyUUID }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.error).toMatch(/no approved/i);
+    expect(data.count).toBeGreaterThan(0);
   });
 
   it("returns 404 when no trip is found for the group", async () => {
@@ -717,6 +775,11 @@ describe("POST /api/groups/:groupId/itinerary/generate (must-haves integration)"
       membersList: [{ userId: noTripLeader.userId.toString(), role: "Leader" }],
     });
     const noTripUUID = noTripGroup.groupID.toString();
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: noTripLeader.userId.toString() },
+      expires: "9999",
+    });
 
     const res = await GENERATE(makeGenerateRequest(noTripUUID), {
       params: Promise.resolve({ groupId: noTripUUID }),

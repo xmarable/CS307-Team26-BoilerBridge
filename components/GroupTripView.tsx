@@ -2,7 +2,7 @@
 "use client";
 
 import { GroupBoard } from "./GroupBoard";
-import { Users, ShieldCheck, MapPin, Calendar } from "lucide-react";
+import { Users, ShieldCheck, Calendar } from "lucide-react";
 import { RainyDayToggle } from "./RainyDayToggle";
 
 export function GroupTripView({ initialData }: { initialData: any }) {

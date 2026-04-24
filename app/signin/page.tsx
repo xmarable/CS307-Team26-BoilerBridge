@@ -6,13 +6,13 @@ import { SignIn } from "@/components/SignIn";
 
 export default async function SignInPage() {
   const session = (await getServerSession(authOptions)) as any;
-  if (session) {
+  if (session?.user?.email) {
     redirect("/dashboard");
   }
 
   return (
     <div>
-      <Header />
+      <Header session={session} />
       <SignIn />
     </div>
   );

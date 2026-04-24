@@ -9,6 +9,7 @@ import {
   Loader2,
   Trash2,
   LogOut,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -33,21 +34,22 @@ export function MemberManagement({
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{
+    userId: string;
+    name: string;
+    isSelf: boolean;
+  } | null>(null);
 
   const currentUserRole = members.find((m) => m.userId === currentUserId)?.role;
   const isCurrentUserLeader = currentUserRole === "Leader";
-  const isCurrentUserAdmin = currentUserRole === "Admin";
-
-  useEffect(() => {
-    fetchMembers();
-  }, [groupId]);
 
   const fetchMembers = async () => {
     try {
       const res = await fetch(`/api/groups/${groupId}/members`);
       const data = await res.json();
+
       if (res.ok) {
-        setMembers(data);
+        setMembers(Array.isArray(data) ? data : data.members || []);
       }
     } catch (err) {
       console.error("failed to fetch members", err);
@@ -55,6 +57,11 @@ export function MemberManagement({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
 
   const handleRoleAction = async (
     targetUserId: string,
@@ -87,30 +94,41 @@ export function MemberManagement({
     }
   };
 
-  const handleRemoveMember = async (userId: string, name: string) => {
-    const isSelf = userId === currentUserId;
-    const confirmMsg = isSelf
-      ? "Are you sure you want to leave this group?"
-      : `Are you sure you want to remove ${name} from the group?`;
-
-    if (!confirm(confirmMsg)) return;
-
+  const confirmAndRemove = (userId: string, name: string, isSelf: boolean) => {
     if (isSelf && isCurrentUserLeader && members.length > 1) {
       alert("You must transfer leadership to another member before leaving.");
       return;
     }
+    setConfirmRemove({ userId, name, isSelf });
+  };
 
+  const executeRemoval = async () => {
+    if (!confirmRemove) return;
+    const { userId, isSelf } = confirmRemove;
+
+    setConfirmRemove(null);
     setProcessingId(userId);
+
     try {
-      const res = await fetch(`/api/groups/${groupId}/members`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
+      let res: Response;
+
+      if (isSelf) {
+        // use the leave route which handles leadership transfer and group deletion
+        res = await fetch(`/api/groups/${groupId}/leave`, {
+          method: "POST",
+          credentials: "include",
+        });
+      } else {
+        // use the secure leader-only member removal route
+        res = await fetch(`/api/groups/${groupId}/members/${userId}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+      }
 
       if (res.ok) {
         if (isSelf) {
-          router.push("/dashboard/groups");
+          router.push("/dashboard");
         } else {
           await fetchMembers();
           if (onUpdate) onUpdate();
@@ -121,6 +139,7 @@ export function MemberManagement({
       }
     } catch (err) {
       console.error("error removing member", err);
+      alert("something went wrong");
     } finally {
       setProcessingId(null);
     }
@@ -128,66 +147,104 @@ export function MemberManagement({
 
   if (loading)
     return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="animate-spin text-amber-500" />
+      <div className="flex justify-center items-center min-h-37.5">
+        <Loader2 className="animate-spin text-amber-500" size={32} />
       </div>
     );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-black text-gray-900">Group Members</h3>
-        <button
-          onClick={() => handleRemoveMember(currentUserId, "myself")}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-xl transition-all"
-        >
-          <LogOut size={14} />
-          Leave Group
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {members.map((member) => (
-          <div
-            key={member.userId}
-            className="flex items-center justify-between p-5 bg-gray-50 rounded-4xl border border-gray-100 transition-all hover:bg-white hover:shadow-sm"
-          >
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-xs border border-gray-50">
-                <User size={24} />
+    <>
+      {/* Confirmation Modal */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-50 rounded-2xl">
+                <AlertTriangle size={22} className="text-red-500" />
               </div>
-              <div>
-                <p className="font-black text-gray-900">
-                  {member.name} {member.userId === currentUserId && "(You)"}
-                </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span
-                    className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                      member.role === "Leader"
-                        ? "bg-amber-500 text-white shadow-sm shadow-amber-100"
-                        : member.role === "Admin"
-                          ? "bg-blue-500 text-white shadow-sm shadow-blue-100"
-                          : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {member.role}
-                  </span>
-                </div>
-              </div>
+              <h3 className="text-xl font-black text-gray-900">
+                {confirmRemove.isSelf ? "Leave Group" : "Remove Member"}
+              </h3>
             </div>
+            <p className="text-gray-600 font-medium mb-8 leading-relaxed">
+              {confirmRemove.isSelf
+                ? "Are you sure you want to leave this group? You will lose access immediately."
+                : `Are you sure you want to remove ${confirmRemove.name} from the group? They will lose access immediately.`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                disabled={processingId === confirmRemove.userId}
+                className="flex-1 py-3 rounded-2xl font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeRemoval}
+                disabled={processingId === confirmRemove.userId}
+                className="flex-1 py-3 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-60"
+              >
+                {confirmRemove.isSelf ? "Leave" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-            {/* Controls */}
-            {member.userId !== currentUserId &&
-              (isCurrentUserLeader || isCurrentUserAdmin) && (
-                <div className="flex items-center gap-2">
-                  {processingId === member.userId ? (
-                    <Loader2
-                      size={18}
-                      className="animate-spin text-gray-400 mr-2"
-                    />
-                  ) : (
-                    <>
-                      {isCurrentUserLeader && (
+      <div className="space-y-6 w-full">
+        <div className="flex items-center justify-between mb-8 px-2">
+          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+            Group Members
+          </h3>
+          <button
+            onClick={() => confirmAndRemove(currentUserId, "myself", true)}
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-2xl transition-all border border-transparent hover:border-red-100"
+          >
+            <LogOut size={16} />
+            Leave Group
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {members.length > 0 ? (
+            members.map((member) => (
+              <div
+                key={member.userId}
+                className="flex items-center justify-between p-6 bg-gray-50/50 rounded-4xl border-2 border-gray-50 transition-all hover:bg-white hover:border-amber-100 hover:shadow-xl hover:shadow-amber-50/20 group"
+              >
+                <div className="flex items-center gap-5">
+                  <div className="h-14 w-14 bg-white rounded-2xl flex items-center justify-center text-amber-500 shadow-sm border border-gray-100 group-hover:scale-105 transition-transform">
+                    <User size={28} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black text-gray-900 leading-none">
+                      {member.name} {member.userId === currentUserId && "(You)"}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-full ${
+                          member.role === "Leader"
+                            ? "bg-amber-500 text-white shadow-md shadow-amber-100"
+                            : member.role === "Admin"
+                              ? "bg-blue-500 text-white shadow-md shadow-blue-100"
+                              : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {member.role}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {/* Controls only visible to the group leader, and only for other members */}
+                {member.userId !== currentUserId &&
+                  (isCurrentUserLeader || currentUserRole === "Admin") && (
+                    <div className="flex items-center gap-3">
+                      {processingId === member.userId ? (
+                        <Loader2
+                          size={20}
+                          className="animate-spin text-gray-400"
+                        />
+                      ) : (
                         <>
                           <button
                             onClick={() =>
@@ -197,7 +254,8 @@ export function MemberManagement({
                                 member.role === "Admin" ? "Viewer" : "Admin",
                               )
                             }
-                            className="p-2.5 hover:bg-white rounded-xl transition-all border border-transparent hover:border-gray-200 text-gray-400 hover:text-blue-600 shadow-xs"
+                            disabled={member.role === "Leader"}
+                            className="p-3 bg-white hover:bg-blue-50 rounded-2xl transition-all border border-gray-100 hover:border-blue-200 text-gray-400 hover:text-blue-600 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
                             title={
                               member.role === "Admin"
                                 ? "Demote to Viewer"
@@ -205,52 +263,63 @@ export function MemberManagement({
                             }
                           >
                             {member.role === "Admin" ? (
-                              <ShieldCheck size={20} />
+                              <ShieldCheck size={22} />
                             ) : (
-                              <Shield size={20} />
+                              <Shield size={22} />
                             )}
                           </button>
 
-                          <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  `Transfer leadership to ${member.name}? You will become an Admin.`,
-                                )
-                              ) {
-                                handleRoleAction(
+                          {isCurrentUserLeader && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Transfer leadership to ${member.name}? You will become an Admin.`,
+                                  )
+                                ) {
+                                  handleRoleAction(
+                                    member.userId,
+                                    "TRANSFER_LEADERSHIP",
+                                  );
+                                }
+                              }}
+                              className="p-3 bg-white hover:bg-amber-50 rounded-2xl transition-all border border-gray-100 hover:border-amber-200 text-gray-400 hover:text-amber-500 shadow-sm"
+                              title="Transfer Leadership"
+                            >
+                              <Crown size={22} />
+                            </button>
+                          )}
+
+                          {isCurrentUserLeader && (
+                            <button
+                              onClick={() =>
+                                confirmAndRemove(
                                   member.userId,
-                                  "TRANSFER_LEADERSHIP",
-                                );
+                                  member.name,
+                                  false,
+                                )
                               }
-                            }}
-                            className="p-2.5 hover:bg-white rounded-xl transition-all border border-transparent hover:border-amber-200 text-gray-400 hover:text-amber-500 shadow-xs"
-                            title="Transfer Leadership"
-                          >
-                            <Crown size={20} />
-                          </button>
+                              className="p-3 bg-white hover:bg-red-50 rounded-2xl transition-all border border-gray-100 hover:border-red-200 text-gray-400 hover:text-red-500 shadow-sm"
+                              title="Remove from Group"
+                            >
+                              <Trash2 size={22} />
+                            </button>
+                          )}
                         </>
                       )}
-
-                      {(isCurrentUserLeader ||
-                        (isCurrentUserAdmin && member.role === "Viewer")) && (
-                        <button
-                          onClick={() =>
-                            handleRemoveMember(member.userId, member.name)
-                          }
-                          className="p-2.5 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 text-gray-400 hover:text-red-500 shadow-xs"
-                          title="Remove from Group"
-                        >
-                          <Trash2 size={20} />
-                        </button>
-                      )}
-                    </>
+                    </div>
                   )}
-                </div>
-              )}
-          </div>
-        ))}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-4xl">
+              <p className="text-gray-400 font-bold">
+                No members found in this group.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

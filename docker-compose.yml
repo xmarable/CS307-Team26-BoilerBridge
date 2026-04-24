@@ -1,0 +1,18 @@
+services:
+  app:
+    env_file: .env.local
+    build:
+      context: .
+      dockerfile: Dockerfile.dev # <--- point this to your new dev file
+    working_dir: /workspaces/CS307-Team26-BoilerBridge
+    volumes:
+      - .:/workspaces/CS307-Team26-BoilerBridge
+      - /workspaces/CS307-Team26-BoilerBridge/node_modules
+      - ollama_data:/root/.ollama
+    ports:
+      - "3000:3000"
+    environment:
+      - OLLAMA_SKIP=0
+
+volumes:
+  ollama_data:

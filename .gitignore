@@ -1,5 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+
 # dependencies
 /node_modules
 /.pnp
@@ -50,6 +51,13 @@ next-env.d.ts
 .*.sw?
 *.un~
 *~
+# Local Environment Variables
+.env.local
 .env*.local
 .pnpm-store/
 weeklyReport.py
+
+# Local development state/notes
+.boiler_state.md
+
+.claude

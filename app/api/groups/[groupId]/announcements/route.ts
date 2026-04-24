@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
 import TravelGroup from "@/models/TravelGroup";
 import User from "@/models/User";
+import mongoose from "mongoose";
 
 export async function POST(
   req: NextRequest,
@@ -19,7 +21,9 @@ export async function POST(
 
     await dbConnect();
 
-    const currentUser = await User.findOne({ email: session.user.email });
+    const currentUser = await User.findOne({
+      email: session.user.email,
+    }).lean();
     if (!currentUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -32,13 +36,22 @@ export async function POST(
       );
     }
 
-    const group = await TravelGroup.findOne({ groupID: groupId });
+    /**
+     * UUID FIX: Querying with BSON UUID
+     */
+    const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    const group = await TravelGroup.findOne({ groupID: binaryGroupId });
+
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
+    /**
+     * UUID FIX: Normalize to string for comparison
+     */
+    const currentUserIdStr = currentUser.userId.toString();
     const memberRecord = group.membersList.find(
-      (m: any) => m.userId === currentUser.userId,
+      (m: any) => m.userId.toString() === currentUserIdStr,
     );
 
     // AC: Create the logic for leaders to add messages
@@ -50,13 +63,14 @@ export async function POST(
     }
 
     const newAnnouncement = {
+      announcementID: new (mongoose.Types as any).UUID(), // ensure ID is generated properly
       content: content.trim(),
-      pinnedBy: currentUser.name || currentUser.username,
+      pinnedBy: currentUser.username || currentUser.name || "Leader",
       pinnedByID: currentUser.userId,
       timestamp: new Date(),
     };
 
-    // AC: Message appears at the top (unshift adds to the beginning of the array)
+    // AC: Message appears at the top
     group.pinnedAnnouncements.unshift(newAnnouncement);
     await group.save();
 
@@ -75,7 +89,8 @@ export async function GET(
     const { groupId } = await context.params;
     await dbConnect();
 
-    const group = await TravelGroup.findOne({ groupID: groupId })
+    const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    const group = await TravelGroup.findOne({ groupID: binaryGroupId })
       .select("pinnedAnnouncements")
       .lean();
 
@@ -110,7 +125,9 @@ export async function DELETE(
 
     await dbConnect();
 
-    const currentUser = await User.findOne({ email: session.user.email });
+    const currentUser = await User.findOne({
+      email: session.user.email,
+    }).lean();
     if (!currentUser)
       return NextResponse.json({ error: "User not found" }, { status: 404 });
 
@@ -122,12 +139,14 @@ export async function DELETE(
       );
     }
 
-    const group = await TravelGroup.findOne({ groupID: groupId });
+    const binaryGroupId = new (mongoose.Types as any).UUID(groupId);
+    const group = await TravelGroup.findOne({ groupID: binaryGroupId });
     if (!group)
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
+    const currentUserIdStr = currentUser.userId.toString();
     const memberRecord = group.membersList.find(
-      (m: any) => m.userId === currentUser.userId,
+      (m: any) => m.userId.toString() === currentUserIdStr,
     );
 
     // AC: Create the logic for leaders to remove messages
@@ -139,8 +158,9 @@ export async function DELETE(
     }
 
     // AC: Item is removed from the view for all members
+    // UUID comparison fix for deletion
     group.pinnedAnnouncements = group.pinnedAnnouncements.filter(
-      (a: any) => a.announcementID !== announcementID,
+      (a: any) => a.announcementID.toString() !== announcementID.toString(),
     );
 
     await group.save();

@@ -1,0 +1,168 @@
+/*
+ * components.dark.css
+ *
+ * Automatic dark-mode overrides for hardcoded Tailwind color classes.
+ * Imported by globals.css — no changes needed in individual components.
+ *
+ * To opt a single element out, add an explicit dark:<utility> on that element.
+ */
+
+/* ── Backgrounds: all boxes match the page background ────────────── */
+
+.dark .bg-white {
+  background-color: #161b22;
+} /* card level — matches sidebar */
+.dark .bg-gray-50 {
+  background-color: #0d1117;
+} /* background level */
+.dark .bg-gray-100 {
+  background-color: #21262d;
+}
+.dark .bg-gray-200 {
+  background-color: #30363d;
+}
+
+/* Opacity variants: the inner light-gray rows → background */
+.dark .bg-gray-50\/50 {
+  background-color: #0d1117;
+}
+.dark .bg-gray-50\/80 {
+  background-color: #0d1117;
+}
+.dark .bg-gray-100\/50 {
+  background-color: #0d1117;
+}
+.dark .bg-gray-200\/60 {
+  background-color: #21262d;
+}
+
+.dark .bg-amber-50 {
+  background-color: rgb(245 158 11 / 0.08);
+}
+.dark .bg-amber-100 {
+  background-color: rgb(245 158 11 / 0.14);
+}
+
+/* Amber opacity variants */
+.dark .bg-amber-50\/30 {
+  background-color: rgb(245 158 11 / 0.05);
+}
+.dark .bg-amber-50\/40 {
+  background-color: rgb(245 158 11 / 0.06);
+}
+.dark .bg-amber-50\/50 {
+  background-color: rgb(245 158 11 / 0.07);
+}
+.dark .bg-amber-50\/80 {
+  background-color: rgb(245 158 11 / 0.09);
+}
+.dark .bg-amber-50\/90 {
+  background-color: rgb(245 158 11 / 0.1);
+}
+.dark .bg-amber-100\/90 {
+  background-color: rgb(245 158 11 / 0.14);
+}
+
+.dark .bg-red-50 {
+  background-color: rgb(248 81 73 / 0.08);
+}
+.dark .bg-green-50 {
+  background-color: rgb(35 134 54 / 0.08);
+}
+.dark .bg-green-50\/90 {
+  background-color: rgb(35 134 54 / 0.1);
+}
+.dark .bg-blue-50 {
+  background-color: rgb(56 139 253 / 0.08);
+}
+.dark .bg-blue-50\/30 {
+  background-color: rgb(56 139 253 / 0.05);
+}
+.dark .bg-pink-50\/50 {
+  background-color: rgb(236 72 153 / 0.07);
+}
+
+/* ── Text ─────────────────────────────────────────────────────────── */
+
+.dark .text-gray-900 {
+  color: #e6edf3;
+}
+.dark .text-gray-800 {
+  color: #c9d1d9;
+}
+.dark .text-gray-700 {
+  color: #8b949e;
+}
+.dark .text-gray-600 {
+  color: #8b949e;
+}
+.dark .text-gray-500 {
+  color: #6e7681;
+}
+.dark .text-gray-400 {
+  color: #484f58;
+}
+.dark .text-gray-300 {
+  color: #30363d;
+}
+.dark .text-gray-200 {
+  color: #21262d;
+}
+
+.dark .text-amber-800 {
+  color: #fbbf24;
+}
+.dark .text-amber-900 {
+  color: #f59e0b;
+}
+.dark .text-red-600 {
+  color: #f85149;
+}
+.dark .text-red-700 {
+  color: #ff7b72;
+}
+
+/* ── Borders ──────────────────────────────────────────────────────── */
+
+.dark .border-gray-50 {
+  border-color: #1e1e1e;
+}
+.dark .border-gray-100 {
+  border-color: #2a2a2a;
+}
+.dark .border-gray-200 {
+  border-color: #333333;
+}
+.dark .border-gray-300 {
+  border-color: #3a3a3a;
+}
+
+/* ── Shadows ──────────────────────────────────────────────────────── */
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4);
+}
+.dark .shadow-md {
+  box-shadow: 0 4px 8px 0 rgb(0 0 0 / 0.5);
+}
+.dark .shadow-lg {
+  box-shadow: 0 10px 20px 0 rgb(0 0 0 / 0.6);
+}
+.dark .shadow-xl {
+  box-shadow: 0 20px 40px 0 rgb(0 0 0 / 0.6);
+}
+
+/* ── Divide lines ─────────────────────────────────────────────────── */
+
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2a2a2a;
+}
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #333333;
+}
+
+/* ── Placeholder text ─────────────────────────────────────────────── */
+
+.dark .placeholder-gray-400::placeholder {
+  color: #484f58;
+}

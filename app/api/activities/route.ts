@@ -4,12 +4,37 @@ import { z } from "zod";
 import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import Activity from "@/models/Activity";
+import { resolvePlaceFieldsForCreate } from "@/lib/travel/googlePlaces";
+
+const ReferenceLinkSchema = z.object({
+  title: z.string().min(1).trim(),
+  url: z.string().trim().min(1),
+});
+
 
 const CreateActivitySchema = z.object({
+  /** Free-text: e.g. "Kayaking in Chicago" — server resolves Google Place ID when configured */
   name: z.string().min(1, "Name is required").trim(),
+  /** Optional disambiguation hint; combined with name for Places text search */
   address: z.string().trim().optional(),
-  placeId: z.string().trim().optional(),
+  description: z.string().trim().optional(),
+  infoUrl: z.string().trim().optional(),
+  referenceLinks: z.array(ReferenceLinkSchema).optional(),
+  /** Specific vendor / ticket URL only — otherwise US16 uses destination hotel search */
+  bookingUrl: z.string().trim().optional(),
+  estimatedCost: z.coerce.number().optional(),
 });
+
+function safeUrlString(s: string | undefined): string | undefined {
+  if (!s?.trim()) return undefined;
+  try {
+    const u = new URL(s.trim());
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
 
 function serializeId(id: unknown): string {
   if (id && typeof (id as { toString: () => string }).toString === "function") {
@@ -43,9 +68,9 @@ export async function GET(req: NextRequest) {
         .lean();
       return NextResponse.json({
         activities: activities.map((a) => {
-          const doc = a as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+          const doc = a as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
           return {
-            _id: serializeId(doc._id),
+            activityId: doc.activityId,
             placeId: doc.placeId,
             name: doc.name,
             address: doc.address,
@@ -66,10 +91,10 @@ export async function GET(req: NextRequest) {
         reviews: [],
       });
       const doc = created.toObject ? created.toObject() : created;
-      const d = doc as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+      const d = doc as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
       return NextResponse.json({
         activity: {
-          _id: serializeId(d._id),
+          activityId: d.activityId,
           placeId: d.placeId,
           name: d.name,
           address: d.address,
@@ -79,10 +104,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const doc = activity as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+    const doc = activity as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
     return NextResponse.json({
       activity: {
-        _id: serializeId(doc._id),
+        activityId: doc.activityId,
         placeId: doc.placeId,
         name: doc.name,
         address: doc.address,
@@ -121,25 +146,76 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, address, placeId } = parsed.data;
+    const {
+      name,
+      address,
+      description,
+      infoUrl,
+      referenceLinks,
+      bookingUrl,
+      estimatedCost,
+    } = parsed.data;
 
     await dbConnect();
 
+    const resolved = await resolvePlaceFieldsForCreate(process.env.GOOGLE_MAPS_API_KEY, {
+      name,
+      address,
+    });
+
+    const mergedAddress = address?.trim() || resolved.address?.trim() || undefined;
+    const mergedDescription =
+      description?.trim() || resolved.description?.trim() || undefined;
+    const mergedInfoUrl =
+      safeUrlString(infoUrl) || safeUrlString(resolved.infoUrl) || undefined;
+    const mergedPlaceId = resolved.placeId?.trim() || undefined;
+
+    const links: { title: string; url: string }[] =
+      referenceLinks
+        ?.map((l) => {
+          const url = safeUrlString(l.url);
+          if (!url) return null;
+          return { title: l.title, url };
+        })
+        .filter((x): x is { title: string; url: string } => x != null) ?? [];
+
+    if (
+      resolved.googleMapsUri &&
+      !links.some((l) => l.url === resolved.googleMapsUri)
+    ) {
+      links.push({ title: "Google Maps", url: resolved.googleMapsUri });
+    }
+
     const created = await Activity.create({
       name,
-      address: address || undefined,
-      placeId: placeId || undefined,
+      address: mergedAddress,
+      placeId: mergedPlaceId,
+      description: mergedDescription,
+      infoUrl: mergedInfoUrl,
+      referenceLinks: links.length ? links : undefined,
+      bookingUrl: safeUrlString(bookingUrl),
+      googleMapsUri: safeUrlString(resolved.googleMapsUri),
+      googleTypes:
+        resolved.googleTypes?.length ? resolved.googleTypes : undefined,
+      priceLevel:
+        resolved.priceLevel != null ? resolved.priceLevel : undefined,
+      phoneNumber: resolved.phoneNumber?.trim() || undefined,
+      openingHoursSummary: resolved.openingHoursSummary?.trim() || undefined,
+      googlePhotoReference: resolved.googlePhotoReference?.trim() || undefined,
+      googlePhotoMediaResource:
+        resolved.googlePhotoMediaResource?.trim() || undefined,
+      estimatedCost: estimatedCost != null ? estimatedCost : undefined,
       reviewCount: 0,
       reviews: [],
     });
 
     const doc = created.toObject ? created.toObject() : created;
-    const d = doc as { _id: unknown; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
+    const d = doc as { activityId: string; placeId?: string; name: string; address?: string; rating?: number; reviewCount?: number };
 
     return NextResponse.json(
       {
         activity: {
-          _id: serializeId(d._id),
+          activityId: d.activityId,
           placeId: d.placeId,
           name: d.name,
           address: d.address,

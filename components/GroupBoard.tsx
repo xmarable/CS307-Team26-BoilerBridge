@@ -31,10 +31,6 @@ export function GroupBoard({
   const [newContent, setNewContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * AC: Given a group leader pins a message...
-   * Then that message appears at the top of the board.
-   */
   const handlePostAnnouncement = async () => {
     if (!newContent.trim()) return;
     setIsSubmitting(true);
@@ -58,7 +54,6 @@ export function GroupBoard({
           timestamp: added.timestamp || new Date().toISOString(),
           pinnedBy: added.pinnedBy || "Leader",
         };
-        // Prepend to state to reflect "top of board" immediately
         setAnnouncements([newAnnouncement, ...announcements]);
         setNewContent("");
       }
@@ -69,10 +64,6 @@ export function GroupBoard({
     }
   };
 
-  /**
-   * AC: Given an announcement is unpinned by a leader...
-   * Then the item is removed from the view for all members.
-   */
   const handleDeleteAnnouncement = async (announcementID: string) => {
     try {
       const res = await fetch(`/api/groups/${groupId}/announcements`, {
@@ -82,7 +73,6 @@ export function GroupBoard({
       });
 
       if (res.ok) {
-        // Filter out the deleted item from the local state
         setAnnouncements((prev) =>
           prev.filter((a) => a.announcementID !== announcementID),
         );
@@ -93,48 +83,52 @@ export function GroupBoard({
   };
 
   return (
-    <div className="space-y-6">
-      {" "}
-      {/* wrapped in a div to stack them */}
-      <Card className="border-2 border-amber-100 shadow-sm rounded-3xl overflow-hidden">
-        <CardHeader className="bg-amber-50/50 border-b border-amber-100 p-6">
+    <div className="space-y-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <Card className="border-none bg-white shadow-sm rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="bg-amber-50/40 p-8 border-b border-amber-100/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500 rounded-xl text-white">
-                <Megaphone size={20} />
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-200">
+                <Megaphone size={28} />
               </div>
-              <CardTitle className="text-xl font-bold text-gray-900">
-                Group Board
-              </CardTitle>
+              <div>
+                <CardTitle className="text-2xl font-black text-gray-900 tracking-tight">
+                  Group Board
+                </CardTitle>
+                <p className="text-sm font-bold text-amber-600 uppercase tracking-widest mt-1">
+                  Pinned Announcements
+                </p>
+              </div>
             </div>
-            <span className="text-xs font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full uppercase tracking-wider">
-              {announcements.length} Pinned
-            </span>
+            <div className="px-5 py-2 bg-white border-2 border-amber-100 rounded-2xl shadow-sm">
+              <span className="text-lg font-black text-amber-600">
+                {announcements.length}
+              </span>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="p-6">
-          {/* Leader-only Posting UI */}
+        <CardContent className="p-8">
           {isLeader && (
-            <div className="flex gap-2 mb-8">
+            <div className="flex flex-col sm:flex-row gap-4 mb-10">
               <Input
                 placeholder="Pin an important update for the group..."
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                className="rounded-xl border-gray-200 focus:ring-amber-500"
+                className="h-16 rounded-2xl border-2 border-gray-100 bg-gray-50/50 text-lg focus:ring-amber-500 font-medium px-8 flex-1"
               />
               <Button
                 onClick={handlePostAnnouncement}
                 disabled={isSubmitting}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl px-6"
+                className="h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl px-10 transition-transform active:scale-95 shadow-lg shadow-amber-100"
               >
-                <Pin size={18} className="mr-2" />
-                Pin
+                <Pin size={22} className="mr-3 fill-white" />
+                PIN
               </Button>
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {announcements.length > 0 ? (
               [...announcements]
                 .sort((a, b) => {
@@ -147,22 +141,23 @@ export function GroupBoard({
                 .map((item) => (
                   <div
                     key={item.announcementID || `ann-${Math.random()}`}
-                    className="group relative bg-white border border-gray-100 p-5 rounded-2xl hover:border-amber-200 hover:bg-amber-50/10 transition-all shadow-xs"
+                    className="group relative bg-white border-2 border-gray-50 p-8 rounded-4xl hover:border-amber-200 hover:shadow-xl hover:shadow-amber-50/50 transition-all"
                   >
-                    {/* Explicit string conversion ensures JSDOM doesn't self-close the tag */}
-                    <p className="text-gray-800 font-medium text-lg mb-4 leading-relaxed">
+                    <p className="text-gray-800 font-bold text-xl mb-6 leading-snug">
                       {item.content ? String(item.content) : " "}
                     </p>
 
-                    <div className="flex items-center justify-between mt-auto">
-                      <div className="flex items-center gap-4 text-xs font-semibold text-gray-500">
-                        <div className="flex items-center gap-1.5">
-                          <UserIcon size={14} className="text-amber-500" />
-                          <span>{item.pinnedBy || "Leader"}</span>
+                    <div className="flex items-center justify-between border-t-2 border-gray-50 pt-6 mt-auto">
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl">
+                          <UserIcon size={16} className="text-amber-500" />
+                          <span className="text-sm font-black text-gray-600 uppercase tracking-wider">
+                            {item.pinnedBy || "Leader"}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} />
-                          <span>
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <Clock size={16} />
+                          <span className="text-sm font-bold">
                             {item.timestamp
                               ? formatDistanceToNow(new Date(item.timestamp))
                               : "just now"}{" "}
@@ -176,28 +171,32 @@ export function GroupBoard({
                           onClick={() =>
                             handleDeleteAnnouncement(item.announcementID)
                           }
-                          /* Test-runner visibility fix */
-                          className="text-gray-300 hover:text-red-500 transition-all p-1 cursor-pointer opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                          className="text-gray-200 hover:text-red-500 transition-colors p-2 cursor-pointer"
                           title="Unpin Announcement"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={20} />
                         </button>
                       )}
                     </div>
                   </div>
                 ))
             ) : (
-              <div className="text-center py-10 border-2 border-dashed border-gray-100 rounded-3xl">
-                <p className="text-gray-400 font-medium">
-                  No pinned announcements yet.
-                </p>
+              <div className="text-center py-16 border-4 border-dashed border-gray-50 rounded-[2.5rem]">
+                <div className="flex flex-col items-center gap-4">
+                  <Pin size={32} className="text-gray-200" />
+                  <p className="text-gray-400 font-bold text-lg">
+                    No pinned announcements yet.
+                  </p>
+                </div>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
-      {/* Checklist appears right under the board card */}
-      <TripChecklist groupId={groupId} />
+
+      <div className="px-2">
+        <TripChecklist groupId={groupId} />
+      </div>
     </div>
   );
 }

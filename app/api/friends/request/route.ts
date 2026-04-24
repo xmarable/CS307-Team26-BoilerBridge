@@ -26,12 +26,14 @@ export async function GET() {
         const formattedRequests = await Promise.all(
           requests.map(async (req: any) => {
             const sender = await User.findOne({ userId: req.requesterId })
-              .select("username")
+              .select("username email")
               .lean();
             return {
-              id: req.requestId,
-              senderName: sender?.username || "Unknown User",
-              requesterId: req.requesterId,
+              id: req.requestId?.toString(),
+              senderId: req.requesterId?.toString(),
+              senderName: (sender as any)?.username || "Unknown User",
+              senderEmail: (sender as any)?.email || "",
+              createdAt: req.createdAt,
             };
           }),
         );
@@ -39,7 +41,7 @@ export async function GET() {
         return NextResponse.json(formattedRequests, { status: 200 });
       }
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },
@@ -139,16 +141,10 @@ export async function POST(req: Request) {
               { status: 400 },
             );
           } else {
-            const newRequest = await FriendRequest.create({
+            await FriendRequest.create({
               requesterId: requesterUUID,
               recipientId: recipientId,
-              status: "pending",
             });
-
-            /* console.log(
-              "SUCCESS: Created FriendRequest with ID:",
-              newRequest.requestId,
-            ); debug print statement */
 
             return NextResponse.json(
               { message: "Friend request sent" },
@@ -192,7 +188,7 @@ export async function DELETE(req: Request) {
         { status: 200 },
       );
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

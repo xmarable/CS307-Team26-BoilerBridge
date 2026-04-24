@@ -14,6 +14,14 @@ export interface ICalendarEvent extends Document {
   source: "manual" | "itinerary";
   externalId?: string;
   timezone?: string;
+  /** Explicit display order within a day group; null means fall back to startTime ordering */
+  displayOrder?: number;
+  /** Stored Activity document id for /dashboard/activities/[id] */
+  linkedActivityId?: string;
+  /** Google Places id when preview detail is used */
+  linkedPlaceId?: string;
+  /** Trip destination city when row was created from Spark (for destination-aware preview links) */
+  itineraryDestinationCity?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +71,10 @@ const CalendarEventSchema = new Schema<ICalendarEvent>(
 
     externalId: { type: String },
     timezone: { type: String, default: "UTC" },
+    displayOrder: { type: Number },
+    linkedActivityId: { type: String, trim: true },
+    linkedPlaceId: { type: String, trim: true },
+    itineraryDestinationCity: { type: String, trim: true },
   },
   { timestamps: true },
 );

@@ -4,27 +4,37 @@ import dbConnect from "@/lib/dbConnect";
 import { authOptions } from "@/lib/auth";
 import TravelGroup from "@/models/TravelGroup";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(req: NextRequest) {
+export async function GET(
+  req: NextRequest,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<NextResponse<{ invites: any[] } | { error: string }>> {
   try {
+    void req; // to silence unused variable warning since we need the function signature to match Next.js expectations
     await dbConnect();
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email?.toLowerCase();
 
-    if (!email) {
+    const session = await getServerSession(authOptions);
+    const emailRaw = session?.user?.email;
+    if (!emailRaw) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    const email = emailRaw.toLowerCase();
 
-    // find groups where u are invited but not a member yet
     const invites = await TravelGroup.find({
       "pendingRequests.email": email,
     })
       .select("groupID groupName description")
       .lean();
 
-    return NextResponse.json(invites || [], { status: 200 });
+    // return NextResponse.json(invites || [], { status: 200 });
+    return NextResponse.json(
+      { invites: invites ?? [] },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (err) {
     console.error("fetch invites error:", err);
-    return NextResponse.json({ error: "server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "server error" },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

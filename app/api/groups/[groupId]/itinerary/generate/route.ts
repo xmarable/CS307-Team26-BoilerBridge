@@ -1,5 +1,24 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+
 import dbConnect from "@/lib/dbConnect";
+import { authOptions } from "@/lib/auth";
+import { getMemberPermissions } from "@/lib/roles";
+import {
+  generateFullTripEvents,
+  type MustHaveContext,
+} from "@/lib/itinerary/generateFull";
+import { mapTripToGenerationContext } from "@/lib/itinerary/mapTripToGenerationContext";
+import { normalizeProposedTimeline } from "@/lib/itinerary/normalizeProposedTimeline";
+import { filterProposedEventsByAvoidLists } from "@/lib/itinerary/filterProposedByAvoid";
+import { resolveActivityLinksForProposals } from "@/lib/itinerary/resolveActivityLinks";
+import { augmentResolvedLinksWithTextSearch } from "@/lib/itinerary/augmentResolvedLinksWithTextSearch";
+import {
+  getItineraryChronologyIssues,
+  ItineraryValidationError,
+} from "@/lib/itinerary/itineraryChronology";
+import { mergeItineraryValidationIssues } from "@/lib/itinerary/itineraryDeterministic";
+
 import CalendarEvent from "@/models/CalendarEvent";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
@@ -9,7 +28,11 @@ export async function POST(
   { params }: { params: Promise<{ groupId: string }> },
 ) {
   try {
-    await dbConnect();
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as { userId?: string })?.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { groupId } = await params;
 
@@ -20,92 +43,190 @@ export async function POST(
       );
     }
 
-    // 1. Fetch trip details
-    // using 'as any' on the query object satisfies the UUID/string type mismatch
-    const trip = await Trip.findOne({ groupID: groupId as any });
-    if (!trip) {
+    await dbConnect();
+
+    const permissionResult = await getMemberPermissions(groupId, userId);
+    if ("error" in permissionResult && permissionResult.error) {
       return NextResponse.json(
-        { error: "Trip settings not found for the provided Group ID." },
-        { status: 404 },
+        { error: permissionResult.error },
+        { status: permissionResult.status },
+      );
+    }
+    if (!permissionResult.canEdit) {
+      return NextResponse.json(
+        { error: "Forbidden: insufficient permissions to generate itinerary" },
+        { status: 403 },
       );
     }
 
-    // 2. Validate trip dates
-    const startDate = new Date(trip.fromDate);
-    const endDate = new Date(trip.toDate);
+    let selectedTripId: string | undefined;
+    try {
+      const body = (await req.json()) as { tripId?: unknown };
+      if (typeof body?.tripId === "string" && body.tripId.trim().length > 0) {
+        selectedTripId = body.tripId.trim();
+      }
+    } catch {
+      // Empty body is valid; fallback to latest trip for the group.
+    }
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    const trip = selectedTripId
+      ? await Trip.findOne({
+          _id: selectedTripId as never,
+          groupID: groupId as never,
+        }).lean()
+      : await Trip.findOne({ groupID: groupId as never })
+          .sort({ createdAt: -1 })
+          .lean();
+    if (!trip) {
+      return NextResponse.json(
+        {
+          error: selectedTripId
+            ? "The selected trip could not be found for this group."
+            : "No trip is set up for this group yet. Use Trip settings next to Timeline (group page) to add route, dates, and budget, then try again.",
+        },
+        { status: selectedTripId ? 400 : 404 },
+      );
+    }
+
+    const startDate = new Date((trip as { fromDate: Date }).fromDate);
+    const endDate = new Date((trip as { toDate: Date }).toDate);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       return NextResponse.json(
         { error: "Invalid date range found in the trip configuration." },
         { status: 400 },
       );
     }
 
-    // 3. Fetch approved must-haves
-    const approvedMustHaves = await MustHave.find({
-      groupId: groupId as any,
+    const mustHaveDocs = await MustHave.find({
+      groupId: groupId as never,
       status: "approved",
-    }).sort({ priority: -1 });
+    } as never)
+      .sort({ priority: -1 })
+      .lean();
 
-    if (approvedMustHaves.length === 0) {
+    const approvedMustHaves: MustHaveContext[] = mustHaveDocs.map((m) => ({
+      name: String((m as { name: string }).name),
+      address: (m as { address?: string }).address,
+      category: (m as { category?: string }).category,
+      notes: (m as { notes?: string }).notes,
+      placeId:
+        typeof (m as { placeId?: string }).placeId === "string"
+          ? (m as { placeId?: string }).placeId
+          : undefined,
+    }));
+
+    const tripCtx = mapTripToGenerationContext({
+      ...(trip as Record<string, unknown>),
+      fromDate: startDate,
+      toDate: endDate,
+    });
+
+    let proposed;
+    try {
+      proposed = await generateFullTripEvents(tripCtx, approvedMustHaves);
+      proposed = normalizeProposedTimeline(proposed, { trip: tripCtx });
+      proposed = filterProposedEventsByAvoidLists(
+        proposed,
+        tripCtx.avoidActivities ?? [],
+        tripCtx.avoidLocations ?? [],
+        approvedMustHaves,
+      );
+
+      let issues = mergeItineraryValidationIssues(
+        proposed,
+        tripCtx,
+        getItineraryChronologyIssues(proposed, tripCtx),
+      );
+      if (issues.length > 0) {
+        console.warn("[itinerary] validation failed, retrying once:", issues);
+        proposed = await generateFullTripEvents(tripCtx, approvedMustHaves, {
+          chronologyCorrectionNote: issues.join("; "),
+        });
+        proposed = normalizeProposedTimeline(proposed, { trip: tripCtx });
+        proposed = filterProposedEventsByAvoidLists(
+          proposed,
+          tripCtx.avoidActivities ?? [],
+          tripCtx.avoidLocations ?? [],
+          approvedMustHaves,
+        );
+        issues = mergeItineraryValidationIssues(
+          proposed,
+          tripCtx,
+          getItineraryChronologyIssues(proposed, tripCtx),
+        );
+      }
+      if (issues.length > 0) {
+        console.error("[itinerary] chronology validation failed after retry:", issues);
+        throw new ItineraryValidationError(issues);
+      }
+    } catch (e) {
+      if (e instanceof ItineraryValidationError) {
+        return NextResponse.json(
+          {
+            error:
+              "Generated itinerary could not be validated for realistic times. Try again or simplify trip settings.",
+            details: e.issues.join("; "),
+          },
+          { status: 422 },
+        );
+      }
+      console.error("Ollama full itinerary generation:", e);
+      const msg = e instanceof Error ? e.message : String(e);
       return NextResponse.json(
-        { error: "No approved items available to generate an itinerary." },
-        { status: 400 },
+        {
+          error: "Itinerary generation failed (Ollama).",
+          details: msg,
+        },
+        { status: 502 },
       );
     }
 
-    // 4. Clear existing generated itinerary events
     await CalendarEvent.deleteMany({
-      groupId: groupId as any,
+      groupId: groupId as never,
       source: "itinerary",
+    } as never);
+
+    let linkRows = await resolveActivityLinksForProposals(proposed, approvedMustHaves);
+    linkRows = await augmentResolvedLinksWithTextSearch(proposed, linkRows, {
+      toCity: tripCtx.toCity,
+      fromCity: tripCtx.fromCity,
     });
 
-    // 5. Distribution logic
-    const totalDays =
-      Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      ) || 1;
-    const generatedEvents: any[] = [];
+    const destCity = tripCtx.toCity?.trim() ?? "";
 
-    approvedMustHaves.forEach((mh, index) => {
-      const dayOffset = Math.floor(index / 3) % totalDays;
-      const slot = index % 3;
+    const docs = proposed.map((ev, i) => ({
+      title: ev.title,
+      description: ev.description,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+      location: linkRows[i]?.linkedLocationHint?.trim() || ev.location,
+      eventType: ev.eventType ?? "general",
+      createdBy: userId,
+      groupId,
+      source: "itinerary" as const,
+      timezone: ev.timezone ?? "UTC",
+      ...(destCity ? { itineraryDestinationCity: destCity } : {}),
+      ...(linkRows[i]?.linkedActivityId
+        ? { linkedActivityId: linkRows[i]!.linkedActivityId }
+        : {}),
+      ...(linkRows[i]?.linkedPlaceId ? { linkedPlaceId: linkRows[i]!.linkedPlaceId } : {}),
+    }));
 
-      const eventStart = new Date(startDate);
-      eventStart.setDate(startDate.getDate() + dayOffset);
-
-      const hour = slot === 0 ? 10 : slot === 1 ? 14 : 18;
-      eventStart.setHours(hour, 0, 0, 0);
-
-      const eventEnd = new Date(eventStart);
-      eventEnd.setHours(eventStart.getHours() + 2);
-
-      generatedEvents.push({
-        title: mh.name,
-        description: mh.notes || "",
-        location: mh.address || "",
-        startTime: eventStart,
-        endTime: eventEnd,
-        groupId: groupId,
-        createdBy: mh.addedBy,
-        source: "itinerary",
-        eventType: mh.category || "activity",
-      });
-    });
-
-    // 6. Batch insert generated events
-    const created = await CalendarEvent.insertMany(generatedEvents);
+    const created = await CalendarEvent.insertMany(docs);
 
     return NextResponse.json({
       message: "Itinerary sparked successfully.",
       count: created.length,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    // i want to see why this is failing so im logging the whole err object lol
     console.error("Itinerary generation error:", err);
+    const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
       {
         error: "Internal server error during itinerary generation.",
-        details: err.message,
+        details: message,
       },
       { status: 500 },
     );

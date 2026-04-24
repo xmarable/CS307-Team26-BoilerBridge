@@ -1,4 +1,4 @@
-import { getServerSession, Session } from "next-auth";
+import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import dbConnect from "./dbConnect";
 import TravelGroup from "@/models/TravelGroup";
