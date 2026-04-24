@@ -1360,6 +1360,16 @@ export default function CalendarEventsPanel({
       (!!overDayEntry && overDayEntry[0] !== activeDay);
 
     if (isCrossDay) {
+      if (!overIsDayHeader && overDayEntry) {
+        const targetCard = overDayEntry[1].find((e) => e._id === overId);
+        if (targetCard?.isLocked) {
+          setErr(
+            "Cannot move an activity into a locked activity's time slot. Unlock it first.",
+          );
+          return;
+        }
+      }
+
       const targetDayKey = overIsDayHeader ? overId : overDayEntry![0];
       const targetDayEvents =
         eventsGroupedByDay.find(([k]) => k === targetDayKey)?.[1] ?? [];
@@ -1478,6 +1488,14 @@ export default function CalendarEventsPanel({
     const oldIndex = activeDayEvents.findIndex((e) => e._id === activeId);
     const newIndex = activeDayEvents.findIndex((e) => e._id === overId);
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+    const cardAtTarget = activeDayEvents[newIndex];
+    if (cardAtTarget?.isLocked) {
+      setErr(
+        "Cannot move an activity into a locked activity's time slot. Unlock it first.",
+      );
+      return;
+    }
 
     const reordered = arrayMove(activeDayEvents, oldIndex, newIndex);
     const timeSlots = [...activeDayEvents]
