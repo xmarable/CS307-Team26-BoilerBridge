@@ -25,6 +25,7 @@ import CalendarEvent from "@/models/CalendarEvent";
 import ItineraryOptionVote from "@/models/ItineraryOptionVote";
 import MustHave from "@/models/MustHave";
 import Trip from "@/models/Trip";
+import { createTripNotif } from "@/lib/notifications";
 
 export async function POST(
   req: Request,
@@ -241,6 +242,12 @@ export async function POST(
     }));
 
     const created = await CalendarEvent.insertMany(docs);
+
+    createTripNotif({
+      groupID: groupId,
+      userId: userId,
+      message: `Itinerary generated for ${trip.toCity}`
+    });
 
     return NextResponse.json({
       message: "Itinerary sparked successfully.",

@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
+import { createTripNotif } from "@/lib/notifications";
 import TravelGroup from "@/models/TravelGroup";
 import User from "@/models/User";
+import { group } from "console";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -93,6 +95,12 @@ export async function POST(
 
   info.group.polls.push(newPoll as any);
   await info.group.save();
+
+  createTripNotif({
+    groupID: info.group.groupID,
+    userId: info.userId,
+    message: `Poll created in ${info.group.groupName}`
+  });
 
   return NextResponse.json({ polls: newPoll }, { status: 200 });
 }

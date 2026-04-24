@@ -22,7 +22,11 @@ import {
 interface GroupInvite {
   groupID: string;
   groupName: string;
-}
+};
+
+interface GroupInvitePayload {
+  invites: GroupInvite[];
+};
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -55,13 +59,21 @@ export function NotificationBell() {
     refreshInterval: 5000,
   });
 
-  const { data: groupInvites, mutate: mutateGroups } = useSWR<GroupInvite[]>(
+  const { data: groupInvites, mutate: mutateGroups } = useSWR<GroupInvitePayload>(
     "/api/groups/invites",
     fetcher,
     {
       refreshInterval: 5000,
     },
   );
+
+  const { data: tripPayload, mutate: mutateTripNotifs } = useSWR(
+    "/api/notifications/trips",
+    fetcher,
+    {
+      refreshInterval: 5000,
+    },
+  )
 
   const {
     data: notifPayload,
@@ -144,8 +156,22 @@ export function NotificationBell() {
     }
   };
 
+  const markTripNotificationRead = async (notificationID: string) => {
+    try {
+      await fetch(`/api/notifications/${notificationID}/read`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      mutateTripNotifs();
+    } catch {
+      /* ignore */
+    }
+  };
+
   const fList = Array.isArray(friendRequests) ? friendRequests : [];
-  const gList = Array.isArray(groupInvites) ? groupInvites : [];
+  const gList = Array.isArray(groupInvites?.invites) ? groupInvites.invites : [];
+  const tList = Array.isArray(tripPayload?.notifications) ? tripPayload.notifications : [];
   const payload = notifPayload as NotificationsPayload | undefined;
   const inAppList: InAppNotification[] = Array.isArray(payload?.notifications)
     ? payload!.notifications!
@@ -332,6 +358,37 @@ export function NotificationBell() {
                         </p>
                       </div>
                     </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {tList.length > 0 && (
+            <div>
+              {fList.length > 0 || gList.length > 0 || inAppList.length > 0 ? (
+                <DropdownMenuSeparator className="bg-gray-100 my-2" />
+              ) : null}
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide px-2 mb-1">
+                Trip
+              </p>
+              <ul className="space-y-1">
+                {tList.map((t) => (
+                  <li key={t.notificationID}>
+                    <div className="flex items-start gap-3 p-2 rounded-lg transition-colors">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 shrink-0 mt-0.5">
+                        <Banknote size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-900 leading-snug">
+                          {t.message ?? "Payment update"}
+                        </p>
+                        <Link onClick={() => markTripNotificationRead(t.notificationID)} href={`/dashboard/groups/${t.groupID}`} className="text-[11px] text-amber-700 font-medium mt-0.5">
+                          Open group
+                        </Link>
+                      </div>
+                      <Link href="" onClick={() => markTripNotificationRead(t.notificationID)} className="text-amber-700">Mark as read</Link>
+                    </div>
                   </li>
                 ))}
               </ul>

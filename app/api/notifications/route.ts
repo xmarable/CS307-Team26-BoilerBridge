@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const recipientID = userId.toString();
 
     const [notifications, total, unreadCount] = await Promise.all([
-      Notification.find({ recipientID })
+      Notification.find({ recipientID, type: "payment_confirmed" })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)

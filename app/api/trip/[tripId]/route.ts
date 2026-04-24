@@ -10,6 +10,7 @@ import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
 import { AccessibilityRequirementsSchema } from "@/lib/itinerary/schemas";
 import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
+import { createTripNotif } from "@/lib/notifications";
 
 const TripPatchSchema = z
   .object({
@@ -223,6 +224,12 @@ export async function PATCH(
       new: true,
     });
 
+    createTripNotif({
+      groupID: trip.groupID,
+      userId: userId,
+      message: `Trip updated for ${trip.toCity}`
+    });
+
     return NextResponse.json(updatedTrip, { status: 200 });
   } catch (err: any) {
     console.error("PATCH /api/trip/[tripId] error:", err);
@@ -270,6 +277,13 @@ export async function DELETE(
     }
 
     await Trip.findByIdAndDelete(tripId);
+
+    createTripNotif({
+      groupID: trip.groupID,
+      userId: userId,
+      message: `Trip deleted for ${trip.toCity}`
+    });
+
     return NextResponse.json({ message: "Trip deleted" }, { status: 200 });
   } catch (err: any) {
     console.error("DELETE /api/trip/[tripId] error:", err);

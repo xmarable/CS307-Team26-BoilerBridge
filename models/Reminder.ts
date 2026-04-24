@@ -1,4 +1,4 @@
-import { Schema, Document, model, models } from "mongoose";
+import mongoose, { type Document } from "mongoose";
 
 export interface IReminder extends Document {
   userId: string;
@@ -12,7 +12,7 @@ export interface IReminder extends Document {
   createdAt: Date;
 }
 
-const ReminderSchema = new Schema<IReminder>({
+const ReminderSchema = new mongoose.Schema<IReminder>({
   userId: { type: String, required: true },
   groupID: { type: String },
   text: { type: String, required: true },
@@ -28,4 +28,6 @@ const ReminderSchema = new Schema<IReminder>({
 ReminderSchema.index({ triggerTime: 1, completed: 1 });
 ReminderSchema.index({ userId: 1, type: 1 });
 
-export default models.Reminder || model<IReminder>("Reminder", ReminderSchema);
+export default
+  mongoose.models.Reminder ||
+  mongoose.model<IReminder>("Reminder", ReminderSchema);

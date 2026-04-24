@@ -9,6 +9,7 @@ import { getMemberPermissions } from "@/lib/roles";
 import { generateRainyDayPlan } from "@/lib/rainyDayEngine";
 import { AccessibilityRequirementsSchema } from "@/lib/itinerary/schemas";
 import { ensureItinerarySectionIds } from "@/lib/itinerary/ensureItinerarySectionIds";
+import { createTripNotif } from "@/lib/notifications";
 
 type ItineraryActivityInput = {
   activityId: string;
@@ -250,6 +251,12 @@ export async function POST(req: NextRequest) {
         })),
       );
     }
+
+    createTripNotif({
+      groupID: groupID,
+      userId: userId,
+      message: `Trip update for ${trip.toCity}`
+    });
 
     const t = trip as Record<string, unknown>;
     return NextResponse.json(
