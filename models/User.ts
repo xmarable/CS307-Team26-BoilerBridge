@@ -62,41 +62,41 @@ const userSchema = new mongoose.Schema({
       tripReminders: {
         inApp: {
           type: Boolean,
-          default: false
+          default: true
         },
         email: {
           type: Boolean,
-          default: false
+          default: true
         }
       },
       friendRequests: {
         inApp: {
           type: Boolean,
-          default: false
+          default: true
         },
         email: {
           type: Boolean,
-          default: false
+          default: true
         }
       },
       groupInvites: {
         inApp: {
           type: Boolean,
-          default: false
+          default: true
         },
         email: {
           type: Boolean,
-          default: false
+          default: true
         }
       },
       groupNotifications: {
         inApp: {
           type: Boolean,
-          default: false
+          default: true
         },
         email: {
           type: Boolean,
-          default: false
+          default: true
         }
       }
     },

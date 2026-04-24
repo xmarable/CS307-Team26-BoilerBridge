@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["payment_confirmed"],
+      enum: ["payment_confirmed", "trip"],
     },
     groupID: {
       type: String,
@@ -25,7 +25,7 @@ const notificationSchema = new mongoose.Schema(
     },
     paymentRequestID: {
       type: String,
-      required: true,
+      required: false,
     },
     actorUserId: {
       type: mongoose.Schema.Types.UUID,

@@ -1,5 +1,6 @@
 "use client"
 import { Badge, Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Droplets, Loader2, Snowflake, Sun, Wind } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type DayForecast = {
@@ -58,9 +59,14 @@ export function ItinieraryWeather({ groupId }: { groupId: string }) {
         <p className="text-2xl font-black text-gray-900 tracking-tight">
           10-Day Forecast
         </p>
-        <p className="text-sm font-bold text-gray-500 mt-1">
-          {city || "Based on your trips destination"}
-        </p>
+        <div className="flex flex-l justify-between">
+          <p className="text-sm font-bold text-gray-500 mt-1">
+            {city || "Based on your trips destination"}
+          </p>
+          <p className="text-sm font-bold text-gray-500 mt-1 justify-right">
+            From: <a className="underline" href="https://open-meteo.com/en/docs/geocoding-api" target="_blank">geocoding-api</a> and <a className="underline" href="https://open-meteo.com/" target="_blank">open-meteo</a>
+          </p>
+        </div>
       </div>
 
       {loading ? (
