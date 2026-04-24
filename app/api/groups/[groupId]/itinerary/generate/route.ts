@@ -17,6 +17,7 @@ import {
   getItineraryChronologyIssues,
   ItineraryValidationError,
 } from "@/lib/itinerary/itineraryChronology";
+import { mergeItineraryValidationIssues } from "@/lib/itinerary/itineraryDeterministic";
 
 import CalendarEvent from "@/models/CalendarEvent";
 import MustHave from "@/models/MustHave";
@@ -132,9 +133,13 @@ export async function POST(
         approvedMustHaves,
       );
 
-      let issues = getItineraryChronologyIssues(proposed, tripCtx);
+      let issues = mergeItineraryValidationIssues(
+        proposed,
+        tripCtx,
+        getItineraryChronologyIssues(proposed, tripCtx),
+      );
       if (issues.length > 0) {
-        console.warn("[itinerary] chronology validation failed, retrying once:", issues);
+        console.warn("[itinerary] validation failed, retrying once:", issues);
         proposed = await generateFullTripEvents(tripCtx, approvedMustHaves, {
           chronologyCorrectionNote: issues.join("; "),
         });
@@ -145,7 +150,11 @@ export async function POST(
           tripCtx.avoidLocations ?? [],
           approvedMustHaves,
         );
-        issues = getItineraryChronologyIssues(proposed, tripCtx);
+        issues = mergeItineraryValidationIssues(
+          proposed,
+          tripCtx,
+          getItineraryChronologyIssues(proposed, tripCtx),
+        );
       }
       if (issues.length > 0) {
         console.error("[itinerary] chronology validation failed after retry:", issues);

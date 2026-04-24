@@ -11,6 +11,7 @@ import {
   dedupeRedundantArrivalEvents,
   repairIntercityDayOneSequence,
 } from "@/lib/itinerary/itineraryChronology";
+import { enforceDeterministicItineraryRules } from "@/lib/itinerary/itineraryDeterministic";
 import {
   interCityBlockMs,
   intraCityTransitionMs,
@@ -101,6 +102,10 @@ function injectReturnTravel(
   const startKey = zonedDayKey(trip.fromDate, tz);
   const endKey = zonedDayKey(trip.toDate, tz);
   if (startKey === endKey) return events;
+
+  if (events.some((e) => isStrictReturnIntercityLeg(e, trip))) {
+    return sortByStart(events);
+  }
 
   const lastParts = getZonedParts(trip.toDate, tz);
   const retStart = utcForZonedWallClock(tz, lastParts.year, lastParts.month, lastParts.day, 16, 0);
@@ -251,6 +256,7 @@ export function repairItinerarySlice(events: ProposedEventInput[], trip: TripCon
   if (events.length === 0) return [];
   const tz = inferPlanningTimezone(trip.toCity, trip.fromCity);
   let working = sortByStart(events);
+  working = enforceDeterministicItineraryRules(working, trip, tz);
   working = repairIntercityDayOneSequence(working, trip, tz);
   working = dedupeRedundantArrivalEvents(working, trip, tz);
   working = bumpNightOwlStarts(working, tz);
@@ -268,8 +274,10 @@ export function finalizeItineraryProposedEvents(
   const tz = inferPlanningTimezone(trip.toCity, trip.fromCity);
 
   let working = sortByStart(events);
+  working = enforceDeterministicItineraryRules(working, trip, tz);
   working = injectOutboundTravel(working, trip, tz);
   working = injectReturnTravel(working, trip, tz);
+  working = enforceDeterministicItineraryRules(working, trip, tz);
   working = bumpNightOwlStarts(working, tz);
   working = repairIntercityDayOneSequence(working, trip, tz);
   working = dedupeRedundantArrivalEvents(working, trip, tz);
