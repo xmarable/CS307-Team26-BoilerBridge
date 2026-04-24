@@ -23,6 +23,10 @@ import {
 } from "@/lib/offline/tripItineraryCache";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { RainyDayTripInput } from "@/components/RainyDayToggle";
+import {
+  clearOfflineGroupNavigationCache,
+  primeOfflineGroupNavigationCache,
+} from "@/lib/offline/primeOfflineGroupNavigationCache";
 
 type GroupTripDetailState = (RainyDayTripInput & { _id: string }) | null;
 
@@ -386,6 +390,12 @@ export function useGroupItineraryOffline({
     void loadTripDetail();
   }, [loadTripDetail]);
 
+  useEffect(() => {
+    if (!groupId || !userHasOfflineSave) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    void primeOfflineGroupNavigationCache(groupId);
+  }, [groupId, userHasOfflineSave]);
+
   const saveForOffline = useCallback(async () => {
     if (!groupId || !idbSupported) return;
     const tid =
@@ -415,6 +425,7 @@ export function useGroupItineraryOffline({
       setTripPlanError(null);
       await refreshOfflineMeta(tid);
       setItinerarySyncState("idle");
+      void primeOfflineGroupNavigationCache(groupId);
     } catch {
       setItinerarySyncState("failed");
     } finally {
@@ -471,6 +482,7 @@ export function useGroupItineraryOffline({
       null;
     if (!tid) return;
     await deleteTripItineraryCache(tid, groupId);
+    await clearOfflineGroupNavigationCache(groupId);
     setUserHasOfflineSave(false);
     setSavedAt(null);
     setLastSyncedAt(null);

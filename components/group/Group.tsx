@@ -651,6 +651,30 @@ export default function GroupDashboard() {
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">
+                {(tripActive || isOffline) ? (
+                  <ItineraryOfflineControls
+                    isOnline={!isOffline}
+                    userHasOfflineSave={userHasOfflineSave}
+                    savedAt={savedAt}
+                    lastSyncedAt={lastSyncedAt}
+                    tripPlanError={tripPlanError}
+                    hasTripContent={!!groupTripDetail}
+                    idbSupported={idbSupported}
+                    itinerarySyncState={itinerarySyncState}
+                    offlineActionBusy={offlineActionBusy}
+                    tripPlanLoading={tripPlanLoading}
+                    onSaveForOffline={() => {
+                      void (async () => {
+                        await saveForOffline();
+                        if (groupId && group) {
+                          cacheGroupShell(groupId, group);
+                        }
+                      })();
+                    }}
+                    onRemoveOffline={() => void removeLocalItineraryCopy()}
+                    onRetrySync={() => void refreshTripItinerary()}
+                  />
+                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-2">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
@@ -693,23 +717,6 @@ export default function GroupDashboard() {
                   )}
                 </div>
                 <div className="bg-bb-surface rounded-[2.5rem] border border-bb-border shadow-sm p-8 h-fit min-h-125 space-y-6">
-                  {(tripActive || isOffline) ? (
-                    <ItineraryOfflineControls
-                      isOnline={!isOffline}
-                      userHasOfflineSave={userHasOfflineSave}
-                      savedAt={savedAt}
-                      lastSyncedAt={lastSyncedAt}
-                      tripPlanError={tripPlanError}
-                      hasTripContent={!!groupTripDetail}
-                      idbSupported={idbSupported}
-                      itinerarySyncState={itinerarySyncState}
-                      offlineActionBusy={offlineActionBusy}
-                      tripPlanLoading={tripPlanLoading}
-                      onSaveForOffline={() => void saveForOffline()}
-                      onRemoveOffline={() => void removeLocalItineraryCopy()}
-                      onRetrySync={() => void refreshTripItinerary()}
-                    />
-                  ) : null}
                   <CalendarEventsPanel
                     groupId={groupId!}
                     canPublishItinerary={

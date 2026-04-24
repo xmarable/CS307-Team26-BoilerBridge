@@ -19,6 +19,9 @@ describe("public/sw-itinerary.js", () => {
     expect(src).toContain("clients.claim");
     expect(src).toContain("Save for Offline");
     expect(src).toContain("offlinePathname");
+    expect(src).toContain("idbHasUserSavedItineraryForGroup");
+    expect(src).toContain("not saved for offline viewing");
+    expect(src).toContain("ignoreSearch");
     expect(src).toContain('redirect: "manual"');
     expect(src).toContain("shouldPutNavigationInCache");
     expect(src).toContain("bb-offline-v3");

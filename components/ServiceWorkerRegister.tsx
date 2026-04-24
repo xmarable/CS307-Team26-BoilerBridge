@@ -3,8 +3,9 @@
 import { useEffect } from "react";
 
 /**
- * Registers `/sw-itinerary.js` (scope `/`) so static chunks and safe navigations can be
- * replayed from Cache Storage after an online visit. Offline refresh is most reliable
+ * Registers `/sw-itinerary.js` (scope `/`). Navigation cache name matches
+ * `OFFLINE_NAV_CACHE_NAME` in `lib/offline/primeOfflineGroupNavigationCache.ts`.
+ * Offline refresh is most reliable
  * after `npm run build && npm run start`; `next dev` may invalidate chunk URLs between loads.
  */
 export function ServiceWorkerRegister() {

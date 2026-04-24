@@ -1,10 +1,10 @@
 /* eslint-disable no-undef */
 /**
  * BoilerBridge offline shell:
- * - HTML navigations: network-first (redirect: manual), then Cache Storage on failure.
- * - Never stores auth redirects as successful navigations (prevents /dashboard ↔ /signin loops).
- * - /_next/static/*: cache-first (hashed assets safe to keep).
- * - Selected GET APIs: network-first, then cache (trip, groups, friends, share) — not /api/auth/*.
+ * - HTML navigations: network-first (redirect: manual), then Cache Storage, then minimal HTML fallback.
+ * - Group pages with an explicit Save for Offline (IndexedDB) get broader cache matching on refresh offline.
+ * - /_next/static/*: cache-first.
+ * - Selected GET APIs: network-first, then cache — not /api/auth/*.
  */
 
 const CACHE_NS = "bb-offline-v3";
@@ -12,6 +12,8 @@ const NAV = `${CACHE_NS}-nav`;
 const STATIC = `${CACHE_NS}-static`;
 const API = `${CACHE_NS}-api`;
 const LEGACY_CACHES = ["bb-sw-trip-get-v1"];
+const IDB_NAME = "bb-offline-v1";
+const IDB_VERSION = 1;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -90,6 +92,69 @@ function shouldPutNavigationInCache(requestUrl, responseUrl, response) {
   return true;
 }
 
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(IDB_NAME, IDB_VERSION);
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => resolve(r.result);
+  });
+}
+
+function idbGet(db, storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readonly");
+    const req = tx.objectStore(storeName).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbHasUserSavedItineraryForGroup(groupId) {
+  let db;
+  try {
+    db = await idbOpen();
+    const mapRow = await idbGet(db, "groupTripId", groupId);
+    const tripId = mapRow && typeof mapRow.tripId === "string" ? mapRow.tripId : null;
+    if (!tripId) return false;
+    const tripRow = await idbGet(db, "trips", tripId);
+    const p = tripRow && tripRow.payload;
+    return !!(
+      tripRow &&
+      tripRow.savedByUser === true &&
+      p &&
+      Array.isArray(p.primaryItinerary) &&
+      Array.isArray(p.rainyDayItinerary)
+    );
+  } catch (_) {
+    return false;
+  } finally {
+    try {
+      if (db) db.close();
+    } catch (_) {}
+  }
+}
+
+async function matchNavCacheForGroup(cache, groupId) {
+  const keys = await cache.keys();
+  const needle = `/dashboard/groups/${groupId}`;
+  for (const req of keys) {
+    try {
+      const u = new URL(req.url);
+      if (u.pathname === needle || u.pathname === `${needle}/`) {
+        const hit = await cache.match(req);
+        if (hit) return hit;
+      }
+    } catch (_) {}
+  }
+  for (const req of keys) {
+    if (req.url.includes(needle)) {
+      const hit = await cache.match(req);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
 async function navNetworkFirst(request) {
   const cache = await caches.open(NAV);
   try {
@@ -101,9 +166,29 @@ async function navNetworkFirst(request) {
     }
     return res;
   } catch {
-    const hit = await cache.match(request);
+    const pathname = offlinePathname(request.url);
+    const m = /^\/dashboard\/groups\/([^/]+)\/?$/i.exec(pathname);
+    let hit = null;
+    try {
+      hit = await cache.match(request, { ignoreSearch: true });
+    } catch (_) {}
+    if (!hit) {
+      try {
+        const noQuery = request.url.split("?")[0];
+        hit = await cache.match(noQuery);
+      } catch (_) {}
+    }
+    if (!hit) {
+      try {
+        hit = await cache.match(request);
+      } catch (_) {}
+    }
+    if (!hit && m) {
+      hit = await matchNavCacheForGroup(cache, m[1]);
+    }
     if (hit) return hit;
-    return offlineDocumentFallback(request.url);
+    const hasSaved = m ? await idbHasUserSavedItineraryForGroup(m[1]) : false;
+    return offlineDocumentFallback(request.url, hasSaved);
   }
 }
 
@@ -115,7 +200,7 @@ function offlinePathname(pageUrl) {
   }
 }
 
-function offlineDocumentFallback(pageUrl) {
+function offlineDocumentFallback(pageUrl, hasUserSavedForGroup) {
   const safe = String(pageUrl).replace(/</g, "");
   const pathname = offlinePathname(pageUrl);
   const onDashboardRoot = pathname === "/dashboard" || pathname === "/dashboard/";
@@ -126,9 +211,12 @@ function offlineDocumentFallback(pageUrl) {
   if (onDashboardRoot) {
     body =
       "The dashboard needs a connection the first time it loads in this browser. For an <strong>offline itinerary</strong>: while online, open a <strong>group</strong> → <strong>Itinerary</strong> → <strong>Save for Offline</strong>. After that, that <strong>group</strong> page can open here without internet (not this dashboard list).";
+  } else if (onGroupPage && hasUserSavedForGroup) {
+    body =
+      "Your itinerary is saved on this device, but the cached page shell is missing. With a brief connection, open this group page once (it will reload), then tap <strong>Save for Offline</strong> again to restore offline refresh.";
   } else if (onGroupPage) {
     body =
-      "Reconnect once to load this group in this browser. Then open <strong>Itinerary</strong> and choose <strong>Save for Offline</strong>. After that, refresh works here without internet.";
+      "This itinerary is not saved for offline viewing. While online, open this group and choose <strong>Save for Offline</strong> near the timeline section.";
   }
 
   let extra =
