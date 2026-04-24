@@ -5,6 +5,9 @@ import clientPromise from "./mongodb";
 import { validateLogin } from "./validateLogin";
 import { JWT } from "next-auth/jwt";
 
+/** Avoid running users.findOne on every getServerSession (JWT is checked very frequently). */
+const DB_USER_SYNC_TTL_MS = 2 * 60 * 1000;
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -72,33 +75,43 @@ export const authOptions: NextAuthOptions = {
         token.eduEmail = session.user?.eduEmail ?? token.eduEmail;
       }
 
-      // sync with DB to check if user still exists
       if (token?.email) {
-        try {
-          const client = await clientPromise;
-          // Use default DB from MONGODB_URI (same as Mongoose/dbConnect), not a hardcoded name.
-          const db = client.db();
-          const dbUser = await db
-            .collection("users")
-            .findOne({ email: token.email });
+        const t = token as any;
+        const now = Date.now();
+        const needsUserDbSync =
+          Boolean(user) ||
+          trigger === "update" ||
+          typeof t.dbUserSyncedAt !== "number" ||
+          now - t.dbUserSyncedAt > DB_USER_SYNC_TTL_MS;
 
-          if (!dbUser) {
-            // user was deleted from the cluster
-            return {
-              ...token,
-              isDeleted: true, // flag this for the session callback
-            } as any;
+        if (needsUserDbSync) {
+          try {
+            const client = await clientPromise;
+            const db = client.db();
+            const dbUser = await db
+              .collection("users")
+              .findOne(
+                { email: token.email },
+                { maxTimeMS: 8_000 },
+              );
+
+            if (!dbUser) {
+              return {
+                ...token,
+                isDeleted: true,
+              } as any;
+            }
+
+            t.dbUserSyncedAt = now;
+            token.name = dbUser.username || dbUser.name || token.name;
+            token.picture = dbUser.image || token.picture;
+            token.isStudentVerified =
+              dbUser.settings?.security?.isStudentVerified ?? false;
+            token.eduEmail = dbUser.eduEmail || null;
+            token.isDeleted = false;
+          } catch (error) {
+            console.error("Auth Callback DB Error:", error);
           }
-
-          // user exists, sync fresh data
-          token.name = dbUser.username || dbUser.name || token.name;
-          token.picture = dbUser.image || token.picture;
-          token.isStudentVerified =
-            dbUser.settings?.security?.isStudentVerified ?? false;
-          token.eduEmail = dbUser.eduEmail || null;
-          token.isDeleted = false;
-        } catch (error) {
-          console.error("Auth Callback DB Error:", error);
         }
       }
 

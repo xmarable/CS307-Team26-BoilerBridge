@@ -114,6 +114,7 @@ describe("GET /api/activities/[activityId]", () => {
     });
 
     expect(res.status).toBe(200);
+    expect(mockFindOne).toHaveBeenCalledWith({ activityId: oid });
     const json = await res.json();
     expect(json.activity.name).toBe("Museum Tour");
     expect(json.activity.description).toBe("A great museum.");

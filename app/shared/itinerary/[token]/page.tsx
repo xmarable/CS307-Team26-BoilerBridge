@@ -57,7 +57,7 @@ export default function SharedItineraryPage() {
 
   const snap = data.snapshot;
   const primary = Array.isArray(snap?.primaryItinerary) ? snap.primaryItinerary : [];
-  const rainy = snap?.rainyDayItinerary as unknown[] | undefined;
+  const rainy = snap?.rainyDayItinerary as [] | [];
   const groupEvents = snap?.groupEvents as
     | {
       title: string;

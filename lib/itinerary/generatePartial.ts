@@ -111,6 +111,7 @@ ${sliceBlock}
 Respond with a JSON object: { "events": [ ... ] }
 Each event must have: title (string), description (string, optional), startTime (ISO 8601 string), endTime (ISO 8601 string), location (string, optional), eventType (string, optional), timezone (string, optional, default UTC).
 Use realistic same-day durations (about 1–3 hours for typical attractions, ~1–2 hours for meals). Avoid placeholder windows like midnight→noon unless it is an overnight/red-eye travel block labeled as travel/transit.
+Events must be strictly chronological: startTime < endTime for each row, no overlapping times, sorted by startTime. Intercity transport must not be preceded by destination "arrival" blocks; use eventType "transport", "travel", or "transit" for real travel segments.
 The "events" array MUST contain EXACTLY ${targetEvents.length} objects, in the same order as the slice above. Do not add or merge entries; one output event per input line.
 `;
 }
