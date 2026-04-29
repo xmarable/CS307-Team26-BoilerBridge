@@ -611,7 +611,7 @@ function SortableEventCard({
               voting={votingOptionId === ev._id}
               onPick={() => void onOptionGroupVote(ev.optionGroupId!, ev._id)}
               showFinalize={
-                isLeader &&
+                (isLeader || canEdit) &&
                 firstEventIdByOptionGroup.get(ev.optionGroupId!) === ev._id
               }
               finalizing={finalizingGroupId === ev.optionGroupId}
@@ -1331,7 +1331,7 @@ export default function CalendarEventsPanel({
 
   async function handleDragEnd(dragEvent: DragEndEvent) {
     const { active, over } = dragEvent;
-    if (!over || active.id === over.id) return;
+    if (!canEdit || !over || active.id === over.id) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);

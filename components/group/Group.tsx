@@ -672,7 +672,7 @@ export default function GroupDashboard() {
             icon={<AlignEndHorizontal size={18} />}
             label="Polls"
           />
-          {isLeader && (
+          {(userRole === "Leader" || userRole === "Admin") && (
             <TabButton
               active={activeSection === "notify"}
               onClick={() => setActiveSection("notify")}
@@ -809,7 +809,7 @@ export default function GroupDashboard() {
                       userRole === "Leader" || userRole === "Admin"
                     }
                     canEdit={userRole === "Leader" || userRole === "Admin"}
-                    isLeader={isLeader}
+                    isLeader={userRole === "Leader" || userRole === "Admin"}
                     onTripPlanSynced={() => void refreshTripItinerary()}
                   />
                 </div>
@@ -966,7 +966,7 @@ export default function GroupDashboard() {
                   </div>
                 )}
 
-              {isLeader && (
+              {(userRole === "Leader" || userRole === "Admin") && (
                 <div className="bg-linear-to-br from-bb-brand to-bb-brand-to rounded-[2.5rem] p-10 text-white shadow-xl shadow-amber-100 w-full">
                   <h3 className="text-2xl font-black mb-2 tracking-tight text-white">
                     Invite your squad
@@ -1113,16 +1113,17 @@ export default function GroupDashboard() {
             </div>
           )}
 
-          {isLeader && activeSection === "notify" && (
-            <div className="min-w-0 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <GroupNotification
-                activeGroup={{
-                  groupID: group.groupID,
-                  groupName: group.groupName,
-                }}
-              />
-            </div>
-          )}
+          {(userRole === "Leader" || userRole === "Admin") &&
+            activeSection === "notify" && (
+              <div className="min-w-0 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <GroupNotification
+                  activeGroup={{
+                    groupID: group.groupID,
+                    groupName: group.groupName,
+                  }}
+                />
+              </div>
+            )}
         </main>
       </div>
     </div>
