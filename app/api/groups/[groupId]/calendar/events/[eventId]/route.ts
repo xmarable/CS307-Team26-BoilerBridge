@@ -12,18 +12,6 @@ import CalendarEvent from "@/models/CalendarEvent";
 import { findCalendarEventOverlap } from "@/lib/calendar/findCalendarEventOverlap";
 import { getMemberPermissions } from "@/lib/roles";
 
-function isMemberOrLeader(group: any, userId: string) {
-  const leader = group?.leaderID?.toString() === userId;
-  const member =
-    Array.isArray(group?.membersList) &&
-    group.membersList.some((m: any) => (m.userId || m)?.toString() === userId);
-  return leader || member;
-}
-
-function isLeader(group: any, userId: string) {
-  return group?.leaderID.toString() === userId;
-}
-
 const UpdateEventSchema = z.object({
   title: z.string().min(1, "Title cannot be empty").optional(),
   description: z.string().optional(),
@@ -53,41 +41,23 @@ export async function PUT(
 
     await dbConnect();
 
-    // we need the full group document (not lean) because we might save reminders to it
-    const group: any = await TravelGroup.findOne({ groupID: groupId });
-    if (!group) {
-      console.error(
-        "[PUT] group not found — groupId:",
-        groupId,
-        "| userId:",
-        userId,
+    // 1. use the helper for consistent role logic
+    const perms = await getMemberPermissions(groupId, userId);
+    if ("error" in perms && perms.error) {
+      return NextResponse.json(
+        { error: perms.error },
+        { status: perms.status },
       );
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
-    }
-
-    if (!isMemberOrLeader(group, userId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
-      console.error(
-        "[PUT] event not found — eventId:",
-        eventId,
-        "| groupId:",
-        groupId,
-        "| userId:",
-        userId,
-      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const creator = !!(await CalendarEvent.exists({
-      _id: eventId,
-      createdBy: userId,
-    }));
-    const leader = isLeader(group, userId);
-    if (!creator && !leader) {
+    // 2. authorize: creator OR anyone with canEdit (Leader/Admin)
+    const isAuthorized = String(event.createdBy) === userId || perms.canEdit;
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -101,6 +71,7 @@ export async function PUT(
     }
 
     const updates = parsed.data;
+    const group = perms.group; // helper already fetched the full doc
 
     const timeChanged =
       updates.startTime !== undefined &&
@@ -153,14 +124,11 @@ export async function PUT(
 
     await event.save();
 
-    // ─── REMINDER AUTO-UPDATE LOGIC ───
     if (timeChanged && group.reminders && group.reminders.length > 0) {
       const newEventStart = new Date(event.startTime).getTime();
 
       group.reminders = group.reminders.map((reminder: any) => {
-        // if this reminder is linked to the event we just moved...
         if (reminder.linkedEventId === eventId) {
-          // recalculate the dueDate using the stored offset
           reminder.dueDate = new Date(
             newEventStart - reminder.offsetMinutes * 60000,
           );
@@ -168,7 +136,6 @@ export async function PUT(
         return reminder;
       });
 
-      // mark the reminders array as modified so mongoose saves it
       group.markModified("reminders");
       await group.save();
     }
@@ -202,46 +169,29 @@ export async function DELETE(
 
     await dbConnect();
 
-    const group: any = await TravelGroup.findOne({ groupID: groupId });
-    if (!group) {
-      console.error(
-        "[DELETE] group not found — groupId:",
-        groupId,
-        "| userId:",
-        userId,
+    // 1. use the helper here too
+    const perms = await getMemberPermissions(groupId, userId);
+    if ("error" in perms && perms.error) {
+      return NextResponse.json(
+        { error: perms.error },
+        { status: perms.status },
       );
-      return NextResponse.json({ error: "Group not found" }, { status: 404 });
-    }
-
-    if (!isMemberOrLeader(group, userId)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const event: any = await CalendarEvent.findOne({ _id: eventId, groupId });
     if (!event) {
-      console.error(
-        "[DELETE] event not found — eventId:",
-        eventId,
-        "| groupId:",
-        groupId,
-        "| userId:",
-        userId,
-      );
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const creator = !!(await CalendarEvent.exists({
-      _id: eventId,
-      createdBy: userId,
-    }));
-    const leader = isLeader(group, userId);
-    if (!creator && !leader) {
+    // 2. authorize: creator OR anyone with canEdit (Leader/Admin)
+    const isAuthorized = String(event.createdBy) === userId || perms.canEdit;
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     await CalendarEvent.deleteOne({ _id: eventId, groupId });
 
-    // clean up orphaned reminders if the event is deleted
+    const group = perms.group;
     if (group.reminders) {
       group.reminders = group.reminders.filter(
         (r: any) => r.linkedEventId !== eventId,
