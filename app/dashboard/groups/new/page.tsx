@@ -100,7 +100,7 @@ export default function CreateGroupPage() {
 
   return (
     <div className="p-6 lg:p-8 flex justify-center items-center min-h-[calc(100vh-8rem)]">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+      <div className="w-full max-w-md bg-bb-surface rounded-2xl shadow-sm border border-bb-border p-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
             Create a travel group
@@ -110,7 +110,7 @@ export default function CreateGroupPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 text-gray-900">
+        <form onSubmit={handleSubmit} className="space-y-5 text-bb-text">
           <div>
             <Label htmlFor="groupName" className="text-gray-900 font-medium">
               Group name *
@@ -160,7 +160,7 @@ export default function CreateGroupPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="bg-white border-amber-500 text-amber-700 hover:bg-amber-50 hover:text-amber-800 rounded-xl"
+                className="bg-bb-surface border-amber-500 text-amber-700 hover:bg-bb-surface-subtle hover:text-amber-800 rounded-xl"
               >
                 Cancel
               </Button>

@@ -84,51 +84,51 @@ export function GroupBoard({
 
   return (
     <div className="space-y-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <Card className="border-none bg-white shadow-sm rounded-[2.5rem] overflow-hidden">
-        <CardHeader className="bg-amber-50/40 p-8 border-b border-amber-100/50">
+      <Card className="bg-bb-surface rounded-[2.5rem] shadow-sm border border-bb-border overflow-hidden">
+        <CardHeader className="p-8 border-b border-bb-border bg-linear-to-b from-bb-surface-subtle to-bb-surface">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-4 bg-amber-500 rounded-2xl text-white shadow-lg shadow-amber-200">
-                <Megaphone size={28} />
+              <div className="w-14 h-14 bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200/20">
+                <Megaphone className="text-white" size={28} />
               </div>
               <div>
-                <CardTitle className="text-2xl font-black text-gray-900 tracking-tight">
+                <CardTitle className="text-2xl font-black text-bb-text tracking-tight">
                   Group Board
                 </CardTitle>
-                <p className="text-sm font-bold text-amber-600 uppercase tracking-widest mt-1">
-                  Pinned Announcements
+                <p className="text-sm font-bold text-bb-text-muted uppercase tracking-widest">
+                  {announcements.length} Pinned Announcements
                 </p>
               </div>
-            </div>
-            <div className="px-5 py-2 bg-white border-2 border-amber-100 rounded-2xl shadow-sm">
-              <span className="text-lg font-black text-amber-600">
-                {announcements.length}
-              </span>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="p-8">
           {isLeader && (
-            <div className="flex flex-col sm:flex-row gap-4 mb-10">
-              <Input
-                placeholder="Pin an important update for the group..."
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                className="h-16 rounded-2xl border-2 border-gray-100 bg-gray-50/50 text-lg focus:ring-amber-500 font-medium px-8 flex-1"
-              />
-              <Button
-                onClick={handlePostAnnouncement}
-                disabled={isSubmitting}
-                className="h-16 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl px-10 transition-transform active:scale-95 shadow-lg shadow-amber-100"
-              >
-                <Pin size={22} className="mr-3 fill-white" />
-                PIN
-              </Button>
+            <div className="space-y-3 mb-10">
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Pin an important update for the group..."
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  className="h-14 rounded-2xl border-bb-border-input bg-bb-surface-subtle px-6 font-medium text-bb-text focus:ring-amber-500 transition-all placeholder:text-bb-text-muted"
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && handlePostAnnouncement()
+                  }
+                />
+                <Button
+                  onClick={handlePostAnnouncement}
+                  disabled={isSubmitting}
+                  aria-label="Pin"
+                  className="h-14 w-14 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl shadow-md transition-all active:scale-95 shrink-0"
+                >
+                  <Pin size={24} />
+                </Button>
+              </div>
             </div>
           )}
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             {announcements.length > 0 ? (
               [...announcements]
                 .sort((a, b) => {
@@ -141,23 +141,23 @@ export function GroupBoard({
                 .map((item) => (
                   <div
                     key={item.announcementID || `ann-${Math.random()}`}
-                    className="group relative bg-white border-2 border-gray-50 p-8 rounded-4xl hover:border-amber-200 hover:shadow-xl hover:shadow-amber-50/50 transition-all"
+                    className="group relative flex flex-col p-6 rounded-3xl border border-bb-border bg-bb-surface hover:border-amber-200 dark:hover:border-amber-900 hover:shadow-md transition-all duration-300"
                   >
-                    <p className="text-gray-800 font-bold text-xl mb-6 leading-snug">
+                    <p className="text-bb-text font-bold text-xl mb-6 leading-snug">
                       {item.content ? String(item.content) : " "}
                     </p>
 
-                    <div className="flex items-center justify-between border-t-2 border-gray-50 pt-6 mt-auto">
+                    <div className="flex items-center justify-between border-t border-bb-border pt-6 mt-auto">
                       <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl">
-                          <UserIcon size={16} className="text-amber-500" />
-                          <span className="text-sm font-black text-gray-600 uppercase tracking-wider">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-bb-surface-subtle rounded-xl">
+                          <UserIcon size={14} className="text-amber-500" />
+                          <span className="text-xs font-black text-bb-text-muted uppercase tracking-wider">
                             {item.pinnedBy || "Leader"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <Clock size={16} />
-                          <span className="text-sm font-bold">
+                        <div className="flex items-center gap-2 text-bb-text-muted">
+                          <Clock size={14} />
+                          <span className="text-xs font-bold">
                             {item.timestamp
                               ? formatDistanceToNow(new Date(item.timestamp))
                               : "just now"}{" "}
@@ -171,7 +171,7 @@ export function GroupBoard({
                           onClick={() =>
                             handleDeleteAnnouncement(item.announcementID)
                           }
-                          className="text-gray-200 hover:text-red-500 transition-colors p-2 cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 text-bb-text-muted hover:text-bb-danger transition-all p-2"
                           title="Unpin Announcement"
                         >
                           <Trash2 size={20} />
@@ -181,13 +181,11 @@ export function GroupBoard({
                   </div>
                 ))
             ) : (
-              <div className="text-center py-16 border-4 border-dashed border-gray-50 rounded-[2.5rem]">
-                <div className="flex flex-col items-center gap-4">
-                  <Pin size={32} className="text-gray-200" />
-                  <p className="text-gray-400 font-bold text-lg">
-                    No pinned announcements yet.
-                  </p>
-                </div>
+              <div className="text-center py-16 bg-bb-surface-subtle rounded-4xl border-2 border-dashed border-bb-border">
+                <Pin className="mx-auto text-bb-border mb-4" size={48} />
+                <p className="text-bb-text-muted font-black text-xl">
+                  No pinned announcements yet.
+                </p>
               </div>
             )}
           </div>

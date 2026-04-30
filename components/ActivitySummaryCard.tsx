@@ -45,7 +45,7 @@ function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
               ? "fill-amber-500 text-amber-500"
               : i === full && hasHalf
                 ? "fill-amber-500/50 text-amber-500"
-                : "text-gray-200",
+                : "text-bb-text-muted",
           )}
         />
       ))}
@@ -127,8 +127,8 @@ export function ActivitySummaryCard({
     return (
       <Card className={cn("overflow-hidden", className)}>
         <CardContent className="py-6">
-          <div className="flex flex-col items-center gap-2 text-gray-500">
-            <Sparkles className="h-8 w-8 text-gray-300" />
+          <div className="flex flex-col items-center gap-2 text-bb-text-muted">
+            <Sparkles className="h-8 w-8 text-bb-text-muted" />
             <p className="text-center text-sm">
               {message ??
                 "No summary available yet. Add reviews to see a summary."}
@@ -145,7 +145,7 @@ export function ActivitySummaryCard({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <StarRating rating={summary.averageRating} />
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-lg font-bold text-bb-text">
               {summary.averageRating.toFixed(1)}
             </span>
           </div>
@@ -160,22 +160,22 @@ export function ActivitySummaryCard({
             Book Now
           </Button>
         </div>
-        <CardTitle className="text-base font-medium text-gray-700">
+        <CardTitle className="text-base font-medium text-bb-text-sub">
           Review Summary
         </CardTitle>
-        <p className="text-sm text-gray-600">{summary.sentimentSummary}</p>
+        <p className="text-sm text-bb-text-muted">{summary.sentimentSummary}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {summary.highlights.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-bb-text-muted uppercase tracking-wide mb-2">
               Quick insights
             </p>
             <ul className="space-y-1">
               {summary.highlights.map((h, i) => (
                 <li
                   key={i}
-                  className="text-sm text-gray-700 pl-4 border-l-2 border-amber-200"
+                  className="text-sm text-bb-text-sub pl-4 border-l-2 border-amber-200"
                 >
                   {h}
                 </li>

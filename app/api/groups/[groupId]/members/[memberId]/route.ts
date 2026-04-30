@@ -43,11 +43,17 @@ export async function DELETE(
       );
     }
 
-    // ac: verify current user is the group leader
     const leaderIDStr = group.leaderID.toString();
-    if (leaderIDStr !== userId.toString()) {
+    const requesterMember = group.membersList.find(
+      (m: any) => m.userId.toString() === userId.toString(),
+    );
+    const requesterRole = requesterMember?.role;
+    const isRequesterLeader = leaderIDStr === userId.toString();
+    const isRequesterAdmin = requesterRole === "Admin";
+
+    if (!isRequesterLeader && !isRequesterAdmin) {
       return NextResponse.json(
-        { error: "forbidden: only the leader can remove members" },
+        { error: "forbidden: only leaders and admins can remove members" },
         { status: 403 },
       );
     }
@@ -58,6 +64,19 @@ export async function DELETE(
         { error: "cannot remove the group leader" },
         { status: 400 },
       );
+    }
+
+    // admins cannot remove other admins — only the leader can do that
+    if (isRequesterAdmin && !isRequesterLeader) {
+      const targetMember = group.membersList.find(
+        (m: any) => m.userId.toString() === memberId,
+      );
+      if (targetMember?.role === "Admin") {
+        return NextResponse.json(
+          { error: "forbidden: admins cannot remove other admins" },
+          { status: 403 },
+        );
+      }
     }
 
     // verify target exists in group

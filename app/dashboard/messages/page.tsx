@@ -12,7 +12,6 @@ export default async function MessagesPage() {
     return null;
   }
 
-   
   const userId = (session?.user as any)?.userId as string;
   const groups = await getUserGroups();
 
@@ -24,7 +23,7 @@ export default async function MessagesPage() {
   const sanitizedGroups = JSON.parse(JSON.stringify(groups));
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-hidden bg-white">
+    <div className="h-[calc(100vh-64px)] overflow-hidden bg-bb-surface">
       <Messages groups={sanitizedGroups} userId={userId} />
     </div>
   );

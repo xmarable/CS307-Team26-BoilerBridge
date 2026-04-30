@@ -168,9 +168,9 @@ const pollChoiceSchema = new mongoose.Schema(
     voters: {
       type: [mongoose.Types.UUID],
       default: [],
-    }
+    },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const pollSchema = new mongoose.Schema({
@@ -184,7 +184,7 @@ const pollSchema = new mongoose.Schema({
   },
   question: {
     type: String,
-    required: true
+    required: true,
   },
   choices: {
     type: [pollChoiceSchema],
@@ -209,6 +209,7 @@ const travelGroupSchema = new mongoose.Schema(
       unique: true,
     },
     groupName: { type: String, required: true, trim: true },
+    groupImage: { type: String },
     description: { type: String, trim: true },
     leaderID: {
       type: mongoose.Schema.Types.UUID,
@@ -228,7 +229,7 @@ const travelGroupSchema = new mongoose.Schema(
     iteneraryId: {
       type: mongoose.Schema.Types.UUID,
       //required: true,
-      ref: "Itenerary"
+      ref: "Itenerary",
     },
     notifications: {
       type: [NotificationSchema],
@@ -255,6 +256,10 @@ const travelGroupSchema = new mongoose.Schema(
       type: String,
       trim: true,
       sparse: true,
+    },
+    viewWindow: {
+      from: { type: String },
+      to: { type: String },
     },
   },
   { timestamps: true },

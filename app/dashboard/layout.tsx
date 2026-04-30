@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Navbar } from "@/components/Navbar";
-import { Sidebar } from "@/components/Sidebar";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/dbConnect";
@@ -73,15 +72,12 @@ export default async function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+    <div className="min-h-screen bg-bb-surface-subtle dark:bg-bb-surface-subtle flex flex-col">
       <DashboardWarmer />
       <Navbar session={enhancedSession} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          <div className="h-full">{children}</div>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="h-full">{children}</div>
+      </main>
       <SOSButton />
       <FetchErrorInterceptor />
       <Toaster richColors position="top-center" />

@@ -1,19 +1,17 @@
 "use client";
 
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Map,
   List,
   TrendingUp,
-  MessageSquare,
   DollarSign,
   Settings,
   Users,
-  ShieldAlert,
   Group,
   Globe2,
+  Activity,
 } from "lucide-react";
 
 const navItems = [
@@ -22,7 +20,6 @@ const navItems = [
     name: "Groups",
     href: "/dashboard/groups",
     icon: Group,
-    badege: 11,
   },
   { name: "All Trips", href: "/dashboard/alltrips", icon: List },
   {
@@ -35,23 +32,13 @@ const navItems = [
   {
     name: "Activities",
     href: "/dashboard/activities",
-    icon: MessageSquare,
-    badge: 11,
+    icon: Activity,
   },
-  { name: "Expenses", href: "/dashboard/expenses", icon: DollarSign },
   { name: "Settings", href: "/dashboard/profile", icon: Settings },
-  { name: "Safety & SOS", href: "#sos", icon: ShieldAlert },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-
-  const handleSOSClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    console.log("SOS button clicked, dispatching open-sos event");
-    // Dispatches a custom event that the SOSButton component is listening for
-    window.dispatchEvent(new CustomEvent("open-sos"));
-  };
 
   return (
     <aside className="hidden lg:block w-64 bg-bb-surface border-r border-bb-border min-h-[calc(100vh-73px)] sticky top-18.25">
@@ -62,29 +49,18 @@ export function Sidebar() {
             item.href === "/dashboard/public-itineraries"
               ? pathname === item.href || pathname.startsWith(`${item.href}/`)
               : pathname === item.href;
-          const isSOS = item.href === "#sos";
 
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              onClick={isSOS ? handleSOSClick : undefined}
-              className="block group"
-            >
+            <Link key={item.name} href={item.href} className="block group">
               <div
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors cursor-pointer ${
                   isActive
                     ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    : "text-bb-text-sub dark:text-bb-text-muted hover:bg-bb-surface-subtle dark:hover:bg-bb-surface-subtle"
                 }`}
               >
                 <Icon size={20} />
                 <span className="font-medium">{item.name}</span>
-                {item.badge && (
-                  <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                )}
               </div>
             </Link>
           );

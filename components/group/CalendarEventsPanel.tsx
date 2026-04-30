@@ -70,10 +70,6 @@ import ItineraryRegeneratePreviewModal, {
   type PreviewProposedRow,
 } from "@/components/group/ItineraryRegeneratePreviewModal";
 import { ActivityVoting } from "@/components/group/ActivityVoting";
-import {
-  OptionGroupVoting,
-  type PollData,
-} from "@/components/group/OptionGroupVoting";
 import { ItinerarySourcePublishControls } from "@/components/itineraries/ItinerarySourcePublishControls";
 import { ItineraryExportMenu } from "@/components/group/ItineraryExportMenu";
 import { buildCalendarActivityDetailHref } from "@/lib/calendarActivityDetailLink";
@@ -135,10 +131,10 @@ type Props = {
   groupId: string;
   canPublishItinerary?: boolean;
   canEdit?: boolean;
-  /** Leader-only: finalize option-group polls */
-  isLeader?: boolean;
+  groupData?: any;
   /** For export filename hint */
   groupName?: string;
+  refreshKey?: number;
   /** After calendar rows are copied into Trip.primaryItinerary, refetch trip plan in parent. */
   onTripPlanSynced?: () => void;
 };
@@ -229,12 +225,6 @@ function formatScheduleConflictMessage(data: {
     minute: "2-digit",
   });
   return `${base} Conflicts with “${c.title}” (${startLabel}–${endLabel}).`;
-}
-
-function isDismissibleCandidate(ev: CalendarEvent): boolean {
-  if (ev.source !== "itinerary") return false;
-  const s = ev.itineraryOptionStatus;
-  return s === "candidate" || s === undefined;
 }
 
 function AccessibilityDetailsTrigger({
@@ -347,24 +337,41 @@ function AccessibilityDetailsTrigger({
 function DroppableDayHeader({
   dayKey,
   label,
+  isEmpty,
 }: {
   dayKey: string;
   label: string;
+  isEmpty?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dayKey });
   return (
-    <div ref={setNodeRef} className="flex items-center gap-3 px-1">
-      <div className="h-px flex-1 bg-gray-200" />
-      <span
-        className={`text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full transition-colors ${
-          isOver
-            ? "bg-amber-400 text-white border border-amber-500"
-            : "text-amber-800 bg-amber-50 border border-amber-100"
-        }`}
-      >
-        {label}
-      </span>
-      <div className="h-px flex-1 bg-gray-200" />
+    <div ref={setNodeRef}>
+      <div className="flex items-center gap-3 px-1">
+        <div className="h-px flex-1 bg-gray-200" />
+        <span
+          className={`text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full transition-colors ${
+            isOver
+              ? "bg-amber-400 text-white border border-amber-500"
+              : "text-amber-800 bg-amber-50 border border-amber-100"
+          }`}
+        >
+          {label}
+        </span>
+        <div className="h-px flex-1 bg-gray-200" />
+      </div>
+      {isEmpty && (
+        <div
+          className={`mt-3 flex items-center justify-center h-16 rounded-2xl border-2 border-dashed transition-colors ${
+            isOver
+              ? "border-amber-400 bg-amber-50/80 text-amber-600"
+              : "border-gray-200 bg-gray-50/50 text-gray-400"
+          }`}
+        >
+          <p className="text-sm font-bold">
+            {isOver ? "Drop here" : "No events — drag one here"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -373,43 +380,27 @@ function DroppableDayHeader({
 type SortableEventCardProps = {
   ev: CalendarEvent;
   canEdit: boolean;
-  isLeader: boolean;
   groupId: string;
   selectedIds: Set<string>;
   voteData: VoteData;
-  polls: Record<string, PollData>;
-  votingOptionId: string | null;
-  finalizingGroupId: string | null;
-  firstEventIdByOptionGroup: Map<string, string>;
   activeAccessibilityRequirements: AccessibilityRequirements;
   onToggleSelect: (id: string) => void;
   onEdit: (ev: CalendarEvent) => void;
   onDelete: (id: string) => void;
   onToggleLock: (ev: CalendarEvent) => void;
-  onDismiss: (ev: CalendarEvent) => void;
-  onOptionGroupVote: (optionGroupId: string, optionId: string) => void;
-  onFinalizePoll: (optionGroupId: string) => void;
 };
 
 function SortableEventCard({
   ev,
   canEdit,
-  isLeader,
   groupId,
   selectedIds,
   voteData,
-  polls,
-  votingOptionId,
-  finalizingGroupId,
-  firstEventIdByOptionGroup,
   activeAccessibilityRequirements,
   onToggleSelect,
   onEdit,
   onDelete,
   onToggleLock,
-  onDismiss,
-  onOptionGroupVote,
-  onFinalizePoll,
 }: SortableEventCardProps) {
   const {
     attributes,
@@ -596,36 +587,13 @@ function SortableEventCard({
         )}
 
         <div className="mt-2">
-          {ev.optionGroupId && isDismissibleCandidate(ev) ? (
-            <OptionGroupVoting
-              eventId={ev._id}
-              optionGroupId={ev.optionGroupId}
-              poll={
-                polls[ev.optionGroupId] ?? {
-                  optionGroupId: ev.optionGroupId,
-                  tallies: {},
-                  myVote: null,
-                  candidates: [],
-                }
-              }
-              voting={votingOptionId === ev._id}
-              onPick={() => void onOptionGroupVote(ev.optionGroupId!, ev._id)}
-              showFinalize={
-                (isLeader || canEdit) &&
-                firstEventIdByOptionGroup.get(ev.optionGroupId!) === ev._id
-              }
-              finalizing={finalizingGroupId === ev.optionGroupId}
-              onFinalize={() => void onFinalizePoll(ev.optionGroupId!)}
-            />
-          ) : (
-            <ActivityVoting
-              activityId={ev._id}
-              groupId={groupId}
-              initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
-              initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
-              userVote={voteData[ev._id]?.userVote ?? null}
-            />
-          )}
+          <ActivityVoting
+            activityId={ev._id}
+            groupId={groupId}
+            initialUpvotes={voteData[ev._id]?.upvotes ?? 0}
+            initialDownvotes={voteData[ev._id]?.downvotes ?? 0}
+            userVote={voteData[ev._id]?.userVote ?? null}
+          />
         </div>
       </div>
 
@@ -666,30 +634,18 @@ function SortableEventCard({
           <Edit3 size={16} />
           Edit
         </Button>
-        {canEdit &&
-          (isDismissibleCandidate(ev) ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void onDismiss(ev)}
-              className="rounded-xl text-amber-800 hover:text-amber-900 hover:bg-amber-50 font-semibold h-9"
-            >
-              <Trash2 size={16} className="inline mr-1" />
-              Dismiss
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(ev._id)}
-              className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
-            >
-              <Trash2 size={16} className="inline mr-1" />
-              Remove
-            </Button>
-          ))}
+        {canEdit && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(ev._id)}
+            className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 font-semibold h-9"
+          >
+            <Trash2 size={16} className="inline mr-1" />
+            Remove
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -698,9 +654,10 @@ function SortableEventCard({
 /* ---------- Main Component ---------- */
 export default function CalendarEventsPanel({
   groupId,
+  refreshKey,
+  groupData,
   canPublishItinerary = false,
   canEdit = false,
-  isLeader = false,
   groupName,
   onTripPlanSynced,
 }: Props) {
@@ -772,20 +729,8 @@ export default function CalendarEventsPanel({
   const [voteData, setVoteData] = useState<VoteData>({});
   const [unlockDialogEvent, setUnlockDialogEvent] =
     useState<CalendarEvent | null>(null);
+  const [showEmptyDays, setShowEmptyDays] = useState(false);
 
-  const { data: pollsData, mutate: mutatePolls } = useSWR(
-    groupId ? `/api/groups/${groupId}/itinerary/votes` : null,
-    async (url: string) => {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error("Failed to load polls");
-      return r.json() as Promise<{ polls: Record<string, PollData> }>;
-    },
-  );
-  const polls = pollsData?.polls ?? {};
-  const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
-  const [finalizingGroupId, setFinalizingGroupId] = useState<string | null>(
-    null,
-  );
   const [hideNonMatchingByAccessibility, setHideNonMatchingByAccessibility] =
     useState(true);
   const [activeAccessibilityRequirements, setActiveAccessibilityRequirements] =
@@ -834,20 +779,6 @@ export default function CalendarEventsPanel({
     );
   }, [events, hideNonMatchingByAccessibility, activeAccessibilityRequirements]);
 
-  const firstEventIdByOptionGroup = useMemo(() => {
-    const sorted = [...events].sort(
-      (a, b) =>
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-    );
-    const m = new Map<string, string>();
-    for (const e of sorted) {
-      const og = e.optionGroupId?.trim();
-      if (!og) continue;
-      if (!m.has(og)) m.set(og, e._id);
-    }
-    return m;
-  }, [events]);
-
   const eventsGroupedByDay = useMemo(() => {
     const sorted = filteredEventsForDisplay.slice().sort((a, b) => {
       const dayA = calendarDayKey(a.startTime);
@@ -868,17 +799,50 @@ export default function CalendarEventsPanel({
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredEventsForDisplay]);
 
+  const allTripDays = useMemo(() => {
+    try {
+      const days: string[] = [];
+      const current = new Date(from);
+      const end = new Date(to);
+      current.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      if (isNaN(current.getTime()) || isNaN(end.getTime()) || current > end)
+        return [];
+      while (current <= end && days.length < 62) {
+        days.push(calendarDayKey(current.toISOString()));
+        current.setDate(current.getDate() + 1);
+      }
+      return days;
+    } catch {
+      return [];
+    }
+  }, [from, to]);
+
   const customCollision: CollisionDetection = (args) => {
     const pointerHits = pointerWithin(args);
     const cardHits = pointerHits.filter(
-      (c) => !eventsGroupedByDay.some(([dayKey]) => dayKey === String(c.id)),
+      (c) => !allTripDays.includes(String(c.id)),
     );
     if (cardHits.length > 0) return cardHits;
     const dayHits = pointerHits.filter((c) =>
-      eventsGroupedByDay.some(([dayKey]) => dayKey === String(c.id)),
+      allTripDays.includes(String(c.id)),
     );
     if (dayHits.length > 0) return dayHits;
     return [];
+  };
+
+  const updateViewWindow = async (newFrom: string, newTo: string) => {
+    try {
+      await fetch(`/api/groups/${groupId}/view-window`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: newFrom, to: newTo }),
+      });
+      // tell dashboard to smack the syncVersion so browser b re-fetches
+      onTripPlanSynced?.();
+    } catch (err) {
+      console.error("sync error", err);
+    }
   };
 
   /* ---------- API Calls ---------- */
@@ -918,7 +882,6 @@ export default function CalendarEventsPanel({
           setVoteData(voteJson.votes ?? {});
         }
       }
-      await mutatePolls();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load events.");
     } finally {
@@ -1103,74 +1066,8 @@ export default function CalendarEventsPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete event.");
       await fetchEvents();
-      await mutatePolls();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to delete event.");
-    }
-  }
-
-  async function handleDismissCandidate(ev: CalendarEvent) {
-    const prev = events;
-    setEvents((list) => list.filter((x) => x._id !== ev._id));
-    try {
-      setErr(null);
-      const res = await fetch(
-        `/api/groups/${groupId}/itinerary/options/${ev._id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "dismiss" }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setEvents(prev);
-        throw new Error(data?.error || "Failed to dismiss option.");
-      }
-      await mutatePolls();
-      await fetchEvents();
-    } catch (e: unknown) {
-      setEvents(prev);
-      setErr(e instanceof Error ? e.message : "Failed to dismiss option.");
-    }
-  }
-
-  async function handleOptionGroupVote(
-    optionGroupId: string,
-    optionId: string,
-  ) {
-    try {
-      setVotingOptionId(optionId);
-      const res = await fetch(`/api/groups/${groupId}/itinerary/votes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ optionGroupId, optionId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Vote failed");
-      await mutatePolls();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Vote failed");
-    } finally {
-      setVotingOptionId(null);
-    }
-  }
-
-  async function handleFinalizePoll(optionGroupId: string) {
-    try {
-      setFinalizingGroupId(optionGroupId);
-      const res = await fetch(
-        `/api/groups/${groupId}/itinerary/votes/${optionGroupId}/finalize`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Finalize failed");
-      await mutatePolls();
-      await fetchEvents();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Finalize failed");
-    } finally {
-      setFinalizingGroupId(null);
     }
   }
 
@@ -1284,7 +1181,6 @@ export default function CalendarEventsPanel({
       setPreviewProposed([]);
       setSelectedIds(new Set());
       await fetchEvents();
-      await mutatePolls();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to apply changes";
       setErr(msg);
@@ -1349,9 +1245,7 @@ export default function CalendarEventsPanel({
     if (!activeDayEntry) return;
     const [activeDay, activeDayEvents] = activeDayEntry;
 
-    const overIsDayHeader = eventsGroupedByDay.some(
-      ([dayKey]) => dayKey === overId,
-    );
+    const overIsDayHeader = allTripDays.includes(overId);
     const overDayEntry = eventsGroupedByDay.find(([, dayEvents]) =>
       dayEvents.some((e) => e._id === overId),
     );
@@ -1542,7 +1436,7 @@ export default function CalendarEventsPanel({
   useEffect(() => {
     fetchEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, rangeQuery]);
+  }, [groupId, rangeQuery, refreshKey]);
 
   useEffect(() => {
     fetchTripOptions();
@@ -1568,26 +1462,37 @@ export default function CalendarEventsPanel({
 
   /** Restore calendar view window after navigation, or default to trip dates. */
   useEffect(() => {
-    if (!groupId || tripOptions.length === 0) return;
+    if (!groupId) return;
+
+    // 1. priority: use the sync data from the database
+    if (groupData?.viewWindow?.from && groupData?.viewWindow?.to) {
+      setFrom(groupData.viewWindow.from);
+      setTo(groupData.viewWindow.to);
+      return;
+    }
+
+    // 2. secondary: fallback to local storage (for offline/prev sessions)
     const stored = readStoredCalendarRange(groupId);
     if (stored) {
       setFrom(stored.from);
       setTo(stored.to);
       return;
     }
-    const tid = selectedTripId || tripOptions[0]?._id;
-    const trip = tripOptions.find((t) => t._id === tid);
-    if (trip?.fromDate && trip?.toDate) {
-      const start = new Date(String(trip.fromDate));
-      const end = new Date(String(trip.toDate));
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      const fromStr = toDatetimeLocalValue(start);
-      const toStr = toDatetimeLocalValue(end);
-      setFrom(fromStr);
-      setTo(toStr);
+
+    // 3. tertiary: fallback to trip dates
+    if (tripOptions.length > 0) {
+      const tid = selectedTripId || tripOptions[0]?._id;
+      const trip = tripOptions.find((t) => t._id === tid);
+      if (trip?.fromDate && trip?.toDate) {
+        const start = new Date(String(trip.fromDate));
+        const end = new Date(String(trip.toDate));
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        setFrom(toDatetimeLocalValue(start));
+        setTo(toDatetimeLocalValue(end));
+      }
     }
-  }, [groupId, tripOptions, selectedTripId]);
+  }, [groupId, tripOptions, selectedTripId, groupData?.viewWindow]);
 
   /* ---------- Render ---------- */
   return (
@@ -1615,7 +1520,11 @@ export default function CalendarEventsPanel({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => void fetchEvents()}
+              onClick={() => {
+                void updateViewWindow(from, to);
+                void fetchEvents();
+                onTripPlanSynced?.(); // trigger parent dashboard refresh
+              }}
               className="rounded-xl text-amber-600 hover:bg-amber-50"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
@@ -1633,7 +1542,7 @@ export default function CalendarEventsPanel({
               onChange={(e) => {
                 const v = e.target.value;
                 setFrom(v);
-                persistCalendarRange(groupId, v, to);
+                void updateViewWindow(v, to);
               }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
@@ -1648,7 +1557,7 @@ export default function CalendarEventsPanel({
               onChange={(e) => {
                 const v = e.target.value;
                 setTo(v);
-                persistCalendarRange(groupId, from, v);
+                void updateViewWindow(from, v);
               }}
               className="rounded-2xl border-gray-200 h-12 bg-white text-gray-900"
             />
@@ -1863,9 +1772,24 @@ export default function CalendarEventsPanel({
             <h3 className="text-lg font-black text-gray-900">
               Upcoming Activities
             </h3>
-            <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
-              {filteredEventsForDisplay.length} Events Found
-            </Badge>
+            <div className="flex items-center gap-2">
+              {allTripDays.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowEmptyDays((v) => !v)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                    showEmptyDays
+                      ? "bg-amber-100 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800/50 dark:text-amber-300"
+                      : "bg-transparent border-gray-200 text-gray-500 hover:border-amber-200 hover:text-amber-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-amber-700 dark:hover:text-amber-400"
+                  }`}
+                >
+                  {showEmptyDays ? "Hide empty days" : "Show empty days"}
+                </button>
+              )}
+              <Badge className="bg-amber-100 text-amber-700 border-none px-3 py-1 rounded-full font-bold">
+                {filteredEventsForDisplay.length} Events Found
+              </Badge>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
@@ -2015,13 +1939,11 @@ export default function CalendarEventsPanel({
           <div className="flex justify-center py-10">
             <Loader2 className="animate-spin text-amber-500" size={32} />
           </div>
-        ) : filteredEventsForDisplay.length === 0 ? (
+        ) : allTripDays.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
             <Calendar className="mx-auto text-gray-300 mb-2" size={40} />
             <p className="text-gray-400 font-bold">
-              {hasAnyAccessibilityRequirement(activeAccessibilityRequirements)
-                ? "No venues match your selected accessibility requirements in this window."
-                : "No events scheduled for this window."}
+              No events scheduled for this window.
             </p>
           </div>
         ) : (
@@ -2031,9 +1953,11 @@ export default function CalendarEventsPanel({
             onDragEnd={(e) => void handleDragEnd(e)}
           >
             <div className="space-y-10">
-              {eventsGroupedByDay.map(([dayKey, dayEvents]) => {
+              {(showEmptyDays ? allTripDays : eventsGroupedByDay.map(([k]) => k)).map((dayKey) => {
+                const dayEvents =
+                  eventsGroupedByDay.find(([k]) => k === dayKey)?.[1] ?? [];
                 const dayHeading = new Date(
-                  dayEvents[0]!.startTime,
+                  dayKey + "T12:00:00",
                 ).toLocaleDateString(undefined, {
                   weekday: "long",
                   month: "long",
@@ -2042,41 +1966,37 @@ export default function CalendarEventsPanel({
                 });
                 return (
                   <section key={dayKey} className="space-y-4">
-                    <DroppableDayHeader dayKey={dayKey} label={dayHeading} />
-                    <SortableContext
-                      items={dayEvents.map((e) => e._id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div className="grid gap-4">
-                        {dayEvents.map((ev) => (
-                          <SortableEventCard
-                            key={ev._id}
-                            ev={ev}
-                            canEdit={canEdit}
-                            isLeader={isLeader}
-                            groupId={groupId}
-                            selectedIds={selectedIds}
-                            voteData={voteData}
-                            polls={polls}
-                            votingOptionId={votingOptionId}
-                            finalizingGroupId={finalizingGroupId}
-                            firstEventIdByOptionGroup={
-                              firstEventIdByOptionGroup
-                            }
-                            activeAccessibilityRequirements={
-                              activeAccessibilityRequirements
-                            }
-                            onToggleSelect={toggleSelected}
-                            onEdit={openEdit}
-                            onDelete={handleDelete}
-                            onToggleLock={handleToggleLock}
-                            onDismiss={handleDismissCandidate}
-                            onOptionGroupVote={handleOptionGroupVote}
-                            onFinalizePoll={handleFinalizePoll}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
+                    <DroppableDayHeader
+                      dayKey={dayKey}
+                      label={dayHeading}
+                      isEmpty={dayEvents.length === 0}
+                    />
+                    {dayEvents.length > 0 && (
+                      <SortableContext
+                        items={dayEvents.map((e) => e._id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="grid gap-4">
+                          {dayEvents.map((ev) => (
+                            <SortableEventCard
+                              key={ev._id}
+                              ev={ev}
+                              canEdit={canEdit}
+                              groupId={groupId}
+                              selectedIds={selectedIds}
+                              voteData={voteData}
+                              activeAccessibilityRequirements={
+                                activeAccessibilityRequirements
+                              }
+                              onToggleSelect={toggleSelected}
+                              onEdit={openEdit}
+                              onDelete={handleDelete}
+                              onToggleLock={handleToggleLock}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    )}
                   </section>
                 );
               })}

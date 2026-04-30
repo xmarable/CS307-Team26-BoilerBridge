@@ -9,8 +9,14 @@ function getSessionUserIds(session: any): string[] {
   return [session?.user?.userId, session?.user?.id].filter(Boolean);
 }
 
-function isGroupLeader(group: any, userIds: string[]) {
-  return userIds.includes(group?.leaderID?.toString());
+function isGroupLeaderOrAdmin(group: any, userIds: string[]) {
+  if (userIds.includes(group?.leaderID?.toString())) return true;
+  return (
+    Array.isArray(group?.membersList) &&
+    group.membersList.some(
+      (m: any) => userIds.includes(m.userId?.toString()) && m.role === "Admin",
+    )
+  );
 }
 
 function isGroupMember(group: any, userIds: string[]) {
@@ -55,7 +61,7 @@ export async function GET(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    if (!isGroupMember(group, userIds) && !isGroupLeader(group, userIds)) {
+    if (!isGroupMember(group, userIds) && !isGroupLeaderOrAdmin(group, userIds)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -120,7 +126,7 @@ export async function POST(
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    if (!isGroupMember(group, userIds) && !isGroupLeader(group, userIds)) {
+    if (!isGroupMember(group, userIds) && !isGroupLeaderOrAdmin(group, userIds)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

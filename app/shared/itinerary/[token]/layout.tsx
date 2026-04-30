@@ -14,7 +14,6 @@ import { Toaster } from "sonner";
 import { DashboardWarmer } from "@/components/DashboardWarmer";
 import { Header } from "@/components/Header";
 
-
 export default async function DashboardLayout({
   children,
 }: {
@@ -26,7 +25,7 @@ export default async function DashboardLayout({
     return (
       <div className="flex flex-col">
         <Header />
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-bb-surface-subtle flex flex-col">
           <div className="flex flex-1 overflow-hidden">
             {session && <Sidebar />}
             <main className="flex-1 overflow-y-auto pt-20">

@@ -33,6 +33,7 @@ type GroupTripDetailState = (RainyDayTripInput & { _id: string }) | null;
 type Options = {
   groupId: string | undefined;
   itinerarySectionOpen: boolean;
+  refreshKey?: number;
 };
 
 type ItinerarySyncState = "idle" | "syncing" | "failed";
@@ -86,7 +87,9 @@ function applyTripFetchToState(
   setters: {
     setGroupTripDetail: (v: GroupTripDetailState) => void;
     setIsShowingCached: (v: boolean) => void;
-    setTripPlanError: (v: null | "offline_unavailable" | "auth" | "other") => void;
+    setTripPlanError: (
+      v: null | "offline_unavailable" | "auth" | "other",
+    ) => void;
     setUserHasOfflineSave: (v: boolean) => void;
     setSavedAt: (v: number | null) => void;
     setLastSyncedAt: (v: number | null) => void;
@@ -106,8 +109,10 @@ function applyTripFetchToState(
     const d = out.data as Record<string, unknown>;
     setters.setGroupTripDetail({
       _id: String(d._id),
-      primaryItinerary: d.primaryItinerary as RainyDayTripInput["primaryItinerary"],
-      rainyDayItinerary: d.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
+      primaryItinerary:
+        d.primaryItinerary as RainyDayTripInput["primaryItinerary"],
+      rainyDayItinerary:
+        d.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
       itineraryVersion:
         typeof d.itineraryVersion === "number" ? d.itineraryVersion : 0,
     });
@@ -137,6 +142,7 @@ function applyTripFetchToState(
 export function useGroupItineraryOffline({
   groupId,
   itinerarySectionOpen,
+  refreshKey,
 }: Options) {
   const isOnline = useOnlineStatus();
   const [tripActive, setTripActive] = useState(false);
@@ -172,9 +178,13 @@ export function useGroupItineraryOffline({
       const rec = await getFullTripItineraryCache(tripId);
       const saved = rec?.savedByUser === true;
       setUserHasOfflineSave(saved);
-      setSavedAt(saved && typeof rec?.savedAt === "number" ? rec.savedAt : null);
+      setSavedAt(
+        saved && typeof rec?.savedAt === "number" ? rec.savedAt : null,
+      );
       setLastSyncedAt(
-        saved && typeof rec?.lastSyncedAt === "number" ? rec.lastSyncedAt : null,
+        saved && typeof rec?.lastSyncedAt === "number"
+          ? rec.lastSyncedAt
+          : null,
       );
     } catch {
       setUserHasOfflineSave(false);
@@ -268,7 +278,8 @@ export function useGroupItineraryOffline({
       setItinerarySyncState("idle");
       setTripPlanLoading(true);
       const tripId =
-        (await getTripIdForGroup(groupId)) ?? getGroupTripPresenceTripId(groupId);
+        (await getTripIdForGroup(groupId)) ??
+        getGroupTripPresenceTripId(groupId);
       if (myGen !== loadGen.current) return;
       if (!tripId) {
         setGroupTripDetail(null);
@@ -384,11 +395,12 @@ export function useGroupItineraryOffline({
     isOnline,
     listTripsForGroup,
     refreshOfflineMeta,
+    refreshKey,
   ]);
 
   useEffect(() => {
     void loadTripDetail();
-  }, [loadTripDetail]);
+  }, [loadTripDetail, refreshKey]);
 
   useEffect(() => {
     if (!groupId || !userHasOfflineSave) return;
@@ -416,10 +428,14 @@ export function useGroupItineraryOffline({
       setGroupTripPresence(groupId, tid);
       setGroupTripDetail({
         _id: String(net.data._id),
-        primaryItinerary: net.data.primaryItinerary as RainyDayTripInput["primaryItinerary"],
-        rainyDayItinerary: net.data.rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
+        primaryItinerary: net.data
+          .primaryItinerary as RainyDayTripInput["primaryItinerary"],
+        rainyDayItinerary: net.data
+          .rainyDayItinerary as RainyDayTripInput["rainyDayItinerary"],
         itineraryVersion:
-          typeof net.data.itineraryVersion === "number" ? net.data.itineraryVersion : 0,
+          typeof net.data.itineraryVersion === "number"
+            ? net.data.itineraryVersion
+            : 0,
       });
       setIsShowingCached(false);
       setTripPlanError(null);

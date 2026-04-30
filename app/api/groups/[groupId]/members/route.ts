@@ -201,8 +201,15 @@ export async function PATCH(
       );
     }
 
+    const requesterMember = group.membersList.find(
+      (m: any) => m.userId.toString() === sessionUserId.toString(),
+    );
+    const isRequesterLeader =
+      group.leaderID.toString() === sessionUserId.toString();
+    const isRequesterAdmin = requesterMember?.role === "Admin";
+
     if (action === "TRANSFER_LEADERSHIP") {
-      if (group.leaderID.toString() !== sessionUserId.toString()) {
+      if (!isRequesterLeader) {
         return NextResponse.json(
           { error: "only the leader can transfer leadership" },
           { status: 403 },
@@ -224,6 +231,12 @@ export async function PATCH(
       newLeader.role = "Leader";
       group.leaderID = newLeader.userId;
     } else {
+      if (!isRequesterLeader && !isRequesterAdmin) {
+        return NextResponse.json(
+          { error: "only leaders and admins can change member roles" },
+          { status: 403 },
+        );
+      }
       const member = group.membersList.find(
         (m: any) => m.userId.toString() === targetUserId.toString(),
       );
@@ -234,6 +247,13 @@ export async function PATCH(
               "Cannot change the leader's role directly. Use transfer leadership.",
           },
           { status: 400 },
+        );
+      }
+      // admins cannot demote other admins — only the leader can change admin roles
+      if (!isRequesterLeader && isRequesterAdmin && member?.role === "Admin") {
+        return NextResponse.json(
+          { error: "admins cannot change the role of other admins" },
+          { status: 403 },
         );
       }
       if (member) member.role = newRole;

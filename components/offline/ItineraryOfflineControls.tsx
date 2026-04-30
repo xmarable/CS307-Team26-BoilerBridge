@@ -61,8 +61,7 @@ export function ItineraryOfflineControls({
     !tripPlanLoading &&
     !userHasOfflineSave;
   const showSyncing =
-    itinerarySyncState === "syncing" &&
-    (offlineActionBusy || tripPlanLoading);
+    itinerarySyncState === "syncing" && (offlineActionBusy || tripPlanLoading);
   const showSyncFailed =
     isOnline && itinerarySyncState === "failed" && hasTripContent;
 
@@ -83,7 +82,7 @@ export function ItineraryOfflineControls({
       {showOfflineBanner && (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950"
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-200"
         >
           <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
           <span>You’re offline</span>
@@ -100,7 +99,7 @@ export function ItineraryOfflineControls({
       {showSyncFailed && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs font-semibold text-amber-950"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs font-semibold text-amber-950 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-200"
         >
           <span className="inline-flex items-center gap-1.5 min-w-0">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -110,7 +109,7 @@ export function ItineraryOfflineControls({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 rounded-lg border-amber-300 text-amber-950"
+            className="h-8 rounded-lg border-amber-300 text-amber-950 dark:border-amber-700 dark:text-amber-200 dark:bg-transparent dark:hover:bg-amber-900/20"
             onClick={onRetrySync}
             disabled={tripPlanLoading}
           >
@@ -121,16 +120,17 @@ export function ItineraryOfflineControls({
 
       {!idbSupported && hasTripContent && (
         <p className="text-xs font-medium text-bb-text-muted">
-          This browser can’t store an offline copy. The itinerary still works while you are
-          online.
+          This browser can’t store an offline copy. The itinerary still works
+          while you are online.
         </p>
       )}
 
       {showSave && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-bb-text-muted leading-snug">
-            Save a copy on this device to open this itinerary without internet. You can remove
-            it anytime.
+            Save a copy on this device to open this itinerary without internet.
+            <br></br>
+            You can remove it anytime.
           </p>
           <Button
             type="button"
@@ -141,7 +141,10 @@ export function ItineraryOfflineControls({
             disabled={offlineActionBusy || tripPlanLoading}
           >
             {offlineActionBusy ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" aria-hidden />
+              <Loader2
+                className="h-3.5 w-3.5 mr-1.5 animate-spin"
+                aria-hidden
+              />
             ) : (
               <Download className="h-3.5 w-3.5 mr-1.5" aria-hidden />
             )}
@@ -154,17 +157,19 @@ export function ItineraryOfflineControls({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-2 min-w-0">
             <CheckCircle2
-              className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600"
+              className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400"
               aria-hidden
             />
             <div className="min-w-0 space-y-1">
-              <p className="text-sm font-bold text-bb-text">Available Offline</p>
+              <p className="text-sm font-bold text-bb-text">
+                Available Offline
+              </p>
               <p className="text-xs font-medium text-bb-text-muted leading-relaxed">
-                This copy stays on this device until you remove it or it is replaced when you
-                save again after the itinerary changes online.
+                This copy stays on this device until you remove it or it is
+                replaced when you save again after the itinerary changes online.
               </p>
               {(savedLine || syncedLine) && (
-                <p className="text-xs font-semibold text-emerald-800/90 pt-0.5">
+                <p className="text-xs font-semibold text-emerald-800/90 dark:text-emerald-400 pt-0.5">
                   {[savedLine, syncedLine].filter(Boolean).join(" · ")}
                 </p>
               )}
@@ -214,8 +219,9 @@ export function ItineraryOfflineControls({
           className="text-sm font-medium text-bb-text leading-snug"
           role="status"
         >
-          This itinerary is not saved for offline viewing. While online, open this group and
-          choose Save for Offline, then you can use it without signal.
+          This itinerary is not saved for offline viewing. While online, open
+          this group and choose Save for Offline, then you can use it without
+          signal.
         </p>
       )}
 
@@ -224,8 +230,8 @@ export function ItineraryOfflineControls({
           className="text-sm font-medium text-bb-text-muted leading-snug"
           role="status"
         >
-          You’re offline. Open this group once while online so it loads in this browser; then use
-          Save for Offline on the itinerary you want to keep.
+          You’re offline. Open this group once while online so it loads in this
+          browser; then use Save for Offline on the itinerary you want to keep.
         </p>
       )}
     </div>

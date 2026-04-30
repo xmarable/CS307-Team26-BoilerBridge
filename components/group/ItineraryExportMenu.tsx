@@ -1,17 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { z } from "zod";
-import { CalendarPlus, ChevronDown, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react"; // added useState
+import { z } from "zod"; // added z for schema
+import { toast } from "sonner"; // or wherever your toast is imported from
+import {
+  CalendarPlus,
+  ChevronDown,
+  FileText,
+  ExternalLink,
+  Link2,
+  Loader2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 const exportRangeSchema = z
   .object({
@@ -57,8 +64,7 @@ export function ItineraryExportMenu({
   function validateRange(): boolean {
     const r = exportRangeSchema.safeParse({ from: rangeFrom, to: rangeTo });
     if (!r.success) {
-      const msg =
-        r.error.flatten().formErrors[0] ?? r.error.issues[0]?.message;
+      const msg = r.error.flatten().formErrors[0] ?? r.error.issues[0]?.message;
       toast.error(msg ?? "Invalid date range");
       return false;
     }
@@ -145,13 +151,10 @@ export function ItineraryExportMenu({
   async function copySubscriptionLink() {
     setBusy("copy");
     try {
-      const res = await fetch(
-        `/api/groups/${groupId}/itinerary/export/token`,
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
+      const res = await fetch(`/api/groups/${groupId}/itinerary/export/token`, {
+        method: "POST",
+        credentials: "include",
+      });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(
@@ -186,41 +189,71 @@ export function ItineraryExportMenu({
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="rounded-xl border-gray-200 font-bold gap-1"
+          className="rounded-2xl border-bb-border-input bg-bb-surface hover:bg-bb-surface-subtle h-12 px-5 flex items-center gap-2 font-bold text-bb-text-sub transition-all"
         >
           {busy ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <CalendarPlus className="h-4 w-4" />
+            <CalendarPlus size={18} className="text-bb-brand" />
           )}
           Export
-          <ChevronDown className="h-4 w-4 opacity-60" />
+          <ChevronDown size={14} className="text-bb-text-muted" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 rounded-xl">
-        <DropdownMenuItem
-          className="font-semibold cursor-pointer"
-          onClick={() => void downloadIcs()}
-          disabled={busy !== null}
-        >
-          Download .ics
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="font-semibold cursor-pointer"
-          onClick={() => void openGoogleCalendar()}
-          disabled={busy !== null}
-        >
-          Add to Google Calendar
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="font-semibold cursor-pointer"
-          onClick={() => void copySubscriptionLink()}
-          disabled={busy !== null}
-        >
-          Copy subscription link
-        </DropdownMenuItem>
+
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-64 p-0 overflow-hidden rounded-2xl border border-bb-border bg-white shadow-xl shadow-amber-100/20"
+      >
+        <div className="px-6 pt-5 pb-4 bg-amber-50 border-b border-bb-border/50">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mb-3">
+            <CalendarPlus size={20} className="text-bb-brand" />
+          </div>
+          <h2 className="text-sm font-black text-bb-text tracking-tight">
+            Export Trip
+          </h2>
+          <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-0.5">
+            Choose Format
+          </p>
+        </div>
+
+        <div className="p-2">
+          <DropdownMenuItem
+            disabled={busy !== null}
+            onClick={() => void downloadIcs()}
+            className="flex items-center gap-3 rounded-xl px-3 py-3 font-bold text-bb-text-sub cursor-pointer hover:bg-bb-surface-subtle focus:bg-bb-surface-subtle transition-colors"
+          >
+            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+              <FileText size={16} />
+            </div>
+            Download .ics
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            disabled={busy !== null}
+            onClick={() => void openGoogleCalendar()}
+            className="flex items-center gap-3 rounded-xl px-3 py-3 font-bold text-bb-text-sub cursor-pointer hover:bg-bb-surface-subtle focus:bg-bb-surface-subtle transition-colors mt-1"
+          >
+            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+              <ExternalLink size={16} />
+            </div>
+            Add to Google Calendar
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator className="bg-bb-border my-1 mx-2" />
+
+          <DropdownMenuItem
+            disabled={busy !== null}
+            onClick={() => void copySubscriptionLink()}
+            className="flex items-center gap-3 rounded-xl px-3 py-3 font-bold text-bb-text-sub cursor-pointer hover:bg-bb-surface-subtle focus:bg-bb-surface-subtle transition-colors"
+          >
+            <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+              <Link2 size={16} />
+            </div>
+            Copy subscription link
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

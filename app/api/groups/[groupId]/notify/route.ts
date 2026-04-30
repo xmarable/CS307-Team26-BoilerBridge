@@ -47,7 +47,8 @@ export async function POST(
   if (
     !group.membersList.some(
       (m: { userId: { toString(): string }; role: string }) =>
-        m.userId.toString() === userId && m.role === "Leader",
+        m.userId.toString() === userId &&
+        (m.role === "Leader" || m.role === "Admin"),
     )
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

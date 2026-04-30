@@ -17,8 +17,14 @@ function isMemberOrLeader(group: any, userId: string) {
   return leader || member;
 }
 
-function isLeader(group: any, userId: string) {
-  return group?.leaderID?.toString() === userId;
+function isLeaderOrAdmin(group: any, userId: string) {
+  if (group?.leaderID?.toString() === userId) return true;
+  return (
+    Array.isArray(group?.membersList) &&
+    group.membersList.some(
+      (m: any) => m.userId?.toString() === userId && m.role === "Admin",
+    )
+  );
 }
 
 const UpdateMustHaveSchema = z.object({
@@ -72,7 +78,7 @@ export async function PUT(
       );
 
     const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
-    const canEdit = isCreator || isLeader(group, userId);
+    const canEdit = isCreator || isLeaderOrAdmin(group, userId);
     if (!canEdit) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -149,7 +155,7 @@ export async function DELETE(
       );
 
     const isCreator = !!(await MustHave.exists({ _id: id as any, addedBy: userId as any }));
-    const canDelete = isCreator || isLeader(group, userId);
+    const canDelete = isCreator || isLeaderOrAdmin(group, userId);
     if (!canDelete) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

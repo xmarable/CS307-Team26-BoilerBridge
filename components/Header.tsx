@@ -19,46 +19,44 @@ export async function Header({ session: sessionProp }: HeaderProps) {
   const isAuthed = !!session?.user;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-bb-surface/80 backdrop-blur-md border-b border-bb-border">
       <nav className="mx-auto max-w-7xl px-6 py-4 lg:px-8">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">B</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">
-              BoilerBridge
-            </span>
+            <span className="text-xl font-bold text-bb-text">BoilerBridge</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
             <a
               href="#features"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
+              className="text-bb-text-sub hover:text-bb-text transition-colors"
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
+              className="text-bb-text-sub hover:text-bb-text transition-colors"
             >
               How It Works
             </a>
             <a
               href="#testimonials"
-              className="text-gray-700 hover:text-gray-900 transition-colors"
+              className="text-bb-text-sub hover:text-bb-text transition-colors"
             >
               Testimonials
             </a>
             {isAuthed ? (
               <Link href="/dashboard">
-                <Button variant="ghost" className="text-gray-700">
+                <Button variant="ghost" className="text-bb-text-sub">
                   Dashboard
                 </Button>
               </Link>
             ) : (
               <Link href="/signin">
-                <Button variant="ghost" className="text-gray-700">
+                <Button variant="ghost" className="text-bb-text-sub">
                   Sign In
                 </Button>
               </Link>

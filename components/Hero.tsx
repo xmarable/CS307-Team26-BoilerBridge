@@ -18,14 +18,14 @@ export function Hero({ user }: HeroProps) {
               <span className="text-sm">Made for College Students</span>
             </div>
 
-            <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-5xl lg:text-6xl font-bold text-bb-text leading-tight">
               Plan Group Trips{" "}
               <span className="bg-linear-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
                 Without the Chaos
               </span>
             </h1>
 
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-bb-text-muted">
               Coordinate with friends, split costs, and create unforgettable
               memories. BoilerBridge makes group travel planning actually fun.
             </p>
@@ -48,16 +48,16 @@ export function Hero({ user }: HeroProps) {
 
             <div className="flex items-center gap-8 mt-4">
               <div>
-                <p className="text-3xl font-bold text-gray-900">10K+</p>
-                <p className="text-sm text-gray-600">Active Users</p>
+                <p className="text-3xl font-bold text-bb-text">10K+</p>
+                <p className="text-sm text-bb-text-muted">Active Users</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-gray-900">5K+</p>
-                <p className="text-sm text-gray-600">Trips Planned</p>
+                <p className="text-3xl font-bold text-bb-text">5K+</p>
+                <p className="text-sm text-bb-text-muted">Trips Planned</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-gray-900">4.9★</p>
-                <p className="text-sm text-gray-600">User Rating</p>
+                <p className="text-3xl font-bold text-bb-text">4.9★</p>
+                <p className="text-sm text-bb-text-muted">User Rating</p>
               </div>
             </div>
           </div>
@@ -71,12 +71,12 @@ export function Hero({ user }: HeroProps) {
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-lg hidden lg:block">
-              <p className="text-sm text-gray-600">Spring Break Trip</p>
-              <p className="text-lg font-bold text-gray-900">$450/person</p>
+            <div className="absolute -bottom-6 -left-6 bg-bb-surface p-4 rounded-xl shadow-lg hidden lg:block">
+              <p className="text-sm text-bb-text-muted">Spring Break Trip</p>
+              <p className="text-lg font-bold text-bb-text">$450/person</p>
             </div>
-            <div className="absolute -top-6 -right-6 bg-white p-4 rounded-xl shadow-lg hidden lg:block">
-              <p className="text-sm text-gray-600">8 friends going</p>
+            <div className="absolute -top-6 -right-6 bg-bb-surface p-4 rounded-xl shadow-lg hidden lg:block">
+              <p className="text-sm text-bb-text-muted">8 friends going</p>
               <p className="text-lg font-bold text-blue-600">All in! 🎉</p>
             </div>
           </div>

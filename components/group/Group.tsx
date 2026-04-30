@@ -76,6 +76,7 @@ import { ActivityVoting } from "./ActivityVoting";
 import { SheetTitle } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { ItinieraryWeather } from "../itineraries/ItineraryWeather";
+import { useRef } from "react";
 
 type GroupState = {
   _id: string;
@@ -125,6 +126,10 @@ export default function GroupDashboard() {
   const [activeSection, setActiveSection] = useState("itinerary");
   const [paymentRequestsRefresh, setPaymentRequestsRefresh] = useState(0);
 
+  const [syncVersion, setSyncVersion] = useState(0);
+
+  const activeAbortController = useRef<AbortController | null>(null);
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
@@ -163,6 +168,7 @@ export default function GroupDashboard() {
   } = useGroupItineraryOffline({
     groupId,
     itinerarySectionOpen: activeSection === "itinerary",
+    refreshKey: syncVersion,
   });
 
   const tripIdInQuery = searchParams.get("tripId");
@@ -187,6 +193,13 @@ export default function GroupDashboard() {
 
   const fetchGroup = useCallback(async () => {
     if (!groupId) return;
+
+    if (activeAbortController.current) {
+      activeAbortController.current.abort();
+    }
+    const controller = new AbortController();
+    activeAbortController.current = controller;
+
     const looksOffline =
       !isOnline ||
       (typeof navigator !== "undefined" && navigator.onLine === false);
@@ -230,7 +243,8 @@ export default function GroupDashboard() {
         setGroup(data.group);
         cacheGroupShell(groupId, data.group);
       }
-    } catch {
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
       const cached = readGroupShell<GroupState>(groupId);
       if (
         cached &&
@@ -243,7 +257,9 @@ export default function GroupDashboard() {
         setError("Failed to load group.");
       }
     } finally {
-      setLoading(false);
+      if (activeAbortController.current === controller) {
+        setLoading(false);
+      }
     }
   }, [groupId, router, isOnline]);
 
@@ -310,6 +326,12 @@ export default function GroupDashboard() {
       return;
     }
     void refreshTripItinerary();
+
+    return () => {
+      if (activeAbortController.current) {
+        activeAbortController.current.abort();
+      }
+    };
   }, [groupId, tripActive, activeSection, refreshTripItinerary]);
 
   useEffect(() => {
@@ -424,6 +446,25 @@ export default function GroupDashboard() {
     await navigator.clipboard.writeText(data.shareURL);
   };
 
+  const handleGlobalRefresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setSyncVersion((v) => v + 1);
+      // 1. fetch the main group metadata (members, budget, etc)
+      await fetchGroup();
+      // 2. tell the offline hook to pull the latest itinerary
+      await refreshTripItinerary();
+      // 3. update friends list
+      await fetchFriends();
+      // 4. trigger any local state keys (like for payments)
+      setPaymentRequestsRefresh((prev) => prev + 1);
+    } catch (err) {
+      console.error("refresh failed", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchGroup, refreshTripItinerary, fetchFriends]);
+
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-bb-surface-subtle">
@@ -460,7 +501,7 @@ export default function GroupDashboard() {
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-6 lg:px-10 py-6 lg:py-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Link href="/dashboard">
@@ -489,6 +530,33 @@ export default function GroupDashboard() {
           </div>
         </div>
 
+        {(tripActive || isOffline) && (
+          <div className="flex-1 max-w-2xl">
+            <ItineraryOfflineControls
+              isOnline={!isOffline}
+              userHasOfflineSave={userHasOfflineSave}
+              savedAt={savedAt}
+              lastSyncedAt={lastSyncedAt}
+              tripPlanError={tripPlanError}
+              hasTripContent={!!groupTripDetail}
+              idbSupported={idbSupported}
+              itinerarySyncState={itinerarySyncState}
+              offlineActionBusy={offlineActionBusy}
+              tripPlanLoading={tripPlanLoading}
+              onSaveForOffline={() => {
+                void (async () => {
+                  await saveForOffline();
+                  if (groupId && group) {
+                    cacheGroupShell(groupId, group);
+                  }
+                })();
+              }}
+              onRemoveOffline={() => void removeLocalItineraryCopy()}
+              onRetrySync={() => void refreshTripItinerary()}
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-bb-surface border border-bb-border px-5 py-2.5 rounded-2xl shadow-sm">
             <div
@@ -512,9 +580,9 @@ export default function GroupDashboard() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="bottom"
-                align="start"
+                align="end"
                 sideOffset={8}
-                avoidCollisions={false}
+                avoidCollisions={true}
                 className="w-52 rounded-2xl p-2 shadow-lg border border-bb-border bg-white"
               >
                 <DropdownMenuItem
@@ -555,7 +623,7 @@ export default function GroupDashboard() {
         <Sheet open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <SheetContent
             side="right"
-            className="bg-bb-surface border-l border-bb-border p-0 flex flex-col w-160 max-w-md rounded-2xl"
+            className="bg-bb-surface border-l border-bb-border p-0 flex flex-col w-full sm:w-160 max-w-md rounded-2xl"
           >
             <VisuallyHidden>
               <SheetTitle>
@@ -652,8 +720,8 @@ export default function GroupDashboard() {
         </Sheet>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <nav className="bg-bb-surface border border-bb-border rounded-4xl p-2 flex gap-1 shadow-sm w-full overflow-x-auto scrollbar-none">
+      <div className="flex gap-6 items-start">
+        <nav className="bg-bb-surface border border-bb-border rounded-3xl p-3 flex flex-col gap-1 shadow-sm w-64 shrink-0 sticky top-24">
           <TabButton
             active={activeSection === "overview"}
             onClick={() => setActiveSection("overview")}
@@ -733,30 +801,6 @@ export default function GroupDashboard() {
           {activeSection === "itinerary" && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
               <section className="space-y-6 flex-1">
-                {tripActive || isOffline ? (
-                  <ItineraryOfflineControls
-                    isOnline={!isOffline}
-                    userHasOfflineSave={userHasOfflineSave}
-                    savedAt={savedAt}
-                    lastSyncedAt={lastSyncedAt}
-                    tripPlanError={tripPlanError}
-                    hasTripContent={!!groupTripDetail}
-                    idbSupported={idbSupported}
-                    itinerarySyncState={itinerarySyncState}
-                    offlineActionBusy={offlineActionBusy}
-                    tripPlanLoading={tripPlanLoading}
-                    onSaveForOffline={() => {
-                      void (async () => {
-                        await saveForOffline();
-                        if (groupId && group) {
-                          cacheGroupShell(groupId, group);
-                        }
-                      })();
-                    }}
-                    onRemoveOffline={() => void removeLocalItineraryCopy()}
-                    onRetrySync={() => void refreshTripItinerary()}
-                  />
-                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-3 px-2">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
@@ -805,11 +849,12 @@ export default function GroupDashboard() {
                   <CalendarEventsPanel
                     groupId={groupId!}
                     groupName={group.groupName}
+                    groupData={group}
+                    refreshKey={syncVersion}
                     canPublishItinerary={
                       userRole === "Leader" || userRole === "Admin"
                     }
                     canEdit={userRole === "Leader" || userRole === "Admin"}
-                    isLeader={userRole === "Leader" || userRole === "Admin"}
                     onTripPlanSynced={() => void refreshTripItinerary()}
                   />
                 </div>
@@ -817,7 +862,7 @@ export default function GroupDashboard() {
 
               <section className="space-y-6 flex-1">
                 <div className="flex items-center gap-3 px-2">
-                  <div className="p-3 bg-pink-50 rounded-xl text-pink-600">
+                  <div className="p-3 bg-pink-100 dark:bg-pink-900/30 rounded-xl text-pink-600 dark:text-pink-400">
                     <Heart size={24} />
                   </div>
                   <h2 className="text-3xl font-black text-bb-text tracking-tight">
@@ -1144,7 +1189,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl transition-all duration-200 font-bold text-sm ${
+      className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all duration-200 font-bold text-base ${
         active
           ? "bg-linear-to-r from-bb-brand to-bb-brand-to text-white shadow-lg shadow-amber-100"
           : "text-bb-text-muted hover:bg-bb-surface-subtle hover:text-bb-text-sub"

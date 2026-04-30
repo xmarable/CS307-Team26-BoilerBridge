@@ -5,6 +5,7 @@ import { Search, LogOut, Settings, CheckCircle2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { NotificationBell } from "./NotificationBell";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,12 +15,28 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+const navItems = [
+  { name: "My Trips", href: "/dashboard" },
+  { name: "Groups", href: "/dashboard/groups" },
+  { name: "All Trips", href: "/dashboard/alltrips" },
+  { name: "Public Feed", href: "/dashboard/public-itineraries" },
+  { name: "Friends", href: "/dashboard/friends" },
+  { name: "Discover", href: "/dashboard/discover" },
+  { name: "Activities", href: "/dashboard/activities" },
+  { name: "Settings", href: "/dashboard/profile" },
+];
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function Navbar({ session }: { session?: any }) {
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
   const user = session?.user;
 
-  // logic: wait until client-side hydration is done to show user-specific stuff lol
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -30,10 +47,11 @@ export function Navbar({ session }: { session?: any }) {
   const isVerified = user?.isStudentVerified;
 
   return (
-    <header className="bg-bb-surface border-b border-bb-border sticky top-0 z-40 w-full h-18.25 flex items-center">
-      <div className="w-full px-6 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="flex items-center gap-2">
+    <header className="bg-bb-surface border-b border-bb-border sticky top-0 z-40 w-full">
+      {/* Top row: logo, search, actions */}
+      <div className="w-full px-6 flex items-center justify-between h-14">
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">B</span>
             </div>
@@ -41,7 +59,7 @@ export function Navbar({ session }: { session?: any }) {
               BoilerBridge
             </span>
           </Link>
-          <div className="hidden md:block relative w-96">
+          <div className="hidden md:block relative w-80">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
               size={18}
@@ -133,6 +151,26 @@ export function Navbar({ session }: { session?: any }) {
           )}
         </div>
       </div>
+
+      {/* Nav row */}
+      <nav className="w-full px-4 flex items-end gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-t border-bb-border/40">
+        {navItems.map((item) => {
+          const active = isNavActive(pathname, item.href);
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                active
+                  ? "border-amber-500 text-amber-600 dark:text-amber-400"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
+              }`}
+            >
+              {item.name}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }

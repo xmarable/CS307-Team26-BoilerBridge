@@ -178,7 +178,9 @@ function EditTripPageContent() {
       } else {
         const n = Number(bMinRaw);
         if (Number.isNaN(n) || n < 0) {
-          setError("Budget range minimum must be a non‑negative number or empty.");
+          setError(
+            "Budget range minimum must be a non‑negative number or empty.",
+          );
           setSaving(false);
           return;
         }
@@ -189,7 +191,9 @@ function EditTripPageContent() {
       } else {
         const n = Number(bMaxRaw);
         if (Number.isNaN(n) || n < 0) {
-          setError("Budget range maximum must be a non‑negative number or empty.");
+          setError(
+            "Budget range maximum must be a non‑negative number or empty.",
+          );
           setSaving(false);
           return;
         }
@@ -200,7 +204,9 @@ function EditTripPageContent() {
         typeof budgetMaxPayload === "number" &&
         budgetMaxPayload < budgetMinPayload
       ) {
-        setError("Budget range maximum must be greater than or equal to minimum.");
+        setError(
+          "Budget range maximum must be greater than or equal to minimum.",
+        );
         setSaving(false);
         return;
       }
@@ -272,7 +278,7 @@ function EditTripPageContent() {
   if (loading) {
     return (
       <div className="max-w-xl mx-auto p-4 md:p-8">
-        <p className="text-gray-500">Loading trip…</p>
+        <p className="text-bb-text-muted">Loading trip…</p>
       </div>
     );
   }
@@ -299,7 +305,12 @@ function EditTripPageContent() {
   return (
     <div className="max-w-xl mx-auto p-4 md:p-8">
       <div className="mb-4">
-        <Button variant="ghost" size="sm" className="gap-1 -ml-2 text-gray-700" asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 -ml-2 text-bb-text-sub"
+          asChild
+        >
           <Link href={backHref}>
             <ChevronLeft className="h-4 w-4" />
             {returnGroup ? "Back to itinerary" : "Back to all trips"}
@@ -307,7 +318,7 @@ function EditTripPageContent() {
         </Button>
       </div>
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-bb-text">
           {returnGroup ? "Edit trip preferences" : "Edit trip"}
         </h1>
         <Link href={backHref}>
@@ -626,7 +637,9 @@ function EditTripPageContent() {
             page so Spark itinerary generation can include them.
           </p>
           {(trip.mustHaves ?? []).length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">None yet for this group.</p>
+            <p className="text-sm text-gray-400 py-2">
+              None yet for this group.
+            </p>
           ) : (
             <ul className="space-y-2 text-sm mb-4">
               {(trip.mustHaves ?? []).map((m) => (
@@ -636,15 +649,25 @@ function EditTripPageContent() {
                 >
                   <span className="font-medium text-gray-900">{m.name}</span>
                   {m.status && (
-                    <span className="text-xs uppercase text-gray-500">{m.status}</span>
+                    <span className="text-xs uppercase text-gray-500">
+                      {m.status}
+                    </span>
                   )}
                 </li>
               ))}
             </ul>
           )}
           {trip.groupID ? (
-            <Button type="button" variant="outline" size="sm" className="rounded-xl" asChild>
-              <Link href={`/dashboard/groups/${encodeURIComponent(trip.groupID)}`}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              asChild
+            >
+              <Link
+                href={`/dashboard/groups/${encodeURIComponent(trip.groupID)}`}
+              >
                 Manage must-haves on group
               </Link>
             </Button>
@@ -682,7 +705,9 @@ export default function EditTripPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-xl mx-auto p-8 text-gray-600">Loading preferences…</div>
+        <div className="max-w-xl mx-auto p-8 text-gray-600">
+          Loading preferences…
+        </div>
       }
     >
       <EditTripPageContent />

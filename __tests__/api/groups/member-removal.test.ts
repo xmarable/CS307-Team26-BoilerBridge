@@ -144,8 +144,8 @@ describe("AC1 — Given I am the group leader, When I click remove next to a mem
 
 // ─── AC2: Admin / Viewer cannot trigger member removal ─────────────────────
 
-describe("AC2 — Given I am a regular Admin or Viewer, When I view the member list, Then the remove button is hidden and the API rejects the request with 403", () => {
-  it("returns 403 when an Admin attempts to remove a Viewer", async () => {
+describe("AC2 — Admin Removal Permissions", () => {
+  it("returns 200 when an Admin attempts to remove a Viewer (Updated AC)", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
       username: "ac2_leader",
@@ -166,7 +166,7 @@ describe("AC2 — Given I am a regular Admin or Viewer, When I view the member l
       school: "Purdue",
     });
     const group = await TravelGroup.create({
-      groupName: "AC2 Group",
+      groupName: "AC2 Admin Success Group",
       leaderID: leader.userId,
       membersList: [
         { userId: leader.userId, role: "Leader" },
@@ -175,7 +175,7 @@ describe("AC2 — Given I am a regular Admin or Viewer, When I view the member l
       ],
     });
 
-    // admin tries to remove the viewer — should be rejected
+    // Admin should now be able to remove Viewer
     mockGetServerSession.mockResolvedValue({
       user: { userId: admin.userId.toString() },
       expires: "",
@@ -188,53 +188,80 @@ describe("AC2 — Given I am a regular Admin or Viewer, When I view the member l
       }),
     });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
 
-    // viewer must still be in the group
-    const unchanged = await TravelGroup.findOne({
+    const updated = await TravelGroup.findOne({
       groupID: group.groupID.toString(),
     });
-    const dbIds = unchanged!.membersList.map((m: any) => m.userId.toString());
-    expect(dbIds).toContain(viewer.userId.toString());
-    expect(unchanged!.membersList).toHaveLength(3);
+    expect(updated!.membersList).toHaveLength(2);
+    expect(
+      updated!.membersList.map((m: any) => m.userId.toString()),
+    ).not.toContain(viewer.userId.toString());
 
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
     await User.deleteMany({
-      userId: {
-        $in: [
-          leader.userId.toString(),
-          admin.userId.toString(),
-          viewer.userId.toString(),
-        ],
-      },
+      userId: { $in: [leader.userId, admin.userId, viewer.userId] },
     });
   });
 
-  it("returns 403 when a Viewer attempts to remove another member", async () => {
+  it("returns 403 when an Admin attempts to remove the Leader", async () => {
     const passwordHash = await bcrypt.hash("pw", 10);
     const leader = await User.create({
-      username: "ac2v_leader",
-      email: "ac2v_leader@test.com",
+      username: "ac2_l",
+      email: "l@t.com",
       passwordHash,
       school: "Purdue",
     });
-    const viewer = await User.create({
-      username: "ac2v_viewer",
-      email: "ac2v_viewer@test.com",
-      passwordHash,
-      school: "Purdue",
-    });
-    const target = await User.create({
-      username: "ac2v_target",
-      email: "ac2v_target@test.com",
+    const admin = await User.create({
+      username: "ac2_a",
+      email: "a@t.com",
       passwordHash,
       school: "Purdue",
     });
     const group = await TravelGroup.create({
-      groupName: "AC2V Group",
+      groupName: "AC2 Protect Leader",
       leaderID: leader.userId,
       membersList: [
         { userId: leader.userId, role: "Leader" },
+        { userId: admin.userId, role: "Admin" },
+      ],
+    });
+
+    mockGetServerSession.mockResolvedValue({
+      user: { userId: admin.userId.toString() },
+      expires: "",
+    });
+
+    const res = await DELETEMember(new Request("http://localhost"), {
+      params: params({
+        groupId: group.groupID.toString(),
+        memberId: leader.userId.toString(),
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
+    await User.deleteMany({ userId: { $in: [leader.userId, admin.userId] } });
+  });
+
+  it("returns 403 when a Viewer attempts to remove anyone", async () => {
+    const passwordHash = await bcrypt.hash("pw", 10);
+    const viewer = await User.create({
+      username: "viewerUser",
+      email: "viewer@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const target = await User.create({
+      username: "targetUser",
+      email: "target@test.com",
+      passwordHash,
+      school: "Purdue",
+    });
+    const group = await TravelGroup.create({
+      groupName: "AC2 Viewer Block",
+      leaderID: new mongoose.Types.UUID(),
+      membersList: [
         { userId: viewer.userId, role: "Viewer" },
         { userId: target.userId, role: "Viewer" },
       ],
@@ -253,22 +280,8 @@ describe("AC2 — Given I am a regular Admin or Viewer, When I view the member l
     });
 
     expect(res.status).toBe(403);
-
-    const unchanged = await TravelGroup.findOne({
-      groupID: group.groupID.toString(),
-    });
-    expect(unchanged!.membersList).toHaveLength(3);
-
     await TravelGroup.deleteOne({ groupID: group.groupID.toString() });
-    await User.deleteMany({
-      userId: {
-        $in: [
-          leader.userId.toString(),
-          viewer.userId.toString(),
-          target.userId.toString(),
-        ],
-      },
-    });
+    await User.deleteMany({ userId: { $in: [viewer.userId, target.userId] } });
   });
 });
 

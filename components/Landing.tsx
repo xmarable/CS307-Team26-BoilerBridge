@@ -14,7 +14,7 @@ interface LandingProps {
 
 export function Landing({ user }: LandingProps) {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-bb-surface">
       <main>
         <Hero user={user} />
         <Features />
